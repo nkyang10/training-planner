@@ -12,7 +12,8 @@ for, what may it touch, and what has to be true before it merges" without openin
 
 The branch model itself -- layering, naming, stacking, protection -- lives in
 [branching-and-github.md](../branching-and-github.md). This directory is only the instance: the
-actual tree we intend to work in.
+actual tree we intend to work in. A brief may not invent a field name: names are decided once in
+[contract-vocabulary.md](../contract-vocabulary.md) and cited from here.
 
 ## The tree
 

@@ -54,9 +54,16 @@ the check, as this section promised it would.
    mapping between them; a caller never hand-writes the other namespace's spelling, because a
    hand-made mapping is where the same field starts meaning two things. Enum *values* on the wire are
    kebab-case (`move-session`), except identifiers copied verbatim from another namespace — a metric
-   key like `load_sRPE`, or a heuristic anchor like `review-triggers.yaml#freeze_days` — which must
+   key like `load_sRPE`, or a heuristic anchor like `heuristics/review-triggers.yaml#freeze_window_days` — which must
    declare themselves with `x-verbatim-enum-values` so the exception is visible inside the contract
    rather than being silent drift.
+    The rule fixes *how* to spell a name once a namespace is chosen; it cannot decide *which* namespace
+    a name belongs to, and on 2026-11-04 the four namespaces disagreed in seventeen measured places —
+    fourteen of naming, three of what a control actually enforces: the
+    safety tier spelling, the name of a diff's change kind, what a day's status means. Those
+    disagreements are recorded with their evidence and decided once in
+    [contract-vocabulary.md](../docs/engineering/contract-vocabulary.md), which also lists what no gate
+    checks yet. A new disagreement found while working is added there before it is patched locally.
    Two of the five contracts had drifted into snake_case keys before this rule existed, and they are
    the two whose names appear in UI code. They were renamed on 2026-11-03, when no stored payload
    exists yet: this is a search-and-replace today and a migration with a replay fixture after the
