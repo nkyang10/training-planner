@@ -19,7 +19,7 @@ jobs:
     outputs:
       app: ${{ steps.check.outputs.app }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: check
         run: |
           if [ -f package.json ] || ls apps/*/package.json >/dev/null 2>&1; then
@@ -32,8 +32,17 @@ jobs:
   knowledge:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { fetch-depth: 0 }
+
+      - name: No personal absolute paths in the tooling
+        shell: pwsh
+        run: |
+          # The corpus audit once hardcoded the laptop it was written on and passed locally,
+          # failed on the runner. A tool that knows where the repository is cannot fail that way.
+          $hits = Get-ChildItem -Path tools -Recurse -File | Select-String -Pattern 'C:\\Users[\\/]|/home/[a-z]'
+          if ($hits) { $hits | ForEach-Object { "::error file=$($_.Path) line=$($_.LineNumber)::hardcoded personal path: $($_.Line.Trim())" }; exit 1 }
+          'Tooling paths are relative to the repository.'
 
       - name: Corpus integrity (anchors, yaml files, source ids, dead links)
         shell: pwsh
@@ -41,7 +50,7 @@ jobs:
           $out = & ./tools/audit-links.ps1 | Tee-Object -FilePath audit.txt
           $text = $out -join "`n"
           $bad = @()
-          foreach ($k in 'MISSING ANCHORS', 'MISSING YAML FILES', 'BAD SOURCE IDS', 'DEAD LINKS') {
+          foreach ($k in 'MISSING ANCHORS', 'MISSING YAML FILES', 'BAD SOURCE IDS', 'DEAD LINKS', 'UNTRACKED TARGETS', 'UNCOMMITTED CORPUS FILES') {
             if ($text -match "$k`:\s*(\d+)") {
               if ([int]$Matches[1] -ne 0) { $bad += "$k = $($Matches[1])" }
             } else { $bad += "$k not reported by the audit" }
@@ -54,11 +63,12 @@ jobs:
         run: |
           $strict = New-Object System.Text.UTF8Encoding($false, $true)
           $fail = 0
-          Get-ChildItem -Recurse -Include *.json -File | Where-Object { $_.FullName -notmatch 'node_modules' } | ForEach-Object {
+          Get-ChildItem -Path . -Recurse -Include *.json -File | Where-Object { $_.FullName -notmatch 'node_modules' } | ForEach-Object {
+            $name = $_.FullName
             try {
-              $null = $strict.GetString([System.IO.File]::ReadAllBytes($_.FullName))
-              $_.FullName | Get-Content -Raw -Encoding utf8 | ConvertFrom-Json | Out-Null
-            } catch { "::error::${_}: $($_.Exception.Message)"; $fail = 1 }
+              $bytes = [System.IO.File]::ReadAllBytes($name)
+              $strict.GetString($bytes) | ConvertFrom-Json | Out-Null
+            } catch { "::error::${name}: $($_.Exception.Message)"; $fail = 1 }
           }
           exit $fail
 
@@ -101,10 +111,10 @@ jobs:
     if: needs.detect.outputs.app == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with: { version: 10 }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint

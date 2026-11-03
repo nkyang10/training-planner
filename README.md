@@ -58,6 +58,7 @@ Conflating them is why adaptive apps feel either useless ("nothing changed") or 
 |---|---|---|
 | `README.md` | this map | — |
 | `AGENTS.md` | rules for humans and AI agents working here | yes |
+| `CONTRIBUTING.md` | how work is planned, branched and reviewed; what this repo refuses | [branching-and-github.md](docs/engineering/branching-and-github.md) |
 | `docs/vision/` | what we are building, for whom, and what we refuse to do | [product-vision.md](docs/vision/product-vision.md) |
 | `docs/architecture/` | components, tenancy/isolation, integrations, stack | [system-overview.md](docs/architecture/system-overview.md) |
 | `docs/engine/` | the brain: planner, feedback loop, review policy, safety | [planner-engine.md](docs/engine/planner-engine.md) |
@@ -65,6 +66,8 @@ Conflating them is why adaptive apps feel either useless ("nothing changed") or 
 | `docs/ux/` | screens, calendar interaction, comment microcopy | [screens.md](docs/ux/screens.md) |
 | `docs/adr/` | decisions and why they were made (append-only) | [README](docs/adr/README.md) |
 | `docs/roadmap/` | milestones and backlog | [milestones.md](docs/roadmap/milestones.md) |
+| `docs/review/` | dated self-reviews of the whole design, written from the runner's seat | [2026-11-03 5W1H review](docs/review/2026-11-03-enduser-5w1h-review.md) |
+| `docs/engineering/` | branch model, CI gates, per-branch briefs | [branches/README.md](docs/engineering/branches/README.md) |
 | `knowledge/` | **long-term domain memory** — physiology, periodization, signals, personas, workout library, machine-readable heuristics | [knowledge/INDEX.md](knowledge/INDEX.md) + [MAINTENANCE.md](knowledge/MAINTENANCE.md) |
 | `research/` | dated, immutable research drops; never edited after the fact | `research/2026-11-03-foundation/` |
 | `schemas/` | machine contracts: JSON Schema + SQL DDL | `schemas/json/` |
@@ -98,5 +101,7 @@ prose file, a source grade, and a golden test — see
 | Domain knowledge base | seeding now (physiology, metrics, periodization, personas, feedback, safety, heuristics) |
 | System design | written: engine, data model, tenancy, integrations, UI |
 | Machine contracts | drafted: `schemas/` |
+| Self-review | 2026-11-03: three personas walked the design end to end, 10 findings, 2 launch blockers (F1 prompt policy, F2 session duration) |
+| Development setup | [github.com/nkyang10/training-planner](https://github.com/nkyang10/training-planner), public; `main` plus the 14-branch tree is pushed, and labels, milestones, branch protection (`knowledge` required, 1 approving review) and the merge styles are each read back from the API by `tools/github-setup.ps1`, which must print `SETUP VERIFIED` |
 | Code | not started — M1 is a headless planner core with golden tests |
 | Verified external constraints | Strava developer terms verified 2026-11-03; Garmin access **not verified** (see [integrations.md](docs/architecture/integrations.md)) |
