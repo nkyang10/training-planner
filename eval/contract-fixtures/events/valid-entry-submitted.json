@@ -1,0 +1,12 @@
+{
+  "eventId": "3f2b6c1e-0000-4000-8000-0000000000c1",
+  "userId": "3f2b6c1e-0000-4000-8000-000000000001",
+  "type": "entry.submitted",
+  "occurredAt": "2026-11-04T00:30:00.000Z",
+  "actor": "runner",
+  "payloadVersion": 1,
+  "payload": { "day": "2026-11-04", "outcome": "completed" },
+  "trainingDay": "2026-11-04",
+  "timezone": "Asia/Taipei",
+  "idempotencyKey": "tap-2026-11-04-0730"
+}

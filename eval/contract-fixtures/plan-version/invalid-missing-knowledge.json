@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "versionId": "3f2b6c1e-0000-4000-8000-0000000000a1",
+  "planId": "3f2b6c1e-0000-4000-8000-0000000000d1",
+  "userId": "3f2b6c1e-0000-4000-8000-000000000001",
+  "parentVersionId": null,
+  "generatedBy": "initial-build",
+  "generatedAtDay": "2026-11-03",
+  "firstDay": "2026-11-04",
+  "lastDay": "2026-12-15",
+  "plannerVersion": "0.1.0",
+  "inputsHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "sessions": [
+    { "day": "2026-11-04", "kind": "easy", "outcome": "planned", "restDay": false, "summaryText": "easy 8 km" }
+  ],
+  "appliedRules": [],
+  "clampedKnobs": [],
+  "assumptions": [],
+  "warnings": []
+}

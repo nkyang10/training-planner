@@ -116,6 +116,29 @@ jobs:
           }
           'Vocabulary gate clean.'
 
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      - name: Contract instances (valid must validate, invalid must not)
+        shell: pwsh
+        run: |
+          # Item 23 of docs/engineering/contract-vocabulary.md: until this step existed, every
+          # contract here was parsed and compared and never run, so a contract could be true as a
+          # document and wrong as a gate. Fixtures live in eval/contract-fixtures/, one directory
+          # per contract; the file name decides the expectation (valid-* must validate, invalid-*
+          # must not). Coverage is part of the gate: a contract with no fixture directory, or a
+          # directory with no negative case, fails - a schema that accepts everything cannot pass
+          # as though it accepted the right things.
+          python -m pip install --quiet --disable-pip-version-check jsonschema
+          $out = & python tools/validate-contracts.py 2>&1 | Tee-Object -FilePath contract-instances.txt
+          $text = $out -join "`n"
+          $text
+          if ($text -notmatch 'RESULT: OK') {
+            "::error::a contract and its fixture disagree, or fixture coverage is missing"
+            exit 1
+          }
+          'Contract instances clean.'
+
       - name: Heuristics are valid YAML with range + confidence + sources
         continue-on-error: false
         run: |

@@ -47,7 +47,11 @@ the check, as this section promised it would.
    Postgres 16 inside a transaction it then rolls back, applies it again for real, and reads the
    isolation claims back out of the catalog with [check-claims.sql](../tools/check-claims.sql). A
    sketch nobody can execute drifts quietly: this file has already carried two purge bugs that were
-   silent successes on paper and only showed up against a live server.
+   silent successes on paper and only showed up against a live server. The same standard now applies
+   to the JSON contracts: `tools/validate-contracts.py` validates one instance per schema from
+   `eval/contract-fixtures/`, and every contract must also carry at least one deliberately invalid
+   instance that the validator rejects — a schema that accepts everything cannot pass as though it
+   accepted the right things.
 7. **Three namespaces, three spellings, no hand-mapping.** JSON contract keys are `camelCase`
    (`firstTouchedDay`), SQL columns are `snake_case` (`first_touched_day`), and knowledge knobs keep
    the `snake_case` they are written in inside `knowledge/heuristics/*.yaml`. Codegen owns the

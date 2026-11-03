@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "reviewId": "3f2b6c1e-0000-4000-8000-0000000000d1",
+  "userId": "3f2b6c1e-0000-4000-8000-000000000001",
+  "openedAtDay": "2026-11-04",
+  "evidence": { "signalIds": ["s"], "ruleIds": ["r"], "evidenceGradeMax": "B" },
+  "horizonDays": 14,
+  "options": [
+    { "optionId": "0", "labelKey": "k", "keepAsIs": true, "diffId": null, "costSummary": "c", "expiresAfterDay": "2026-11-18" }
+  ],
+  "status": "declined"
+}

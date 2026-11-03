@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "diffId": "3f2b6c1e-0000-4000-8000-0000000000b1",
+  "userId": "3f2b6c1e-0000-4000-8000-000000000001",
+  "fromVersionId": "3f2b6c1e-0000-4000-8000-0000000000a1",
+  "toVersionId": "3f2b6c1e-0000-4000-8000-0000000000a2",
+  "createdAtDay": "2026-11-04",
+  "changes": [
+    {
+      "kind": "distance.changed",
+      "day": "2026-11-07",
+      "beforeSummary": "long run 14 km",
+      "afterSummary": "long run 18 km",
+      "reason": "a safety rule may not add load",
+      "signalId": "load_sRPE:ramp_rate",
+      "expectedCost": "more load, which is the point of the refusal",
+      "knobsUsed": ["load-progression.yaml#weekly_increment_pct"],
+      "isSafety": true
+    }
+  ],
+  "changeCountWithinLimit": true,
+  "knowledgeHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
