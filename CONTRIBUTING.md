@@ -3,7 +3,10 @@
 Start with [AGENTS.md](AGENTS.md) (eight hard rules) and [knowledge/INDEX.md](knowledge/INDEX.md)
 (what the corpus contains and what it admits it does not). Then
 [docs/engineering/branching-and-github.md](docs/engineering/branching-and-github.md) for how a branch
-is named, stacked, reviewed and merged.
+is named, stacked, reviewed and merged. When two contracts spell the same thing differently — a tier,
+a change kind, a day's status — the decision is already recorded in
+[docs/engineering/contract-vocabulary.md](docs/engineering/contract-vocabulary.md); add to it before
+inventing a third spelling.
 
 ## Pick up work
 

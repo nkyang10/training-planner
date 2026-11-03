@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 ---
 
 # Calendar, timezones, and the definition of "today"
@@ -46,7 +46,11 @@ On `availability.changed` with a `travel` intent (or from the trip form: from/to
    is what carries the training stress; clock time is incidental.
 2. **Jet-lag-aware placement**: for trips crossing ≥ 4 zones, the first 2 days get easy/short
    options and no interval session is placed in the first 48 h after arrival; a treadmill or short
-   repeats alternate is offered. (`missed-session-rules.yaml#travel-*`)
+   repeats alternate is offered. (`heuristics/missed-session-rules.yaml#swap_window_days` and
+   `heuristics/missed-session-rules.yaml#race_week_no_long_run_swap_days` move a session inside the
+   week; neither knows what a time zone is. The zone-crossing thresholds above are design intent,
+   with no codified rule yet: they are row 11 of the **Now** table
+   (`travel week shift`) in [roadmap/backlog.md](../roadmap/backlog.md).)
 3. Entries logged abroad are stamped with the **zone at the time of the activity** (`entry.submitted`
    carries `tz_at_event`), so a 06:00 Berlin run lands on the Berlin training day, not the Taipei one.
 4. Race travel is special: the race-day session is immovable, everything before it compresses, and

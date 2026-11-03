@@ -67,10 +67,10 @@ Conflating them is why adaptive apps feel either useless ("nothing changed") or 
 | `docs/adr/` | decisions and why they were made (append-only) | [README](docs/adr/README.md) |
 | `docs/roadmap/` | milestones and backlog | [milestones.md](docs/roadmap/milestones.md) |
 | `docs/review/` | dated self-reviews of the whole design, written from the runner's seat | [2026-11-03 5W1H review](docs/review/2026-11-03-enduser-5w1h-review.md) |
-| `docs/engineering/` | branch model, CI gates, per-branch briefs | [branches/README.md](docs/engineering/branches/README.md) |
+| `docs/engineering/` | branch model, CI gates, contract vocabulary, per-branch briefs | [branches/README.md](docs/engineering/branches/README.md) · [contract-vocabulary.md](docs/engineering/contract-vocabulary.md) |
 | `knowledge/` | **long-term domain memory** — physiology, periodization, signals, personas, workout library, machine-readable heuristics | [knowledge/INDEX.md](knowledge/INDEX.md) + [MAINTENANCE.md](knowledge/MAINTENANCE.md) |
 | `research/` | dated, immutable research drops; never edited after the fact | `research/2026-11-03-foundation/` |
-| `schemas/` | machine contracts: JSON Schema + SQL DDL | `schemas/json/` |
+| `schemas/` | machine contracts: JSON Schema + SQL DDL | `schemas/json/` · when two files name the same thing differently, [contract-vocabulary.md](docs/engineering/contract-vocabulary.md) is the record |
 | `eval/golden-plans/` | fixtures: profile in → assertions on the plan out | [eval/README.md](eval/README.md) |
 | `apps/`, `packages/` | future implementation, one README each describing its intended shape | — |
 

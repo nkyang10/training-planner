@@ -362,7 +362,10 @@ create table plan_versions (
   status               text not null default 'draft'
                          check (status in ('draft', 'active', 'superseded', 'archived')),
   planner_version      text not null,
-  knowledge_hash       text not null,          -- the frozen bundle this was built with
+  -- the frozen bundle this was built with. Same CHECK as inputs_hash: this is the column that
+  -- makes a plan explainable years later (AGENTS rule 1), so it must not be able to hold a
+  -- version-looking string. docs/engineering/contract-vocabulary.md item 9.
+  knowledge_hash       text not null check (knowledge_hash ~ '^sha256:[0-9a-f]{64}$'),
   inputs_hash          text not null check (inputs_hash ~ '^sha256:[0-9a-f]{64}$'),
   generated_at_day     date not null,          -- the fact/prescription boundary for this version
   first_day            date not null,
@@ -406,10 +409,10 @@ create table phases (
   primary key (user_id, id),
   foreign key (user_id, plan_version_id) references plan_versions(user_id, id) on delete cascade
 );
--- RENAMED from docs/data/data-model.md's phases(start, end): `end` is a reserved word, so the
--- doc's spelling cannot be typed into a CREATE TABLE without quoting it forever. The
--- _day suffix also says what the values are -- training days, not instants -- which the bare
--- names did not, and matches first_day / last_day on plan_versions.
+-- Why start_day / end_day and not start / end: `end` is a reserved word, so the short spelling
+-- would have to be quoted forever; and the _day suffix says what the value is -- a training day,
+-- not an instant -- which the bare names did not, matching first_day / last_day on plan_versions
+-- (docs/engineering/contract-vocabulary.md item 1).
 
 create table plan_weeks (
   user_id   uuid not null references users(id) on delete cascade,
@@ -422,11 +425,10 @@ create table plan_weeks (
   primary key (user_id, plan_version_id, iso_week_start),
   foreign key (user_id, plan_version_id) references plan_versions(user_id, id) on delete cascade
 );
--- DEVIATION from docs/data/data-model.md, which names these volume_m / longest_run_m.
--- Weekly targets are a planning quantity the runner sees in km; activities keep metres
--- because that is the unit the device speaks. One boundary converts, and the unit is in the
--- column name on both sides. A column whose unit is only implied is how a 10x bug ships
--- (schemas/README.md rule 4).
+-- Why km here and metres on activities: weekly targets are a planning quantity the runner sees in
+-- km; activities keep metres because that is the unit the device speaks. One boundary converts, and
+-- the unit is in the column name on both sides. A column whose unit is only implied is how a 10x bug
+-- ships (schemas/README.md rule 4, docs/engineering/contract-vocabulary.md item 2).
 
 create table session_occurrences (
   user_id        uuid not null references users(id) on delete cascade,
@@ -449,9 +451,13 @@ create table session_occurrences (
 );
 -- A version is dense: one row per day from first_day to last_day, rest included, because
 -- rest is a prescription and a missing row means something else entirely.
--- Vocabulary is still open across four documents (planned|adjusted|cancelled|done here,
--- planned|completed|missed|skipped in the contracts). TODO(m0): one day-status vocabulary,
--- decided in the M0 review and applied to all four places in one change.
+-- Two axes, deliberately not one vocabulary (earlier note here asked for "one day-status
+-- vocabulary in four places"; measuring found four spellings of two different questions):
+--   state          -- what the plan did on this day: planned / adjusted / cancelled / done
+--   day_entries    -- what the runner reported: rest / completed / partial / skipped / missed
+-- Collapsing them loses either `adjusted` (the plan moved, the run still happened) or `partial`
+-- (the run happened, less than prescribed). The wire's plan-day `status` belongs to the second
+-- axis and is renamed `outcome` there. See docs/engineering/contract-vocabulary.md item 8.
 
 create table session_overrides (
   user_id        uuid not null references users(id) on delete cascade,
@@ -519,9 +525,17 @@ create table plan_diff_changes (
   signal_id text,
   primary key (user_id, diff_id, ordinal),
   foreign key (user_id, diff_id) references plan_diffs(user_id, id) on delete cascade,
-  -- AGENTS rule 3 as data: a safety-origin change is subtractive by definition. The list
-  -- below is exactly the subtractive half of change.kind in plan-diff.schema.json. Why a
+  -- AGENTS rule 3 as data: a safety-origin change is subtractive by definition. Why a
   -- CHECK and not a test: a test can be skipped on a Friday; this cannot.
+  -- KNOWN DISAGREEMENT, measured 2026-11-04: this list and the `kind` enum in
+  -- plan-diff.schema.json share no value names (dotted here, seven kebab verbs there), and the
+  -- sentence that used to sit here -- "exactly the subtractive half of change.kind in
+  -- plan-diff.schema.json" -- was false. The wire's coarser change-dose can describe *raising* a
+  -- distance, so a change marked is_safety could increase load and still satisfy this CHECK.
+  -- Decided: the finer dotted list is the single change-kind vocabulary, the subtractive subset is
+  -- declared once as x-subtractive-change-kinds in plan-diff.schema.json, and this list mirrors it.
+  -- Until that lands, the CHECK is the stricter side and nothing writes a wire value here.
+  -- (docs/engineering/contract-vocabulary.md items 7 and R2/R4.)
   -- The two-change cap is deliberately NOT here: it lives on reviews.changes_count, one table
   -- away, where the count is known at write time. A CHECK cannot count sibling rows, so the
   -- honest statement is that the cap is enforced somewhere else, not that it is enforced here.
@@ -580,19 +594,21 @@ create table reviews (
   -- half-written review; the pair has to move together.
   constraint accepted_review_has_a_choice
     check ((status = 'accepted') = (chosen_option_id is not null))
-    -- An acceptance with no chosen option, or an option chosen without a status change, is a
-    -- half-written review; the pair has to move together.
 );
--- DIVERGENCE to resolve in the M0 review: severity here is snake_case ('hard_stop') because
--- SQL enum values are snake_case (schemas/README.md rule 7), while review.schema.json and
--- safety-hard-stops.yaml use kebab ('hard-stop'). The wire spelling must not be rewritten by
--- hand on the way in, so codegen owns it -- but the tier names themselves should be one word
--- in one spelling everywhere. TODO(m0): pick one, then fix whichever side is wrong.
--- RENAMED from docs/data/data-model.md's `trigger` column, and its values are the kebab-case
--- wire values of review.schema.json openedBy, not the doc's user_intent|rule. Two reasons:
--- "trigger" collides with a database trigger in every reader's head, and the wire spelling
--- already chose kebab. docs/data/data-model.md still says `trigger`; this file is the
--- reconciliation and the doc is the next thing to update.
+-- DECIDED 2026-11-04: the tier vocabulary is kebab -- advisory / constraint / hard-stop -- and the
+-- two CHECKs in this file that spell it snake_case are the ones to change (next contracts DDL
+-- change, item R4). The earlier note here justified snake_case by "rule 7 says SQL enum values are
+-- snake_case"; rule 7 says no such thing -- it fixes *key* casing and makes kebab the default for
+-- enum *values*. Measured before deciding: knowledge writes hard-stop on 20 lines across 15 files
+-- and hard_stop on 5 lines in one file, so kebab is the minority of edits and needs no
+-- x-verbatim-enum-values flag on the wire. `hard_stop(...)` as a verb inside a rule's `then:` stays
+-- snake_case: a tier is a noun, an action is a verb, and only the tier crosses into this table
+-- (docs/engineering/contract-vocabulary.md items 5 and 6).
+-- opened_by holds the wire's `openedBy`, which already matched exactly. It is NOT the wire's
+-- `trigger`: that property is an object of evidence (signals, rules, grade, streak) and lands in
+-- rule_id + evidence_snapshot + evidence_hash. The name `trigger` also collides with a database
+-- trigger in every reader's head, which is why there is no column by that name here
+-- (docs/engineering/contract-vocabulary.md item 3).
 -- A review is a *question*, so the row that answers it is here too: chosen_option_id and
 -- runner_reason live on the review rather than in a second table, because there is exactly
 -- one answer per review and a join for that is ceremony.
