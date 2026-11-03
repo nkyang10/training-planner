@@ -56,11 +56,11 @@ run belonged to.
 | `signal.computed` | cache-fill event (low value for audit; kept for reproducibility of a policy run) |
 | `comment.generated` | `ruleId`, `templateId`, `narrator`, `factObject`, `locale`, `guardrailResult` |
 | `comment.feedbackGiven` | "useful / unclear" tap |
-| `review.suggested` | rule fired within budget |
+| `review.triggered` | a rule fired within budget; the review row it creates is `open` from the start (there is no `suggested` state) |
 | `review.opened` | user or system opened it |
 | `review.optionsGenerated` | `options[]`, `costs`, `plannerVersion`, `knowledgeHash` |
 | `review.accepted` | `chosenOptionId`, `changesCount`, `appliedPlanVersionId` |
-| `review.declined` | `runnerReason` — autonomy learning |
+| `review.rejected` | `runnerReason` — autonomy learning; raises that trigger's threshold for 30 d (the runner's refusal, formerly spelled `declined`) |
 | `review.deferred` | `recheckAt` |
 | `review.checkpointed` | outcome verdict, closes the learning loop |
 | `safety.flagRaised` / `.acknowledged` / `.overridden` / `.clinicianClearanceRecorded` | full audit chain |

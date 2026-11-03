@@ -64,7 +64,7 @@ intensity class only; every non-colour state has a glyph and a word (colour-blin
 | `SessionOccurrence` | derived (base + overrides) | shows effective session + "was: …" on demand |
 | `DayEntry` | append-only revisions | correction history visible |
 | `SystemComment` | immutable | never edited in place; a new comment can supersede with a reason |
-| `Review` | stateful (suggested→open→decided→checkpointed) | a decision is never lost; declined reviews stay visible |
+| `Review` | stateful (`open` → `accepted` / `rejected` / `deferred` / `expired` / `superseded` → checkpointed) | a decision is never lost; a rejected review stays visible |
 
 ## Two navigation rules
 

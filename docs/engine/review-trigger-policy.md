@@ -34,14 +34,21 @@ A read-only review matters: "show me the plan and tell me if it still makes sens
 common real coaching request and must not force a change nobody asked for.
 
 ### 1.2 System-triggered
-Defined in `knowledge/heuristics/review-triggers.yaml`. Severity classes:
+Defined in `knowledge/heuristics/review-triggers.yaml`. Every rule carries one of the three tiers —
+`advisory`, `constraint`, `hard-stop` — the same three words as the YAML, the two DDL CHECKs and the
+wire enum, compared by `tools/check-vocabulary.ps1` and decided in
+[contract-vocabulary.md](../engineering/contract-vocabulary.md) items 5 and 6.
 
-| Class | Behaviour | Examples |
+What the runner *sees* is a second question, and it is not a fourth vocabulary: no YAML carries it
+and no code computes it yet — that mapping is M1 work. The four presentation levels below are the
+product intent, ordered by how hard they interrupt:
+
+| Presentation | What the runner sees | Examples |
 |---|---|---|
-| `critical` | interrupts now, safety layer active, cannot be deferred | pain ≥ 7, pain that changes gait, chest pain/syncope, blood in urine, illness with fever below the neck |
-| `high` | review card offered at next open; auto-applies only a *reduction* if the runner doesn't respond within 48 h (and says so) | 3 consecutive red days, 2 missed key sessions in 7 days, sustained HRV/RHR deviation, load step > ceiling, adherence < 50% with rising RPE |
-| `medium` | queued suggestion in the weekly summary | 3-week plateau on the same key session, `rpeGap` drift, monotony above threshold, sleep deficit trend, intensity distribution badly off over 4 weeks |
-| `low` | recorded, no user interruption | pace-vs-prediction mismatch, long-run drift, secondary race added |
+| interrupt now | a blocking card; the safety layer is already active; cannot be deferred | pain ≥ 7, pain that changes gait, chest pain/syncope, blood in urine, illness with fever below the neck |
+| offer at next open | review card offered at next open; auto-applies only a *reduction* if the runner doesn't respond within 48 h (and says so) | 3 consecutive red days, 2 missed key sessions in 7 days, sustained HRV/RHR deviation, load step > ceiling, adherence < 50% with rising RPE |
+| weekly summary | queued suggestion in the weekly summary | 3-week plateau on the same key session, `rpeGap` drift, monotony above threshold, sleep deficit trend, intensity distribution badly off over 4 weeks |
+| recorded only | recorded, no user interruption | pace-vs-prediction mismatch, long-run drift, secondary race added |
 
 Thresholds, windows and debounce live in the YAML with `provenance` and `range` — this file owns the
 *discipline*, the YAML owns the *numbers*, and the numbers only change via a golden-tested rule
@@ -51,15 +58,17 @@ change.
 
 ## 2. Arbitration: when several triggers fire
 
-1. Highest severity wins; same severity ⇒ most specific (body-site pain beats general fatigue).
-2. **Budget**: at most one review per `dwellDays` (default 7) unless `critical`. A second concurrent
-   trigger is merged into the open review as additional evidence, not queued as a second review.
+1. Highest presentation level wins (interrupt now > offer at next open > weekly summary > recorded
+   only); same level ⇒ most specific (body-site pain beats general fatigue).
+2. **Budget**: at most one review per `dwellDays` (default 7) unless the trigger is interrupt-now. A
+   second concurrent trigger is merged into the open review as additional evidence, not queued as a
+   second review.
 3. **Cooldown**: a rejected review of the same trigger family cannot re-fire for `cooldownFactor ×
    dwellDays`, with an escalation path: two consecutive rejections of the same signal ⇒ stop nagging,
    raise the threshold, and surface it in the weekly summary as a standing note the runner can act on.
    (Annoying a runner into ignoring the review card is worse than missing a soft signal.)
-4. `critical` bypasses budget and cooldown, and cannot be produced by more than one safety rule per
-   day (dedupe by site/symptom).
+4. An interrupt-now trigger bypasses budget and cooldown, and cannot be produced by more than one
+   safety rule per day (dedupe by site/symptom).
 
 ---
 

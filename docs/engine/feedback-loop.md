@@ -100,13 +100,13 @@ Rules live in `knowledge/heuristics/*.yaml`, versioned with the knowledge hash, 
 - id: DF-014
   when: status == 'skipped' && reason_intent == 'illness' && (fever == true || symptoms_below_neck == true)
   then: { action: hard_stop, scope: 'until 48h symptom-free', downgrade_remaining_block: true }
-  severity: critical
+  severity: hard-stop          # one of advisory | constraint | hard-stop; the action is in then:
   provenance: knowledge/feedback-and-autoregulation/… ; knowledge/risk-and-safety/…
   confidence: high
 ```
 
 Precedence: `safety-hard-stops` → `missed-session-rules` → `daily-feedback-rules` →
-`load-progression` → `review-triggers`. Conflicts resolve by severity, then by "the more conservative
+`load-progression` → `review-triggers`. Conflicts resolve by tier, then by "the more conservative
 action wins" — a documented, testable rule, because "the engine said two different things about
 tomorrow" is the most trust-destroying bug this product can have.
 

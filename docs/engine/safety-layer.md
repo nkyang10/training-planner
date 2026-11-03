@@ -16,13 +16,19 @@ Rule changes are code changes with golden fixtures.
 
 ## 1. Three tiers
 
-| Tier | Effect on plan | User interaction | Logging |
-|---|---|---|---|
-| `hard_stop` | remaining sessions in scope become rest/recovery; review opened | blocking card, must be acknowledged; **not** dismissible by a single tap | permanent record, exported in the season file |
-| `constrain` | upper bound applied (no intensity above X for N days, no long run, no hills) | inline notice on affected days | change-log entry |
-| `advise` | nothing changes | comment + suggestion | event only |
+The machine vocabulary is three nouns — `advisory`, `constraint`, `hard-stop` — and it is the same
+three words in the YAML, in the `reviews.severity` and `safety_events.tier` CHECKs, and in the wire
+enum; `tools/check-vocabulary.ps1` fails if they drift apart. What the rule *does* is a separate
+word, and it lives in the rule's `then:` (`hard_stop(today)`, `constrain(next_7d: …)`,
+`advise(...)`, `flagReview(...)`) where it stays snake_case. A tier is a noun; an action is a verb.
 
-**Override path.** For `hard_stop`, the runner can choose "I understand, continue anyway" *only*
+| Tier | What it means | Action the rule usually takes | User interaction | Logging |
+|---|---|---|---|---|
+| `hard-stop` | blocking; not dismissible by a single tap | `hard_stop(...)`, sometimes plus `downgrade(...)` or `referral(...)` | blocking card, must be acknowledged; overridable only through an explicit recorded acknowledgement, and never at all when the rule is `non_overridable` | permanent record, exported in the season file |
+| `constraint` | must be honoured; adjustable only with an acknowledgement | `constrain(...)`: an upper bound applied (no intensity above X for N days, no long run, no hills) | inline notice on affected days | change-log entry |
+| `advisory` | a recommendation a human may decline | `advise(...)`, `flagReview(...)`, `comment(...)` | comment + suggestion | event only |
+
+**Override path.** For a `hard-stop`, the runner can choose "I understand, continue anyway" *only*
 where the rule is advisory by nature (e.g. load-step ceiling). Rules tagged `non_overridable`
 (chest pain, syncope, haematuria, suspected bone stress with night pain, fever with below-the-neck
 symptoms, post-concussion) offer no continue button at all — only a referral message and a
