@@ -73,7 +73,7 @@ rules:
     then: "compare to that user's baseline; population percentiles may not appear in user-facing text"
     severity: constraint
     explain: "baselines-individual"
-    note: "language-guardrails.yaml#no-population-shaming is the language half of this rule."
+    note: "language-guardrails.yaml#no_population_shaming is the language half of this rule (knob ids are snake_case; the kebab spelling this note used to carry named nothing)."
 
   - id: no-verdict-before-minimum-data
     when: "valid_days < baseline_min_valid_days"

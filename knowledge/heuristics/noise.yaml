@@ -22,7 +22,7 @@ knobs:
     range: [2, 7]
     unit: days
     confidence: high
-    rationale: "Three consecutive mornings in the same direction is the minimum before an HRV or resting-HR change is treated as a trend (mirrors daily-feedback-rules.yaml#hrv-trend-not-day)."
+    rationale: "Three consecutive mornings in the same direction is the minimum before an HRV or resting-HR change is treated as a trend (mirrors daily-feedback-rules.yaml#consecutive-reading-rule, which is the same rule stated from the comment side)."
     persona_overridable: false
   min_change_to_act_on:
     value: "1.0 × within-person sd (or the metric's own typical error, whichever is larger)"

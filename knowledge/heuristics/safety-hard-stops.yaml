@@ -88,7 +88,7 @@ rules:
     note: "FB-S1: the only established treatment is reduced load. We never claim to diagnose OTS (FB-S5)."
 
   - id: pregnancy-postpartum-lock
-    when: "profile.health.flags includes [pregnant, postpartum] and medical-flags.yaml#lock_phase == true"
+    when: "profile.health.flags includes [pregnant, postpartum] and medical-flags.yaml#pregnancy_postpartum_lock == true"
     then: "lock(phase: maintenance, no_intensity_progression: true); forbid_sessionKinds([vo2Intervals, threshold, race-pace-long]); max_intensity_rpe(7)"
     severity: constraint
     non_overridable: true
