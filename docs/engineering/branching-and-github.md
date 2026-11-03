@@ -42,10 +42,11 @@ main
 └─ chore/ci-and-protection
 ```
 
-Three of these are already history on the remote: `spine/m0-contracts` and its two leaves merged into
-`main` on 2026-11-03, and `delete_branch_on_merge=true` removed the branches when the merges landed. So
-the branch list on GitHub is *work in progress*, never the plan -- the tree above is the plan, and each
-branch's brief in [`branches/`](./branches/) stays on `main` as the record after the ref is gone.
+Some of these are already history on the remote: `spine/m0-contracts` and its two leaves merged into
+`main` on 2026-11-03, and `delete_branch_on_merge=true` removed the refs when the merges landed. The
+same will happen to each branch above as it lands. So the branch list on GitHub is *work in progress*,
+never the plan -- the tree here is the plan, and each branch's brief in [`branches/`](./branches/) stays
+on `main` as the record after the ref is gone.
 
 ## Rules that keep the tree readable
 
