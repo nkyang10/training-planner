@@ -9,20 +9,23 @@ two teams interpret differently is a bug that no test catches.
 schemas/
   json/                     JSON Schema draft 2020-12
     athlete-profile.schema.json    who the runner is (slowly changing, versioned)
-    plan-version.schema.json       an immutable generated plan        (in flight, M0)
+    plan-version.schema.json       an immutable generated plan
     plan-diff.schema.json          the visible delta between two versions
     day-entry.schema.json          the runner's daily feedback
     signal.schema.json             a computed signal with confidence
     review.schema.json             a review, its options, and its outcome
-    events.schema.json             envelope for the append-only event log (in flight, M0)
+    events.schema.json             envelope for the append-only event log
   sql/
-    schema.sql                Postgres DDL sketch: tables, RLS, key constraints (in flight, M0)
+    schema.sql                Postgres DDL sketch: tables, RLS, key constraints
   README.md
 ```
 
-The three marked files are listed because they are the remaining M0 deliverables, not because they
-exist. The directory should not claim contracts it does not have: when the last one lands, the
-marker moves from this list into the CI check that the set is complete (`PENDING CONTRACT FILES`).
+Every name in that tree is a file, and `tools/check-contracts.ps1` prints `PENDING CONTRACT FILES`
+to keep it that way: the counter reads the names out of this page and fails the build when one of
+them is missing. Three of the lines above used to carry an "(in flight, M0)" marker, which is the
+exact failure the counter exists for — a directory advertising a contract nobody has written while a
+reader codes against the list. The set is complete now, so the marker has moved from this page into
+the check, as this section promised it would.
 
 ## Rules
 
@@ -40,7 +43,11 @@ marker moves from this list into the CI check that the set is complete (`PENDING
    schemas keep them distinct and never use sentinel values like `-1`.
 6. `sql/schema.sql` is a **design sketch** that the real Drizzle migrations are generated against and
    reviewed against; it is not run in production. Its job is to make the RLS and constraint decisions
-   reviewable in one file.
+   reviewable in one file — and reviewable here means *runnable*: the `ddl` CI job applies it to a real
+   Postgres 16 inside a transaction it then rolls back, applies it again for real, and reads the
+   isolation claims back out of the catalog with [check-claims.sql](../tools/check-claims.sql). A
+   sketch nobody can execute drifts quietly: this file has already carried two purge bugs that were
+   silent successes on paper and only showed up against a live server.
 7. **Three namespaces, three spellings, no hand-mapping.** JSON contract keys are `camelCase`
    (`firstTouchedDay`), SQL columns are `snake_case` (`first_touched_day`), and knowledge knobs keep
    the `snake_case` they are written in inside `knowledge/heuristics/*.yaml`. Codegen owns the
@@ -58,11 +65,17 @@ marker moves from this list into the CI check that the set is complete (`PENDING
    It checks the draft, that `$id` matches the file's own path, that root metadata is present
    (`title`, `description`, `type: object`, `additionalProperties: false`), that keys are camelCase,
    and that enum values are kebab-case unless declared verbatim. It also prints an
-   undocumented-property count as a **ratchet**: 116 of 226 properties today, allowed to go down and
+   undocumented-property count as a **ratchet**: 113 of 279 properties today, allowed to go down and
    never up, so new fields arrive documented. The script cannot tell a true description from a
    invented one; that half of rule 1 stays a human review. A property named inside `if`/`then`/`else`
    is a condition on a field documented at its declaration, so it is casing-checked but not made to
-   repeat a description that would only drift.
+   repeat a description that would only drift. The count fell from 116 while 53 properties were
+   added, because the two contracts written after this gate arrived documented instead of joining
+   the backlog -- the practical budget for new work is zero. The script also fails the build when a
+   contract named on this page is missing from disk, so the tree above cannot promise a file that
+   nobody has written. The DDL has its own job and its own checker (`tools/check-claims.sql`),
+   because "the schema loads" and "the schema isolates" are different claims, and only the second
+   one is worth a gate.
 
 ## Validation & codegen (intended)
 

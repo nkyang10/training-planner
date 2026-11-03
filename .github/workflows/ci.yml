@@ -1,8 +1,9 @@
 name: ci
 
-# Two jobs. `knowledge` is the hard gate that exists today (the corpus is a build input).
-# `app` is guarded: it skips until code exists, so a red-from-birth check never teaches anyone to
-# ignore CI. It becomes required in branch protection at M1, not before.
+# Three gates. `knowledge` is the corpus as a build input. `ddl` runs the isolation contract on a
+# real Postgres and reads its security claims back. `app` is guarded: it skips until code exists, so
+# a red-from-birth check never teaches anyone to ignore CI. It becomes required in branch protection
+# at M1, not before.
 
 on:
   push:
@@ -72,7 +73,7 @@ jobs:
           }
           exit $fail
 
-      - name: Contract shape (casing, ids, documentation ratchet)
+      - name: Contract shape (casing, ids, documentation ratchet, completeness)
         shell: pwsh
         run: |
           # The contracts are the only place a shape is written down, so a convention that lives only
@@ -80,7 +81,7 @@ jobs:
           $out = & ./tools/check-contracts.ps1 | Tee-Object -FilePath contracts.txt
           $text = $out -join "`n"
           $bad = @()
-          foreach ($k in 'PARSE FAILURES', 'MISSING METADATA', 'BAD ID PATHS', 'SNAKE_CASE PROPERTIES', 'SNAKE_CASE ENUM VALUES') {
+          foreach ($k in 'PARSE FAILURES', 'MISSING METADATA', 'BAD ID PATHS', 'SNAKE_CASE PROPERTIES', 'SNAKE_CASE ENUM VALUES', 'PENDING CONTRACT FILES') {
             if ($text -match "$k`:\s*(\d+)") {
               if ([int]$Matches[1] -ne 0) { $bad += "$k = $($Matches[1])" }
             } else { $bad += "$k not reported by the checker" }
@@ -132,6 +133,85 @@ jobs:
             if ($head -match '(?m)^status:\s*(accepted|superseded)') { "::error::${f}: accepted ADR edited - supersede it with a new ADR"; $bad = 1 }
           }
           exit $bad
+
+  ddl:
+    # This DDL is the isolation contract (ADR-0002), and "it loads" proves almost nothing about it:
+    # both purge bugs this file has already carried were silent successes -- a DELETE that matched no
+    # rows while reporting success. So the file runs on a real Postgres 16 twice. Once inside a
+    # transaction that is rolled back, which is also where its own leak test runs; once for real, so
+    # the security claims can be read back out of the catalog instead of asserted in prose.
+    runs-on: ubuntu-latest
+    defaults:
+      run: { shell: bash }
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: ci-only
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Record the server this gate ran against
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 30); do pg_isready -q && break; sleep 2; done
+          pg_isready
+          psql -q -At -c "select 'Postgres ' || current_setting('server_version')"
+          # Printed because row-security behaviour is what is under test: a gate that does not name
+          # its server is a gate nobody can reproduce three years from now.
+
+      - name: Apply inside a transaction, then roll it back
+        run: |
+          set -euo pipefail
+          # schema.sql contains no BEGIN/COMMIT of its own, so the transaction is spelled here. Note
+          # that `psql -1` would NOT be equivalent: without an explicit rollback it commits, and this
+          # pass exists precisely to show the file can be applied to a database that must not change.
+          cat > /tmp/wrapped.sql <<'SQL'
+          begin;
+          \i schemas/sql/schema.sql
+          rollback;
+          SQL
+          # The last statement of schema.sql is its own LEAK TEST. If it ever goes blind it raises
+          # "leak test is blind"; silence in this log is the assertion, so the log is shown.
+          psql -q -t -A -v ON_ERROR_STOP=1 -f /tmp/wrapped.sql > /tmp/apply.log 2>&1 \
+            || { sed -n '1,200p' /tmp/apply.log; exit 1; }
+          # The policy factory returns one row per table, so the log is mostly blank lines.
+          grep -Ev '^[[:space:]]*$' /tmp/apply.log || true
+
+      - name: Prove the rolled-back pass persisted nothing
+        run: |
+          set -euo pipefail
+          objs=$(psql -q -At -c "select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname in ('public','app','analytics') and c.relkind in ('r','v')")
+          roles=$(psql -q -At -c "select count(*) from pg_roles where rolname in ('app_user','worker','analytics_reader','purger')")
+          if [ "$objs" != 0 ] || [ "$roles" != 0 ]; then
+            echo "::error::the rolled-back pass left $objs relations and $roles roles behind"
+            exit 1
+          fi
+          echo "rolled back clean: $objs relations, $roles roles"
+
+      - name: Apply for real and read the security claims back
+        run: |
+          set -euo pipefail
+          psql -q -1 -v ON_ERROR_STOP=1 -f schemas/sql/schema.sql > /tmp/apply2.log 2>&1 \
+            || { sed -n '1,200p' /tmp/apply2.log; exit 1; }
+          grep -E 'NOTICE|ERROR' /tmp/apply2.log || true
+          # Everything above says the file loads. This is the part that says ADR-0002 is true of it:
+          # FORCE on every tenant table, one named exempt table, no application role with BYPASSRLS,
+          # purge visibility, no user_id through analytics, append-only guards still attached.
+          psql -q -v ON_ERROR_STOP=1 -f tools/check-claims.sql
 
   app:
     needs: detect

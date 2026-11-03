@@ -15,7 +15,9 @@
 #   - every property is documented (a description, or a $ref that inherits one), up to a ratchet
 #     budget that may go down and must never go up. Properties named inside if/then/else are
 #     conditions on fields documented at their declaration, so they are casing-checked but not
-#     required to repeat a description that would only drift from the original.
+#     required to repeat a description that would only drift from the original;
+#   - every contract named in schemas/README.md actually exists, so the directory cannot advertise a
+#     shape nobody has written.
 #
 # What it deliberately does not check: whether a description is *true*. That is a reviewer's job,
 # and a fake description that satisfies a script is the failure mode to watch for here.
@@ -24,11 +26,13 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $schemaDir = Join-Path $root 'schemas\json'
 
-# Ratchet: undocumented properties inherited from the pre-gate contracts (116 of 226 on 2026-11-03).
-# Lower it as they are documented; raising it is a deliberate act that should show up in a diff
-# review. New files are expected to arrive documented -- events.schema.json did -- so the practical
-# budget for new work is zero.
-$UndocumentedBudget = 116
+# Ratchet: undocumented properties inherited from the pre-gate contracts. It stood at 116 of 226 on
+# 2026-11-03 and is 113 of 279 now. The count went *down* while the total went up because the two
+# contracts written since -- events.schema.json and plan-version.schema.json -- arrived fully
+# documented, which is the practical meaning of "the budget for new work is zero". Lower the number
+# further as the inherited fields are documented; raising it is a deliberate act that should show up
+# in a diff review.
+$UndocumentedBudget = 113
 
 $CasePattern = '^[a-z][A-Za-z0-9]*$'
 $IdBase = 'https://training-planner.local/schemas/json/'
@@ -184,6 +188,28 @@ foreach ($file in (Get-ChildItem -LiteralPath $schemaDir -Filter '*.json' -File 
     Walk-Node -Node $doc -Path '' -File $rel
 }
 
+# Completeness. schemas/README.md is the promise, so the promise is what gets checked: every contract
+# it names has to exist on disk. A directory that advertises a shape nobody has written is worse than
+# an empty one, because the reader trusts the list and codes against it. The names are read out of
+# that prose rather than kept a second time in this script -- two lists drift, and the drift would
+# look like a green build describing files that are not there.
+$pending = @()
+$readmePath = Join-Path $root 'schemas\README.md'
+if (Test-Path -LiteralPath $readmePath) {
+    $readmeText = [System.IO.File]::ReadAllText($readmePath, (New-Object System.Text.UTF8Encoding($false)))
+    $named = [regex]::Matches($readmeText, '[A-Za-z0-9._-]+\.schema\.json') | ForEach-Object { $_.Value } | Sort-Object -Unique
+    foreach ($name in $named) {
+        if (-not (Test-Path -LiteralPath (Join-Path $schemaDir $name))) { $pending += "schemas/json/$name" }
+    }
+    $promisesSql = $readmeText -match 'sql/schema\.sql'
+    if ($promisesSql -and -not (Test-Path -LiteralPath (Join-Path $root 'schemas\sql\schema.sql'))) {
+        $pending += 'schemas/sql/schema.sql'
+    }
+} else {
+    # Nothing promised means nothing checked, which is a silent pass. Say so.
+    $pending += 'schemas/README.md (the contract list itself is missing, so the set cannot be proven complete)'
+}
+
 "SCHEMA FILES CHECKED: $filesChecked"
 "PROPERTIES CHECKED: $($script:PropCount)"
 "PARSE FAILURES: $($script:Parses.Count)"
@@ -193,10 +219,12 @@ foreach ($file in (Get-ChildItem -LiteralPath $schemaDir -Filter '*.json' -File 
 "SNAKE_CASE ENUM VALUES: $($script:Enums.Count)"
 "UNDOCUMENTED PROPERTIES: $($script:Undoc.Count)"
 "UNDOCUMENTED BUDGET: $UndocumentedBudget"
+"PENDING CONTRACT FILES: $($pending.Count)"
 
 foreach ($group in @($script:Parses, $script:Meta, $script:Ids, $script:Cases, $script:Enums)) {
     foreach ($line in $group) { "  ! $line" }
 }
+foreach ($line in $pending) { "  ! named by schemas/README.md, absent from disk: $line" }
 if ($script:Undoc.Count -gt 0) {
     "  - undocumented (ratchet, not yet a failure):"
     foreach ($line in $script:Undoc) { "      $line" }
@@ -208,6 +236,7 @@ if ($script:Meta.Count -gt 0) { $fail = 1 }
 if ($script:Ids.Count -gt 0) { $fail = 1 }
 if ($script:Cases.Count -gt 0) { $fail = 1 }
 if ($script:Enums.Count -gt 0) { $fail = 1 }
+if ($pending.Count -gt 0) { $fail = 1 }
 if ($script:Undoc.Count -gt $UndocumentedBudget) {
     $fail = 1
     "  ! undocumented properties grew past the budget: document the new field, do not raise the budget"
