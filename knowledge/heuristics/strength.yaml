@@ -2,7 +2,7 @@ schema_version: 1
 id: strength
 status: draft
 owner: phys-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/physiology/vo2max-threshold-economy.md, knowledge/workout-library/strength-for-runners.md]
   sources: [PHYS-S42]
@@ -62,5 +62,5 @@ rules:
   - id: never-competes-with-running-quality
     when: "the week is tight (≤3 running days) and the runner is time-poor"
     then: "offer strength as an explicit trade-off with its visible cost; never schedule it silently"
-    severity: advise
+    severity: advisory
     explain: "strength-is-a-choice"

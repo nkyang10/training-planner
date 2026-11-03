@@ -2,7 +2,7 @@ schema_version: 1
 id: safety-hard-stops
 status: draft
 owner: fb-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs:
     - knowledge/risk-and-safety/overreach-vs-overtraining.md
@@ -38,7 +38,7 @@ rules:
   - id: chest-cardiac
     when: "entry.pain.site in [chest] or symptoms includes [chest-pain, syncope, near-syncope, palpitations-with-dizziness, breathless-at-rest]"
     then: "hard_stop(all_future_sessions_in_phase); referral('urgent'); no_training_suggestion: true"
-    severity: hard_stop
+    severity: hard-stop
     non_overridable: true
     confidence: high
     explain: "stop-cardiac-red-flag"
@@ -47,7 +47,7 @@ rules:
   - id: fever-or-below-neck-illness
     when: "wellness.illnessSymptoms in [fever, below-neck, chest, GI] and status != rest-as-planned"
     then: "hard_stop(today); downgrade(all_quality_within_next_3d); resume_rule('48h-symptom-free-easy-first')"
-    severity: hard_stop
+    severity: hard-stop
     non_overridable: true
     confidence: high
     explain: "stop-fever"
@@ -55,7 +55,7 @@ rules:
   - id: night-pain-or-bone-tenderness
     when: "pain.nightPain == true or (pain.affectsGait == true and pain.duration in [1-2-weeks, over-2-weeks, recurring])"
     then: "hard_stop(all_sessions); advise('load-tolerating-test-and-clinician'); referral('routine-urgent')"
-    severity: hard_stop
+    severity: hard-stop
     non_overridable: true
     confidence: high
     explain: "stop-bone-stress-red-flag"
@@ -64,7 +64,7 @@ rules:
   - id: pain-escalation
     when: "pain.intensity >= 7 or (pain.intensity >= 4 and pain.nextMorningWorse == true and trend == rising over 3 reports)"
     then: "hard_stop(today); constrain(next_7d: no_intensity, long_run_km_capped)"
-    severity: hard_stop
+    severity: hard-stop
     non_overridable: true
     confidence: medium
     explain: "stop-pain-high"
@@ -72,7 +72,7 @@ rules:
   - id: reds-flag-pattern
     when: "3 of [persistent_performance_decline_21d, elevated_rhr_7d, sleep_disturbance_7d, mood_decline_7d, appetite_change_reported, missed_periods_reported, recurrent_illness] AND energy_availability_risk_screen == positive"
     then: "hard_stop(all_quality_sessions); subtract(next_14d: volume_pct 60, intensity none); referral('clinician-with-sports-medicine'); escalate_language: 'recovery-and-fuelling-conversation'"
-    severity: hard_stop
+    severity: hard-stop
     non_overridable: false          # runner may keep easy runs at their own recorded effort; volume is still subtracted
     confidence: medium
     explain: "stop-reds-pattern"
@@ -81,7 +81,7 @@ rules:
   - id: overreach-pattern
     when: "performance_decrement >= 2 sessions_in_week AND legs >= 4 for 3 consecutive days AND load_monotony(7d) > band"
     then: "constrain(next_7d: volume_pct 70, intensity none); flagReview('overreach-check')"
-    severity: constrain
+    severity: constraint
     non_overridable: false
     confidence: medium
     explain: "constrain-overreach"
@@ -90,7 +90,7 @@ rules:
   - id: pregnancy-postpartum-lock
     when: "profile.health.flags includes [pregnant, postpartum] and medical-flags.yaml#lock_phase == true"
     then: "lock(phase: maintenance, no_intensity_progression: true); forbid_sessionKinds([vo2Intervals, threshold, race-pace-long]); max_intensity_rpe(7)"
-    severity: constrain
+    severity: constraint
     non_overridable: true
     confidence: high
     explain: "constrain-medical-lock"
@@ -99,7 +99,7 @@ rules:
   - id: heat-and-altitude
     when: "forecast.tempC >= 28 or forecast.wbgtC >= 26 or (altitude_change_m >= 1200 and days_at_altitude < 5)"
     then: "relocate(quality_sessions: earliest_slot_or_indoor); convert(quality_session -> effort_band); no_pace_target: true"
-    severity: constrain
+    severity: constraint
     confidence: medium
     explain: "constrain-heat"
     note: "Effort replaces pace. Never the runner's fault when the plan loses a session to heat."
@@ -114,7 +114,7 @@ rules:
   - id: unlogged-days-disable-load-rules
     when: "unlogged_days(rolling 7) >= 3"
     then: "disable(all rules whose `when` cites load metrics); flag('need-logs'); comment: gathering"
-    severity: constrain
+    severity: constraint
     confidence: high
     explain: "constrain-insufficient-data"
     note: "Absence of data is never treated as absence of training (feedback-loop.md#2)."

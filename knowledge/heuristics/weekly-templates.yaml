@@ -2,7 +2,7 @@ schema_version: 1
 id: weekly-templates
 status: draft
 owner: plan-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/periodization/weekly-templates.md, knowledge/personas/novice-first-5k.md]
   sources: [PLAN-S1, PLAN-S11]
@@ -121,7 +121,7 @@ rules:
   - id: non-negotiables-capped
     when: "profile.nonNegotiablePerWeek > 1"
     then: "accept_max(1) for novice and at-risk personas; warn_and_confirm for others"
-    severity: warn
+    severity: advisory
     explain: "template-non-negotiable-cap"
 
 

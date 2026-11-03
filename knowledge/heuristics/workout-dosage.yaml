@@ -2,7 +2,7 @@ schema_version: 1
 id: workout-dosage
 status: draft
 owner: plan-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/plan-construction/key-workout-dosage.md]
   sources: [PLAN-S8, PLAN-S11]
@@ -123,7 +123,7 @@ rules:
   - id: quality-degrades-to-volume
     when: "a quality session cannot be completed as prescribed (weather, time, legs)"
     then: "offer_fallback_ladder[strides_then_hills_then_easy_volume]; never mark it done"
-    severity: advise
+    severity: advisory
     explain: "dose-fallback-ladder"
 
 

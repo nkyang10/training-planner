@@ -2,7 +2,7 @@ schema_version: 1
 id: load-progression
 status: draft
 owner: fb-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs:
     - knowledge/plan-construction/mileage-and-progression.md
@@ -126,7 +126,7 @@ rules:
   - id: hold-step-on-poor-adherence
     when: "completion_rate(rolling 14 d) < 0.8 or rpe_gap > 1.5 for 3 sessions"
     then: "target_weekly_km := prev_week_km; flag_review_candidate('plan-too-big')"
-    severity: warn
+    severity: advisory
     explain: "ramp-held-adherence"
 
   - id: novice-conservative
