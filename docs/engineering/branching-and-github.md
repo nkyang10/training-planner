@@ -99,6 +99,7 @@ the `knowledge` CI gate.
 | YAML/JSON parse | the corpus is a build input; a stray quote breaks every consumer |
 | No personal absolute path in `tools/` | the audit that hardcoded the machine it was written on: green on a laptop, red on the runner (happened 2026-11-03) |
 | Every link target is **committed**, with the right case | an unanchored `data/` in `.gitignore` hid `docs/data/` from git; seven documents cited it and the local audit still said zero (happened 2026-11-03) |
+| Every claim a setup tool makes is **read back** from GitHub | `tools/github-setup.ps1` printed 35 successes and created nothing: `@Args` splatted the empty automatic `$args`, so each "call" was a bare `gh` printing its own help and exiting 0 (happened 2026-11-03) |
 | `last_reviewed` age + `status` values | knowledge rotting invisibly while code ships |
 | Golden plans (`eval/golden-plans/`) | a "small tweak" that quietly rewrites 40 km of someone's week |
 | `en` vs `zh-Hant` key parity | half the users getting fallback strings in their system comment |

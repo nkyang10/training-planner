@@ -85,6 +85,18 @@ foreach ($f in $mdFiles) {
   }
 }
 
+# A corpus file that is untracked, or swallowed by .gitignore, is invisible on this machine and
+# every clone. `data/` in .gitignore hid docs/data/ that way: seven documents linked it and the
+# audit still printed zero, because the files were right there on disk.
+$ignored = @()
+if ($gitOk) {
+  # Two questions, two calls: `-o` lists a file that was never added, `-o -i` lists one that
+  # .gitignore swallows (with `-i`, git reports only ignored paths, so one call cannot answer both).
+  $cand = @(& git -C $root ls-files '-o' --exclude-standard -- docs knowledge 2>$null) +
+          @(& git -C $root ls-files '-o' '-i' --exclude-standard -- docs knowledge 2>$null)
+  $ignored = @($cand | Where-Object { $_ -match '\.(md|ya?ml|json|sql)$' -and $_ -notmatch '(^|/)scratch/' } | Select-Object -Unique)
+}
+
 "MISSING ANCHORS: $($missing.Count)"
 $missing
 ""
@@ -100,5 +112,9 @@ $dead
 "UNTRACKED TARGETS: $($untracked.Count)"
 $untracked
 if (-not $gitOk) { '(not a git checkout: link targets checked on disk only)' }
+""
+"UNCOMMITTED CORPUS FILES: $($ignored.Count)"
+$ignored
+if ($ignored) { '(written here but absent from a fresh clone: git add them, or fix .gitignore if a pattern is wrong)' }
 ""
 "TOTAL BACKLINKS: $($links.Count)"

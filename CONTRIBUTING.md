@@ -14,8 +14,11 @@ is named, stacked, reviewed and merged.
 ## Before you open a PR
 
 ```pwsh
-& ./tools/audit-links.ps1        # must print five zeros and the backlink total
+& ./tools/audit-links.ps1        # must print six zeros and the backlink total
 ```
+
+Run it **here**, not only in CI: `UNCOMMITTED CORPUS FILES` asks whether a document exists on your
+disk but not in git, and a fresh clone -- where CI runs -- cannot ask that question.
 
 Then, depending on what you touched:
 
