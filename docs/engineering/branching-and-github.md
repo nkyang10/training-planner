@@ -42,6 +42,12 @@ main
 └─ chore/ci-and-protection
 ```
 
+Some of these are already history on the remote: `spine/m0-contracts` and its two leaves merged into
+`main` on 2026-11-03, and `delete_branch_on_merge=true` removed the refs when the merges landed. The
+same will happen to each branch above as it lands. So the branch list on GitHub is *work in progress*,
+never the plan -- the tree here is the plan, and each branch's brief in [`branches/`](./branches/) stays
+on `main` as the record after the ref is gone.
+
 ## Rules that keep the tree readable
 
 1. **One issue per leaf.** Start it with `gh issue develop <n> --checkout` so the link exists from
@@ -83,32 +89,69 @@ agrees or 60 seconds pass, and creation is preceded by a GET, because a duplicat
 only `Validation Failed (HTTP 422)` with the reason -- *already exists* -- buried in the body.
 A single read produces false alarms, and a tool that cries wolf gets ignored.
 
-**Status 2026-11-03, read back from the API:** labels (26), milestones (7), branch protection
-(`knowledge` required and strict, 1 approving review, stale reviews dismissed), merge styles
-(squash and merge commit on, rebase off, delete branch on merge), description, topics, wiki off.
-`tools/github-setup.ps1` prints `SETUP VERIFIED` for all of it; re-run it any time this page changes.
+**Status 2026-11-03, every field read back by value.** `tools/github-setup.ps1` now prints one line per
+setting as `path  got  want`, and exits non-zero if any line disagrees: 26 labels, 7 milestones,
+`required_status_checks` = `knowledge` + `ddl` with `strict`, 1 approving review, stale reviews
+dismissed, codeowner review required, last-push approval required, no force push, no delete, linear
+history off, conversation resolved, squash and merge commit on with rebase off, description, topics,
+wiki off. `SETUP VERIFIED` means eleven named values were compared, not that the script asked politely.
 
-`enforce_admins` is **off** (next section), so this constrains every actor except the repository
-owner's own token, which can still merge anything. The `knowledge` CI gate is therefore the guarantee
-that applies to the owner as well -- which is why it has been green and required since day one, and
-why no branch is treated as configured until the setup script says so.
+**The `ddl` check joined `required_status_checks` only after its runner log was read as text**, not
+because a tick was green (job `126011872875`): `Postgres 16.15`, `purge capability granted on 22 tenant
+tables`, `rolled back clean: 0 relations, 0 roles`, `claims hold: forced rls, one named exempt table,
+no bypass, purge visibility, anonymous analytics, append-only guards`. A required check whose first run
+nobody opened is a required check that might be vacuous.
 
-- Pull request required, 1 approving review, the `knowledge` check green and up to date, no force
-  push, no delete, conversation resolved. Squash for leaves; merge commit allowed for
+**Codeowner review was not enforced on this repository until 2026-11-03.** The script sent
+`require_codeowner_reviews`; the API field is `require_code_owner_reviews`. GitHub answered 200, stored
+`false`, and the verifier looked at three other fields — so it printed "branch protection: knowledge
+required and up to date, 1 approving review", a sentence about settings it had never read. Same class
+as the two above: `rebase_merge` was an invented field, and a verifier once tested whether
+`enforce_admins` *existed*, which is always true because every toggle arrives as `{enabled: …}`. Three
+invented names, two of them asserted on this page as fact. A protection claim is now only ever the
+read-back value of a named path, and the tool prints a table instead of a sentence, because a sentence
+cannot be audited.
+
+**`block_creations` is not set and is no longer asked for.** It was sent as `true`, answered 200, and
+stayed `false` through 30 seconds of polling: a field this API will not store here. The new verifier
+made that a permanent red — the correct reaction, and the reason the claim was deleted rather than
+polled harder. Deleting `main` to escape the rule is already blocked by `allow_deletions=false`, which
+does read back.
+
+**What `enforce_admins = false` buys is smaller than this page claimed.** It used to say that
+protection constrains everyone except the owner's token, "which can still merge anything". PR #6 was
+used as the experiment on 2026-11-03:
+
+| Attempt on PR #6, as the repository owner | Result |
+| --- | --- |
+| `gh pr review --approve` | refused: *Can not approve your own pull request* |
+| read the state back | `mergeable=MERGEABLE`, `mergeStateStatus=BLOCKED`, `reviewDecision=REVIEW_REQUIRED` |
+| `gh pr merge --merge` | exit 1: *the base branch policy prohibits the merge* |
+| `gh pr merge --merge --admin` | merged, `c38b8e6` |
+
+The review requirement **does** bind the owner. What `enforce_admins = false` leaves is the option of an
+explicit, attributable `--admin` merge — recorded against the token that used it — instead of a silent
+bypass: nothing lands unless someone names the flag. Keep it off while one person holds every seat
+(with it on, the solo owner still merges by hand and gets *less* record of it), flip it the day a second
+maintainer appears. Until then every `spine/* -> main` merge is an `--admin` merge, and the log says so.
+
+- Pull request required, 1 approving review, `knowledge` and `ddl` green and up to date (`strict`), no
+  force push, no delete, conversation resolved. Squash for leaves; merge commit allowed for
   `spine/* -> main`, so a milestone stays bisectable.
-- Codeowner review required (`.github/CODEOWNERS`). The safety band --
+- Codeowner review required **as of 2026-11-03** (`.github/CODEOWNERS`,
+  `require_code_owner_reviews` read back `true`). The safety band --
   `knowledge/heuristics/safety-hard-stops.yaml`, `docs/engine/safety-layer.md`,
   `docs/engine/review-trigger-policy.md`, `schemas/**`, `docs/adr/**`,
-  `packages/planner-core/src/safety/**` -- cannot merge without the safety seat.
+  `packages/planner-core/src/safety/**` -- cannot merge without the safety seat. Before that date the
+  settings holding that line were the CI counters, the SQL leak test and `tools/check-claims.sql`;
+  those are still the first controls I would cite, because they run whether or not anyone is watching.
 - **The second review on the safety band is not something branch protection can express**: an
   approval count is per branch, not per path. Enforceable today is the codeowner requirement above;
   enforceable with one small CI step is counting approvals through the API on PRs that touch those
   paths. Until that step exists the second review is a human rule, stated in the PR template, and we
   call it that instead of pretending the setting does it.
-- `enforce_admins` is **off** while one person holds every seat. With it on, a solo owner cannot
-  approve their own PR and begins bypassing protections by hand -- which is worse than the setting
-  never existing. Flip it on the day a second maintainer appears: that is when it stops being
-  theatre.
+- `enforce_admins` is **off** by choice and measured (table above): it removes the flag requirement for
+  an admin, it does not let anyone merge quietly.
 - Accepted ADRs are **never edited** -- supersede with `docs/adr/NNNN-*.md`
   (`AGENTS.md` Conventions), and the CI step for `docs/adr/` fails on a modified non-draft ADR.
 - Merge commit is allowed only for `spine/* -> main`, so a milestone remains bisectable.
@@ -123,7 +166,8 @@ why no branch is treated as configured until the setup script says so.
 | `ddl`: apply `schemas/sql/schema.sql` on Postgres 16 inside a transaction that is rolled back, prove nothing persisted, apply for real, then read the security claims out of the catalog (`tools/check-claims.sql`) | "the schema loads" was being reported as "the schema isolates". Both purge defects this file carried were *silent successes*: a `SECURITY DEFINER` purge ran as the table owner, matched no policy, deleted nothing and reported success; and a missing `for select` policy gave the `DELETE` an always-false filter, so it removed zero rows and returned zero. Neither is visible to a linter (both 2026-11-03) |
 | No personal absolute path in `tools/` | the audit that hardcoded the machine it was written on: green on a laptop, red on the runner (happened 2026-11-03) |
 | Every link target is **committed**, with the right case | an unanchored `data/` in `.gitignore` hid `docs/data/` from git; seven documents cited it and the local audit still said zero (happened 2026-11-03) |
-| Every claim a setup tool makes is **read back by value, and polled** | three separate lies in one afternoon: 35 printed successes that created nothing (`@Args` splatted the empty automatic `$args`); a `PATCH` containing the invented field `rebase_merge`, answered 200 with no change; and a single read that returned the pre-patch value because settings are eventually consistent (all 2026-11-03) |
+| Every claim a setup tool makes is **read back by value, and polled** | five separate untruths in two days: 35 printed successes that created nothing (`@Args` splatted the empty automatic `$args`); a `PATCH` containing the invented field `rebase_merge`, answered 200 with no change; a single read that returned the pre-patch value because settings are eventually consistent; a verifier asking whether `enforce_admins` *existed* -- toggles arrive as `{enabled: …}`, so existence is always true, and it printed "on" for `false`; and `require_codeowner_reviews`, an invented name that left code-owner review off for a month while the tool reported protection "up to date" (all 2026-11-03) |
+| A setting the API will not store is **deleted from the claim, not polled harder** | `block_creations`: sent `true`, answered 200, still `false` after 30 s of polling. The per-field verifier turned that into a permanent red, which is the only honest outcome -- the repository either has the control or the page stops listing it (2026-11-03) |
 | Every gate counter has been **forced to fail once**, by breaking the thing it measures | `tools/check-claims.sql` first shipped with its queries scoped to schemas that hold no tenant tables: it printed a clean bill of health for a database it had never looked at. `PENDING CONTRACT FILES` was exercised with a fake contract name in `schemas/README.md` before anyone believed its zero. A counter nobody can move is a counter nobody should trust (both 2026-11-03) |
 | `last_reviewed` age + `status` values | knowledge rotting invisibly while code ships |
 | Golden plans (`eval/golden-plans/`) | a "small tweak" that quietly rewrites 40 km of someone's week |

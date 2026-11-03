@@ -1,11 +1,19 @@
 # Owner review is required, not courtesy. The safety band needs a second, separate approval.
 #
 # These are SEATS, not people. Today one human holds every seat, so every line names
-# @nkyang10 and the review requirement is real but satisfiable. When a second person joins,
-# replace the handle on the affected band with a team and nothing else changes:
+# @nkyang10. When a second person joins, replace the handle on the affected band with a team
+# and nothing else changes:
 #   @nkyang10        ->  @nkyang10/safety     (or @org/safety)
 # A band whose owner cannot be resolved is worse than no CODEOWNERS: GitHub silently stops
 # requiring it, and the safety layer looks protected when it is not.
+#
+# Two measured corrections, both 2026-11-03. (1) This file had no force until today: the setup
+# script sent `require_codeowner_reviews` -- a missing underscore -- GitHub answered 200, and the
+# setting stored `false`. The tool printed "protection up to date". It now reads back `true`.
+# (2) "Real but satisfiable" was wrong: an author cannot approve their own PR, so while one person
+# holds every seat, a PR touching these paths lands only through an explicit `--admin` merge.
+# That is a recorded act, not a silent bypass -- and it is why a second pair of hands here is a
+# feature, not a nicety. See docs/engineering/branching-and-github.md.
 
 # Safety band: subtract-only, referrals, contracts, irreversible decisions
 /knowledge/heuristics/safety-hard-stops.yaml   @nkyang10

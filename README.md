@@ -102,6 +102,6 @@ prose file, a source grade, and a golden test — see
 | System design | written: engine, data model, tenancy, integrations, UI |
 | Machine contracts | drafted: `schemas/` |
 | Self-review | 2026-11-03: three personas walked the design end to end, 10 findings, 2 launch blockers (F1 prompt policy, F2 session duration) |
-| Development setup | [github.com/nkyang10/training-planner](https://github.com/nkyang10/training-planner), public; `main` plus the 14-branch tree is pushed, and labels, milestones, branch protection (`knowledge` required, 1 approving review) and the merge styles are each read back from the API by `tools/github-setup.ps1`, which must print `SETUP VERIFIED` |
+| Development setup | [github.com/nkyang10/training-planner](https://github.com/nkyang10/training-planner), public; `main` plus the open branches of [the tree](docs/engineering/branching-and-github.md) (merged ones are deleted on merge). Labels, milestones, merge styles and branch protection are read back **field by field, by value** from the API by `tools/github-setup.ps1`, which must print `SETUP VERIFIED`: `knowledge` **and `ddl`** required and strict, 1 approving review, codeowner review required (this one was silently off until 2026-11-03 — see [branching-and-github.md](docs/engineering/branching-and-github.md)) |
 | Code | not started — M1 is a headless planner core with golden tests |
 | Verified external constraints | Strava developer terms verified 2026-11-03; Garmin access **not verified** (see [integrations.md](docs/architecture/integrations.md)) |

@@ -134,26 +134,39 @@ foreach ($m in $milestones) {
 
 # --- Branch protection on main ---------------------------------------------
 # Squash for leaves, merge commit allowed so spine -> main stays bisectable.
-# required_status_checks lists the gate that exists today; 'app' joins at M1.
+# required_status_checks lists the gates that exist *and have been seen to fail*: 'knowledge' (a dead
+# anchor) and 'ddl' (a schema that loads but does not isolate). 'app' joins at M1.
+# `require_code_owner_reviews` has an underscore between code and owner. This script sent
+# `require_codeowner_reviews` for its first month: GitHub answered 200, stored `false`, and the verifier
+# never mentioned it because it only looked at three fields. Code-owner review on the safety band was
+# off the whole time the page said it was on (read back 2026-11-03).
 $protection = [ordered]@{
     required_status_checks = @{
         strict = $true
-        contexts = @('knowledge')
+        contexts = @('knowledge','ddl')
     }
     # Off while one person holds every seat: with it on, a solo owner cannot approve their own PR
     # and starts bypassing protections by hand. Flip to $true when a second maintainer appears.
+    # What 'off' does NOT buy, measured on PR #6: a plain `gh pr merge` was still refused with "the
+    # base branch policy prohibits the merge", and only `--admin` went through. The review rule binds
+    # the owner as an explicit, attributable act -- not a silent bypass.
     enforce_admins = $false
     required_pull_request_reviews = @{
         required_approving_review_count = 1
         dismiss_stale_reviews = $true
-        require_codeowner_reviews = $true
+        require_code_owner_reviews = $true
         require_last_push_approval = $true
     }
     restrictions = $null
     required_linear_history = $false
     allow_force_pushes = $false
     allow_deletions = $false
-    block_creations = $true
+    # No block_creations here. It was sent as `true` on 2026-11-03, GitHub answered 200, the read-back
+    # polled for 30 s and the field stayed false -- the same invented-field failure as the codeowner
+    # typo, except this one is a field that the API does not honour on this repository at all. The
+    # risk it nominally covers (delete main, re-push main to escape the rule) is already covered by
+    # allow_deletions=false, which does read back. A claim the API will not store is worse than no
+    # claim, because the page then lists a control nobody is enforcing.
     required_conversation_resolution = $true
 }
 $json = $protection | ConvertTo-Json -Depth 6
@@ -226,6 +239,64 @@ function Get-RepoState {
 }
 
 $wantMerge = [ordered]@{ allow_squash_merge = $true; allow_merge_commit = $true; allow_rebase_merge = $false; delete_branch_on_merge = $true }
+
+# Every protection field this page claims, spelled the way the *response* returns it. Each toggle comes
+# back as an object `{ enabled = … }`, so the path ends in `.enabled`; testing the object for existence
+# is how `enforce_admins` was reported as "on" while it was stored false. A path GitHub does not return
+# reads as $null and therefore FAILS, which is the point: an invented field name -- the
+# `require_codeowner_reviews` typo that left code-owner review off for a month -- can no longer pass.
+$wantProt = [ordered]@{
+    'required_status_checks.strict'                                 = $true
+    'required_status_checks.contexts'                               = @('ddl','knowledge')
+    'required_pull_request_reviews.required_approving_review_count' = 1
+    'required_pull_request_reviews.dismiss_stale_reviews'           = $true
+    'required_pull_request_reviews.require_code_owner_reviews'      = $true
+    'required_pull_request_reviews.require_last_push_approval'      = $true
+    # Deliberate, not an oversight: with one maintainer, on means merging by hand. See the note in the
+    # payload above about what it still does not buy.
+    'enforce_admins.enabled'                                        = $false
+    'required_linear_history.enabled'                               = $false
+    'allow_force_pushes.enabled'                                    = $false
+    'allow_deletions.enabled'                                       = $false
+    # block_creations is not in this list, and not in the payload: measured 2026-11-03, the API will
+    # not store it here. Asking for it makes the build red forever, which is the correct *feeling* but
+    # the wrong instrument -- see the note in the payload.
+    'required_conversation_resolution.enabled'                      = $true
+}
+
+# Walked through PSObject.Properties rather than `$cur.$seg`, because a bare member access answers with
+# PowerShell's own members first: a path segment like `count` would silently return a .Count.
+function Get-ProtField {
+    param($Root, [string]$Path)
+    $cur = $Root
+    foreach ($seg in $Path.Split('.')) {
+        if ($null -eq $cur) { return $null }
+        $prop = $cur.PSObject.Properties[$seg]
+        if ($null -eq $prop) { return $null }
+        $cur = $prop.Value
+    }
+    return $cur
+}
+
+function Test-ProtField {
+    param($Got, $Want)
+    if ($null -eq $Got) { return $false }
+    if ($Want -is [array]) {
+        $g = (@(@($Got) | ForEach-Object { "$_" }) | Sort-Object) -join ','
+        $w = (@($Want) | ForEach-Object { "$_" } | Sort-Object) -join ','
+        return $g -eq $w
+    }
+    if ($Want -is [int]) { return ([int]$Got) -eq $Want }
+    return ([bool]$Got) -eq ([bool]$Want)
+}
+
+function Format-ProtValue {
+    param($V)
+    if ($null -eq $V) { return '<absent>' }
+    if ($V -is [array]) { return (@($V) -join ' + ') }
+    return "$V"
+}
+
 $deadline = (Get-Date).AddSeconds(60)
 $waited = 0
 while ($true) {
@@ -234,9 +305,8 @@ while ($true) {
     $missMs     = @($milestones | Where-Object { $st.Ms -notcontains $_ })
     $missTopics = @($wantTopics | Where-Object { $st.Topics -notcontains $_ })
     $badMerge   = @($wantMerge.Keys | Where-Object { $null -eq $st.Flags -or [bool]$st.Flags.$_ -ne $wantMerge[$_] })
-    $protOk     = [bool]($st.Prot -and $st.Prot.required_status_checks.strict -eq $true -and
-                          (@($st.Prot.required_status_checks.contexts) -contains 'knowledge') -and
-                          $st.Prot.required_pull_request_reviews.required_approving_review_count -eq 1)
+    $badProt    = @($wantProt.Keys | Where-Object { -not (Test-ProtField (Get-ProtField $st.Prot $_) $wantProt[$_]) })
+    $protOk     = ($null -ne $st.Prot) -and (-not $badProt.Count)
     $wikiOk     = [bool]($st.Flags -and $st.Flags.has_wiki -eq $false)
     if (-not $missLabels.Count -and -not $missMs.Count -and -not $missTopics.Count -and -not $badMerge.Count -and $protOk -and $wikiOk) { break }
     if ((Get-Date) -gt $deadline) { break }
@@ -246,7 +316,7 @@ while ($true) {
 if ($missLabels.Count) { $Failures += 'labels (read-back)' }
 if ($missMs.Count)     { $Failures += 'milestones (read-back)' }
 if ($badMerge.Count)   { $Failures += 'merge settings (read-back)' }
-if (-not $protOk)      { $Failures += 'branch protection (read-back)' }
+if ($badProt.Count)    { $Failures += ('branch protection (read-back): ' + ($badProt -join ', ')) }
 if ($missTopics.Count) { $Failures += 'topics (read-back)' }
 if (-not $wikiOk)      { $Failures += 'wiki (read-back)' }
 
@@ -254,7 +324,14 @@ if (-not $wikiOk)      { $Failures += 'wiki (read-back)' }
 "  labels missing:    $(@($missLabels).Count) of $($labels.Count) expected$(if ($missLabels) { ' -- ' + ($missLabels -join ', ') })"
 "  milestones missing: $(@($missMs).Count) of $($milestones.Count) expected$(if ($missMs) { ' -- ' + ($missMs -join ', ') })"
 "  merge settings:    squash=$($st.Flags.allow_squash_merge) merge=$($st.Flags.allow_merge_commit) rebase=$($st.Flags.allow_rebase_merge) deleteOnMerge=$($st.Flags.delete_branch_on_merge)$(if ($badMerge.Count) { '  <-- MISMATCH: ' + ($badMerge -join ', ') } else { '  (as intended)' })"
-"  branch protection: $(if ($protOk) { 'knowledge required and up to date, 1 approving review' } else { 'NOT AS DOCUMENTED' })"
+# Printed as one line per field, with the value GitHub actually holds. A sentence like "protection is
+# up to date" is what hid the missing code-owner review; a table cannot hide it.
+"  branch protection:"
+foreach ($k in $wantProt.Keys) {
+    $gotV  = Get-ProtField $st.Prot $k
+    $flag  = if ($badProt -contains $k) { '   <-- NOT AS DOCUMENTED' } else { '' }
+    "    {0,-58} {1,-12} want {2}{3}" -f $k, (Format-ProtValue $gotV), (Format-ProtValue $wantProt[$k]), $flag
+}
 "  topics:            $(if ($missTopics.Count) { 'missing ' + ($missTopics -join ', ') } else { $st.Topics -join ', ' })"
 "  wiki:              $(if ($wikiOk) { 'disabled' } else { 'still enabled' })"
 "  description:       $($st.Flags.description)"
