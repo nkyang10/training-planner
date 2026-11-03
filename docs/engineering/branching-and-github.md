@@ -66,10 +66,23 @@ matches what the script asked for. An earlier version printed 35 `OK` lines and 
 "call" was a bare `gh` printing its own help and exiting 0. A setup script that reports intentions
 as results is worse than none, because it removes the reason to look. Claims are not evidence.
 
-**Status 2026-11-03:** labels (26) and milestones (7) are on the repository and verified by read-back.
-Branch protection and the merge-style settings are **not**: both need the token to hold
-`Administration: write`. Until they land, protection is a convention and the only hard guarantee is
-the `knowledge` CI gate.
+Two more untruths the read-back had to be taught to survive. `rebase_merge` is not a field of
+`PATCH /repos`: GitHub answered 200 and ignored it, while the real name is `allow_rebase_merge`. And
+repository settings are eventually consistent -- immediately after a successful PATCH the read still
+said `rebase=True`, and three seconds later it said `False`. So the verification polls until GitHub
+agrees or 60 seconds pass, and creation is preceded by a GET, because a duplicate `POST` reports
+only `Validation Failed (HTTP 422)` with the reason -- *already exists* -- buried in the body.
+A single read produces false alarms, and a tool that cries wolf gets ignored.
+
+**Status 2026-11-03, read back from the API:** labels (26), milestones (7), branch protection
+(`knowledge` required and strict, 1 approving review, stale reviews dismissed), merge styles
+(squash and merge commit on, rebase off, delete branch on merge), description, topics, wiki off.
+`tools/github-setup.ps1` prints `SETUP VERIFIED` for all of it; re-run it any time this page changes.
+
+`enforce_admins` is **off** (next section), so this constrains every actor except the repository
+owner's own token, which can still merge anything. The `knowledge` CI gate is therefore the guarantee
+that applies to the owner as well -- which is why it has been green and required since day one, and
+why no branch is treated as configured until the setup script says so.
 
 - Pull request required, 1 approving review, the `knowledge` check green and up to date, no force
   push, no delete, conversation resolved. Squash for leaves; merge commit allowed for
@@ -99,7 +112,7 @@ the `knowledge` CI gate.
 | YAML/JSON parse | the corpus is a build input; a stray quote breaks every consumer |
 | No personal absolute path in `tools/` | the audit that hardcoded the machine it was written on: green on a laptop, red on the runner (happened 2026-11-03) |
 | Every link target is **committed**, with the right case | an unanchored `data/` in `.gitignore` hid `docs/data/` from git; seven documents cited it and the local audit still said zero (happened 2026-11-03) |
-| Every claim a setup tool makes is **read back** from GitHub | `tools/github-setup.ps1` printed 35 successes and created nothing: `@Args` splatted the empty automatic `$args`, so each "call" was a bare `gh` printing its own help and exiting 0 (happened 2026-11-03) |
+| Every claim a setup tool makes is **read back by value, and polled** | three separate lies in one afternoon: 35 printed successes that created nothing (`@Args` splatted the empty automatic `$args`); a `PATCH` containing the invented field `rebase_merge`, answered 200 with no change; and a single read that returned the pre-patch value because settings are eventually consistent (all 2026-11-03) |
 | `last_reviewed` age + `status` values | knowledge rotting invisibly while code ships |
 | Golden plans (`eval/golden-plans/`) | a "small tweak" that quietly rewrites 40 km of someone's week |
 | `en` vs `zh-Hant` key parity | half the users getting fallback strings in their system comment |
