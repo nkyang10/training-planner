@@ -1,12 +1,12 @@
 blank_issues_enabled: false
-# tools/github-setup.ps1 rewrites OWNER to the real owner once the remote exists.
+# Owner resolved 2026-11-03 by tools/github-setup.ps1; re-run it with -Repo if the repo moves.
 contact_links:
   - name: How branching and review work
-    url: https://github.com/OWNER/training-planner/blob/main/docs/engineering/branching-and-github.md
+    url: https://github.com/nkyang10/training-planner/blob/main/docs/engineering/branching-and-github.md
     about: Branch tree, stacking, protection, and which paths need two reviews.
   - name: What the knowledge base already knows (and admits it does not)
-    url: https://github.com/OWNER/training-planner/blob/main/knowledge/INDEX.md
+    url: https://github.com/nkyang10/training-planner/blob/main/knowledge/INDEX.md
     about: Read the honesty ledger before proposing a number.
   - name: Health and safety questions
-    url: https://github.com/OWNER/training-planner/blob/main/knowledge/risk-and-safety/guardrails-and-disclaimers.md
+    url: https://github.com/nkyang10/training-planner/blob/main/knowledge/risk-and-safety/guardrails-and-disclaimers.md
     about: This product triages and refers. It does not diagnose.

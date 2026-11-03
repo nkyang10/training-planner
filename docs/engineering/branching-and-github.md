@@ -56,14 +56,59 @@ main
 5. **A branch that touches two areas is two branches.** `knowledge/` and `packages/` land separately:
    the knob first, the code second, so a rollback of code does not silently roll back reasoning.
 6. **No `--no-verify`, no merging your own PR in `knowledge/heuristics/`.**
+7. **A prose link is a dependency; the owner of the target merges first.** Links are audited on every
+   branch, not only on `main`, so a leaf whose prose cites a file that lives on a *sibling* leaf is
+   correct on paper and red in CI until that sibling lands. This happened on `spine/m0-contracts`
+   (2026-11-03): spine prose cited `schemas/json/plan-version.schema.json`, owned by the other leaf,
+   so the RLS leaf printed `DEAD LINKS: 1` while having done nothing wrong. The fix was ordering, not
+   editing — squash-merge the owning leaf, `git merge origin/spine/<...>` into the other, re-push,
+   green. So when two leaves of one spine reference each other's files, **decide the merge order
+   before opening the PRs and write it in both bodies**. A link implies a sequence; a stack without a
+   stated sequence is a stack that discovers its order by failing.
 
 ## Branch protection on `main`
 
-- Pull request required; `knowledge` and `app` checks pass; branch up to date; no force push, no
-  delete, linear history via squash.
-- **Two reviews, one from `@/safety`,** for: `knowledge/heuristics/safety-hard-stops.yaml`,
-  `docs/engine/safety-layer.md`, `schemas/json/**`, `docs/adr/**`, `packages/planner-core/src/safety/**`,
-  and any change adding a number to a file whose `provenance` cites a grade-C or grade-D source.
+Applied by `tools/github-setup.ps1`, so the repository matches this page instead of drifting from it.
+The script finishes by reading the repository back and exits non-zero unless what GitHub *has*
+matches what the script asked for. An earlier version printed 35 `OK` lines and created nothing:
+`@Args` splatted the automatic (empty) `$args` rather than the parameter of the same name, so every
+"call" was a bare `gh` printing its own help and exiting 0. A setup script that reports intentions
+as results is worse than none, because it removes the reason to look. Claims are not evidence.
+
+Two more untruths the read-back had to be taught to survive. `rebase_merge` is not a field of
+`PATCH /repos`: GitHub answered 200 and ignored it, while the real name is `allow_rebase_merge`. And
+repository settings are eventually consistent -- immediately after a successful PATCH the read still
+said `rebase=True`, and three seconds later it said `False`. So the verification polls until GitHub
+agrees or 60 seconds pass, and creation is preceded by a GET, because a duplicate `POST` reports
+only `Validation Failed (HTTP 422)` with the reason -- *already exists* -- buried in the body.
+A single read produces false alarms, and a tool that cries wolf gets ignored.
+
+**Status 2026-11-03, read back from the API:** labels (26), milestones (7), branch protection
+(`knowledge` required and strict, 1 approving review, stale reviews dismissed), merge styles
+(squash and merge commit on, rebase off, delete branch on merge), description, topics, wiki off.
+`tools/github-setup.ps1` prints `SETUP VERIFIED` for all of it; re-run it any time this page changes.
+
+`enforce_admins` is **off** (next section), so this constrains every actor except the repository
+owner's own token, which can still merge anything. The `knowledge` CI gate is therefore the guarantee
+that applies to the owner as well -- which is why it has been green and required since day one, and
+why no branch is treated as configured until the setup script says so.
+
+- Pull request required, 1 approving review, the `knowledge` check green and up to date, no force
+  push, no delete, conversation resolved. Squash for leaves; merge commit allowed for
+  `spine/* -> main`, so a milestone stays bisectable.
+- Codeowner review required (`.github/CODEOWNERS`). The safety band --
+  `knowledge/heuristics/safety-hard-stops.yaml`, `docs/engine/safety-layer.md`,
+  `docs/engine/review-trigger-policy.md`, `schemas/**`, `docs/adr/**`,
+  `packages/planner-core/src/safety/**` -- cannot merge without the safety seat.
+- **The second review on the safety band is not something branch protection can express**: an
+  approval count is per branch, not per path. Enforceable today is the codeowner requirement above;
+  enforceable with one small CI step is counting approvals through the API on PRs that touch those
+  paths. Until that step exists the second review is a human rule, stated in the PR template, and we
+  call it that instead of pretending the setting does it.
+- `enforce_admins` is **off** while one person holds every seat. With it on, a solo owner cannot
+  approve their own PR and begins bypassing protections by hand -- which is worse than the setting
+  never existing. Flip it on the day a second maintainer appears: that is when it stops being
+  theatre.
 - Accepted ADRs are **never edited** -- supersede with `docs/adr/NNNN-*.md`
   (`AGENTS.md` Conventions), and the CI step for `docs/adr/` fails on a modified non-draft ADR.
 - Merge commit is allowed only for `spine/* -> main`, so a milestone remains bisectable.
@@ -74,10 +119,23 @@ main
 | --- | --- |
 | `tools/audit-links.ps1` prints zeros | a doc that cites a knob nobody declared; a source id that does not exist |
 | YAML/JSON parse | the corpus is a build input; a stray quote breaks every consumer |
+| `tools/check-contracts.ps1` counters + the undocumented-property ratchet | a contract folder advertising a file nobody wrote (`PENDING CONTRACT FILES` reads the names out of `schemas/README.md` and looks for them on disk); a new field arriving with no description (ratchet 113/279, down-only) |
+| `ddl`: apply `schemas/sql/schema.sql` on Postgres 16 inside a transaction that is rolled back, prove nothing persisted, apply for real, then read the security claims out of the catalog (`tools/check-claims.sql`) | "the schema loads" was being reported as "the schema isolates". Both purge defects this file carried were *silent successes*: a `SECURITY DEFINER` purge ran as the table owner, matched no policy, deleted nothing and reported success; and a missing `for select` policy gave the `DELETE` an always-false filter, so it removed zero rows and returned zero. Neither is visible to a linter (both 2026-11-03) |
+| No personal absolute path in `tools/` | the audit that hardcoded the machine it was written on: green on a laptop, red on the runner (happened 2026-11-03) |
+| Every link target is **committed**, with the right case | an unanchored `data/` in `.gitignore` hid `docs/data/` from git; seven documents cited it and the local audit still said zero (happened 2026-11-03) |
+| Every claim a setup tool makes is **read back by value, and polled** | three separate lies in one afternoon: 35 printed successes that created nothing (`@Args` splatted the empty automatic `$args`); a `PATCH` containing the invented field `rebase_merge`, answered 200 with no change; and a single read that returned the pre-patch value because settings are eventually consistent (all 2026-11-03) |
+| Every gate counter has been **forced to fail once**, by breaking the thing it measures | `tools/check-claims.sql` first shipped with its queries scoped to schemas that hold no tenant tables: it printed a clean bill of health for a database it had never looked at. `PENDING CONTRACT FILES` was exercised with a fake contract name in `schemas/README.md` before anyone believed its zero. A counter nobody can move is a counter nobody should trust (both 2026-11-03) |
 | `last_reviewed` age + `status` values | knowledge rotting invisibly while code ships |
 | Golden plans (`eval/golden-plans/`) | a "small tweak" that quietly rewrites 40 km of someone's week |
 | `en` vs `zh-Hant` key parity | half the users getting fallback strings in their system comment |
 | Narrator banned-output suite | diagnosis, weight/calorie language, guarantees, shame -- in prose, in both languages |
+
+Two of these rows deserve a footnote about how they fail. `tools/audit-links.ps1` is a *reporter*: it
+exits zero whatever it finds and prints six counters, because it is meant to be run by hand in the
+middle of an edit without punishing the run. The `knowledge` job parses those numbers and fails the
+build. `tools/check-contracts.ps1` does the opposite and exits 1 on a red counter. That inconsistency
+is real, and it survives only because CI parses both outputs rather than trusting either status --
+which is itself a reason to read counters, not exit codes, when a build goes red.
 
 A gate that is red from day one teaches people to ignore it, so the app-level gates are guarded steps
 that skip until the code exists (see `.github/workflows/ci.yml`). They become required at M1, not

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://training-planner.local/schemas/day-entry.schema.json",
+  "$id": "https://training-planner.local/schemas/json/day-entry.schema.json",
   "title": "DayEntry",
   "description": "The runner's daily feedback — the input the whole product depends on. Design constraint: tier 1 (status, RPE, legs) is enough to generate a comment and a micro-adjustment, so the minimum viable save is 3 taps. Everything deeper is optional and progressively disclosed. Corrections never overwrite: they create a new revision with superseded_by (AGENTS.md rule 4).",
   "type": "object",

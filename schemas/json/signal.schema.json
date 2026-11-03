@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://training-planner.local/schemas/signal.schema.json",
+  "$id": "https://training-planner.local/schemas/json/signal.schema.json",
   "title": "Signal",
   "description": "A computed signal with its window, confidence, and permitted uses — the runtime instance of docs/data/metric-definitions.md. 'mayDrive' is machine-enforced: a policy that consumes a signal for a channel the signal is not allowed to drive fails validation, which is how 'ACWR is display-only' stays true after we forget why.",
   "type": "object",
@@ -9,7 +9,8 @@
   "properties": {
     "key": {
       "type": "string",
-      "description": "Registry key from metric-definitions.md. Adding a key requires a definition there first.",
+      "description": "Registry key from metric-definitions.md. Adding a key requires a definition there first. These strings are copied verbatim from the metric registry, so they keep that namespace's spelling rather than this contract's kebab-case rule; tools must not rewrite them.",
+      "x-verbatim-enum-values": true,
       "enum": ["load_sRPE", "load_trimp", "load_normalized", "weekly_load", "load_monotony", "strain", "ctl", "atl", "tsb", "acwr", "ramp_rate", "hrv_lnrmssd_dev", "hrv_data_sufficiency", "rhr_dev", "sleep_debt", "wellness_index", "vdot_equivalent", "pace_bands", "pace_at_hr_easy", "hr_drift", "threshold_hr_est", "durability", "economy_proxy", "completion_rate", "rpe_gap", "log_continuity", "log_quality_by_daytype", "device_coverage", "pain_trend", "adherence_intent_mix"]
     },
     "userId": { "type": "string", "format": "uuid" },
