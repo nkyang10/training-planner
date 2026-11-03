@@ -58,10 +58,11 @@ the check, as this section promised it would.
    declare themselves with `x-verbatim-enum-values` so the exception is visible inside the contract
    rather than being silent drift.
     The rule fixes *how* to spell a name once a namespace is chosen; it cannot decide *which* namespace
-    a name belongs to, and on 2026-11-04 the four namespaces disagreed in twenty measured places:
+    a name belongs to, and on 2026-11-04 the four namespaces disagreed in twenty-two measured places:
     names that had drifted apart, three claims about what a control actually enforces (the safety tier
     spelling, the name of a diff's change kind, what a day's status means), the gate's own field of
-    view, and the day-entry contract against the table it feeds. Those
+    view, the day-entry contract against the table it feeds, two doc-side severity taxonomies that
+    match no YAML, and a README that named a test runner the repo does not contain. Those
     disagreements are recorded with their evidence and decided once in
     [contract-vocabulary.md](../docs/engineering/contract-vocabulary.md), which also lists what no gate
     checks yet. A new disagreement found while working is added there before it is patched locally.
