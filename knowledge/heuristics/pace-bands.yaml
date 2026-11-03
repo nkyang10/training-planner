@@ -2,7 +2,7 @@ schema_version: 1
 id: pace-bands
 status: draft
 owner: phys-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/signals-and-metrics/pace-models.md, knowledge/signals-and-metrics/measurement-and-testing.md]
   sources: [PLAN-S8, PLAN-S11, PHYS-S43, PHYS-S44]
@@ -96,7 +96,7 @@ rules:
   - id: no-chasing
     when: "runner reports running a pace target as a ceiling to beat"
     then: "comment_once(effort_first); if easy-day pace keeps exceeding the band, treat as distribution-easy-drift"
-    severity: advise
+    severity: advisory
     explain: "pace-bands-effort-first"
 
 

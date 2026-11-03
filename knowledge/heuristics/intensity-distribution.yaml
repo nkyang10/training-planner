@@ -2,7 +2,7 @@ schema_version: 1
 id: intensity-distribution
 status: draft
 owner: plan-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/periodization/intensity-distribution.md]
   sources: [PLAN-S1, PLAN-S2, PLAN-S3, PLAN-S4]
@@ -78,18 +78,18 @@ rules:
   - id: moderate-zone-ceiling
     when: "moderate_share(window_days) > pct_moderate_zone.range[1]"
     then: "flagReview(kind: distribution, proposals: [move_one_session_to_easy, move_one_to_high]); never auto-edit"
-    severity: warn
+    severity: advisory
     explain: "distribution-junk-week"
 
   - id: easy-days-must-be-easy
     when: "a session labelled easy has medianRpe >= 6 or pace within easy_band_upper_boundary violation"
     then: "relabel_in_log(as: moderate); count_against(moderate_share); comment(once, non-judgemental)"
-    severity: advise
+    severity: advisory
     explain: "distribution-easy-drift"
 
   - id: stimulus-floor
     when: "high_zone_share(window_days) < pct_high_zone.range[0] and phase in [building, race-prep]"
     then: "flagReview(kind: under-stimulated, proposals: [add_one_quality, add_strides])"
-    severity: advise
+    severity: advisory
     explain: "distribution-no-stimulus"
     note: "This is the only place the system may propose *adding* intensity, and only as a review option — never from the safety layer."

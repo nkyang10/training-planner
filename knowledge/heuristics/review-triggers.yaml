@@ -2,7 +2,7 @@ schema_version: 1
 id: review-triggers
 status: draft
 owner: fb-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs:
     - docs/engine/review-trigger-policy.md
@@ -101,39 +101,39 @@ rules:
   - id: plan-too-big
     when: "completion_rate(window plan_too_big_thresholds.window_days) < completion_rate_lt or quality_misses(7d) >= quality_misses_ge"
     then: "flagReview(kind: plan-too-big, proposals: [reduce_hard_days, shorten_sessions, persona: time-poor-3-days])"
-    severity: flag
+    severity: advisory
     explain: "review-plan-too-big"
 
   - id: load-rising-too-fast
     when: "ramp_pct(rolling 2 wk) > load-progression.weekly_increment_pct_effective or monotony(7d) > monotony_band"
     then: "flagReview(kind: load-shape, proposals: [insert_down_week, cap_long_run, hold_ramp_2wk])"
-    severity: flag
+    severity: advisory
     explain: "review-load-shape"
 
   - id: response-not-landing
     when: "consecutive(rpe_gap > rpe_gap_threshold, 3) and performance_decline_sessions >= 3 and no_confounding_event(7d)"
     then: "flagReview(kind: overreach-check, proposals: [down_week, drop_one_quality, extend_block])"
-    severity: flag
+    severity: advisory
     explain: "review-overreach-check"
     note: "If the safety layer's overreach-pattern fires, this becomes a `constrain`, not a review."
 
   - id: goal-feasibility
     when: "weeks_to_race < goal_date_min_weeks or (target_pace_gap > band and weeks_to_race < 8)"
     then: "flagReview(kind: goal-conversation, proposals: [keep_goal_and_accept_band, choose_b_race, shift_date, finish_only])"
-    severity: flag
+    severity: advisory
     explain: "review-goal-conversation"
     note: "Never states that the goal is impossible; states the band and the evidence age."
 
   - id: life-changed
     when: "profile.constraints.availableDays drops >= 1 or user requests review after travel/work flag"
     then: "flagReview(kind: capacity-change, proposals: [rebuild_week_template, reanchor_volume])"
-    severity: flag
+    severity: advisory
     explain: "review-capacity-change"
 
   - id: stale-evidence
     when: "pace_anchor.age_days > pace-bands.evidence_max_age_days and horizon contains quality sessions with prescribed paces"
     then: "flagReview(kind: re-test, proposals: [field_test, keep_effort_bands])"
-    severity: flag
+    severity: advisory
     explain: "review-stale-anchor"
 
   - id: suppression-and-dwell

@@ -2,7 +2,7 @@ schema_version: 1
 id: session-substitution
 status: draft
 owner: plan-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/workout-library/README.md, knowledge/feedback-and-autoregulation/missed-session-handling.md]
   sources: [FB-S6, FB-S7]
@@ -61,13 +61,13 @@ rules:
   - id: hills-replace-intervals
     when: "intervals impossible (no route, unsafe dark, travel) and hills available"
     then: "swap_to(hill_reps) as class-equivalent; do not count it as pace-specific preparation in race-prep"
-    severity: advise
+    severity: advisory
     explain: "substitute-hills-for-intervals"
 
   - id: pool-and-bike-keep-aerobic-only
     when: "running impossible but movement desired (illness recovering, pain below the triage threshold)"
     then: "allow_zero_impact_option(class: aerobic-time, hard: false); never as a hard-day substitute in race-prep"
-    severity: advise
+    severity: advisory
     explain: "substitute-cross-train"
     note: "cross-training preserves aerobic load and does nothing for running-specific tolerance — the comment must not imply otherwise."
 

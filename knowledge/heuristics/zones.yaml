@@ -2,7 +2,7 @@ schema_version: 1
 id: zones
 status: draft
 owner: phys-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/signals-and-metrics/hr-zone-models.md]
   sources: [PHYS-S2, PHYS-S5, PHYS-S7, PHYS-S45]
@@ -85,7 +85,7 @@ rules:
   - id: device-zone-defaults-are-not-ours
     when: "a connected device exports its own zone boundaries"
     then: "keep_for_display; recompute for planning from our own anchor; disclose the difference if it is > 5 bpm"
-    severity: advise
+    severity: advisory
     explain: "zones-device-not-authority"
 
 

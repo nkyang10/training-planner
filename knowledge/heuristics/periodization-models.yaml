@@ -2,7 +2,7 @@ schema_version: 1
 id: periodization-models
 status: draft
 owner: plan-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/periodization/models-comparison.md]
   sources: [PLAN-S2, PLAN-S3, PLAN-S8, PLAN-S10, PLAN-S11]
@@ -100,7 +100,7 @@ rules:
   - id: non-periodized-is-a-choice
     when: "persona == maintenance or goal == health-only"
     then: "use undulating-minimal with no phase boundaries; do not manufacture blocks"
-    severity: advise
+    severity: advisory
     explain: "model-flat-maintenance"
     note: "PLAN-S10's school deliberately runs a high-frequency, no-down-week plan for some athletes: a flat structure can be a considered choice, not an omission. It is not a generator default."
 

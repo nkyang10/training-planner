@@ -27,7 +27,7 @@ rules:                                   # named rule groups (kebab-case ids)
   - id: down-week-required
     when: "week_index % step_cycle == 0 and phase not in [taper, race]"
     then: "target_weekly_km := round(prev_peak_km * down_week_pct/100, 1)"
-    severity: constraint                 # constraint | warn | advise
+    severity: constraint                 # advisory | constraint | hard-stop
     explain: "down-week"
 ```
 
@@ -36,7 +36,8 @@ Hard rules (from [../../AGENTS.md](../../AGENTS.md)):
 1. **Every knob has `range`.** The engine clamps, and a property test asserts that clamped output can
    never exceed the range — so a typo cannot generate a 40 km threshold session.
 2. **Knob ids are `snake_case`; rule ids are `kebab-case`.** Prose backlinks use
-   `→ rule: heuristics/<file>.yaml#<id>` and a test asserts every backlink resolves.
+   `→ rule: heuristics/<file>.yaml#<id>`, and the corpus audit at the end of this file is what
+   checks them.
 3. `provenance.docs` must exist and be `curated` before `status: curated`. Until then the file is
    `draft` and the planner may load it **only** into a bundle whose hash says so.
 4. **Safety files are subtract-only.** In `safety-hard-stops.yaml` every `then:` must be a removal,
@@ -46,6 +47,13 @@ Hard rules (from [../../AGENTS.md](../../AGENTS.md)):
    value. Duplicated magic numbers are a review blocker.
 6. `value` is a **default**, not a truth: profiles and personas select a value *inside* the range, and
    the selection is recorded in the plan's `explain`.
+7. **`severity:` holds a tier, never an action.** The only three values are `advisory`, `constraint`
+   and `hard-stop`; what a rule *does* lives in `then:` (`hard_stop(today)`,
+   `constrain(next_7d: …)`, `flagReview(...)`) and stays snake_case. A verb in `severity:` is a
+   knowledge bug, not a fourth tier: a tier is a noun, the action is a verb, and the machine layer
+   has room for exactly the three nouns
+   ([../../docs/engineering/contract-vocabulary.md](../../docs/engineering/contract-vocabulary.md)
+   items 5 and 6 own which artefact spells them).
 
 ## What is here
 
@@ -89,7 +97,13 @@ research · **fb** = feedback, safety, heuristics · `status` at 2026-11-03.
 | `safety-hard-stops.yaml` | fb | the subtract-only stop list, non-overridable set | draft |
 
 Every `→ rule:` backlink in `knowledge/**` and `docs/**` is checked against this directory by
-`pnpm vitest run eval/knowledge-links` (a broken or unresolvable rule id is a red test, not a TODO).
+`tools/audit-links.ps1`, which the `knowledge` CI job runs and parses: it prints `MISSING ANCHORS`,
+`MISSING YAML FILES`, `BAD SOURCE IDS`, `DEAD LINKS`, `UNTRACKED TARGETS` and
+`UNCOMMITTED CORPUS FILES`, and the job fails if any of those is non-zero or missing from the
+output. The script itself always exits 0 — the counters are the gate, not its exit code — and what
+it cannot see is written down rather than assumed
+([../../docs/engineering/contract-vocabulary.md](../../docs/engineering/contract-vocabulary.md)
+items 15, 18 and 22).
 
 ## Pending M1 work (deliberately visible)
 

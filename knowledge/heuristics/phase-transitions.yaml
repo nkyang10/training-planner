@@ -2,7 +2,7 @@ schema_version: 1
 id: phase-transitions
 status: draft
 owner: plan-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/periodization/phase-transition-rules.md, knowledge/plan-construction/inputs-and-output.md]
   sources: [PLAN-S2, PLAN-S8, PLAN-S11, FB-S1]
@@ -100,7 +100,7 @@ rules:
   - id: between-races-rebuild
     when: "a race completes and another race exists within race_spacing_min_weeks"
     then: "convert_to_maintenance_volume_with_strides; no new build block"
-    severity: advise
+    severity: advisory
     explain: "between-races-hold"
 
 

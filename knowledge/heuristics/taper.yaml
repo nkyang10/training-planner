@@ -2,7 +2,7 @@ schema_version: 1
 id: taper
 status: draft
 owner: plan-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/plan-construction/taper-and-peak.md]
   sources: [PLAN-S5, PLAN-S10, PLAN-S11]
@@ -115,7 +115,7 @@ rules:
   - id: post-race-week
     when: "the day after a race"
     then: "no structured session for 7 days; easy movement only; then restart from the current capacity, not from the pre-race block"
-    severity: advise
+    severity: advisory
     explain: "post-race-reset"
 
 
