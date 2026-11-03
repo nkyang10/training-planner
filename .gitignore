@@ -1,0 +1,45 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# local environment and secrets — never commit a key, a token, or a DSN
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.p12
+
+# local data: a real athlete's data never enters the repository, not even a dump
+*.sqlite
+*.db
+data/
+fixtures/**/real/**
+*.csv
+*.tcx
+*.fit
+*.gpx
+
+# editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# tooling caches
+.eslintcache
+.cache/
+.turbo/
+.next/
+.vite/
+
+# knowledge tooling: keep the corpus, ignore scratch
+knowledge/**/scratch/
+research/**/raw/*.html

@@ -1,0 +1,81 @@
+schema_version: 1
+id: progression
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/physiology/aerobic-energy-and-adaptation.md, knowledge/plan-construction/mileage-and-progression.md, knowledge/risk-and-safety/injury-risk-and-pain-triage.md]
+  sources: [PHYS-S11, PHYS-S17, PLAN-S8]
+applies_to: [all]
+
+notes: >
+  Two clocks run in parallel and the system must not confuse them: the **aerobic** clock responds in
+  weeks, the **tissue** clock in months. Almost every overuse injury this product could cause comes from
+  raising intensity on a volume the connective tissue has not yet been given time to accept. So duration
+  leads and speed follows, by about two weeks — a rule that costs nothing when it is followed and cannot
+  be unbought when it is not
+  ([../physiology/aerobic-energy-and-adaptation.md](../physiology/aerobic-energy-and-adaptation.md)).
+
+knobs:
+  structural_tissue_lag_factor:
+    value: {intensity_volume_source: previous_week, intensity_delay_weeks: 2}
+    range: {intensity_delay_weeks: [1, 6]}
+    unit: object
+    confidence: medium
+    rationale: "Tissue adaptation lags aerobic adaptation by roughly 6–12 weeks in grade-C sources, so v1 uses the executable form: allowed intensity is set by **last** week's volume, never this week's. Two weeks behind is the conservative reading."
+    persona_overridable: false
+  adaptation_block_weeks:
+    value: 6
+    range: [4, 16]
+    unit: weeks
+    confidence: medium
+    rationale: "≥4 weeks for any measurable aerobic change; ≥8 when the goal is race performance. Block swaps are the planner's most expensive action, so they are capped, not offered."
+    persona_overridable: true
+  block_swap_max_per_macro:
+    value: 1
+    range: [0, 2]
+    unit: count
+    confidence: medium
+    rationale: "One mid-macro change of focus per training cycle; a second is churn and the runner experiences it as the plan not working."
+    persona_overridable: false
+  hard_days_per_week_max:
+    value: "derived: session-classes.yaml#hard_days_per_week_default gated by #second_hard_day_gate"
+    range: [1, 3]
+    unit: pointer
+    confidence: high
+    rationale: "The cap lives in session-classes.yaml so the class table and the cap cannot drift apart; 2 is the ceiling for plans with ≥5 running days that have passed the gate, 1 otherwise."
+    persona_overridable: false
+  hard_day_separation_h:
+    value: "recovery.yaml#hard_day_gap_hours"
+    range: [24, 96]
+    unit: pointer
+    confidence: high
+    rationale: "One home for the spacing number."
+    persona_overridable: false
+  progression_rate_by_age:
+    value: 1.0
+    range: [0.5, 1.0]
+    unit: multiplier
+    confidence: low
+    rationale: "The **only** age-based adjustment in v1, and it is applied to the ramp rate, not to the goal. Default 1.0; 0.75 is available where the runner's own history shows intolerance, never inferred from a birth year alone."
+    persona_overridable: true
+
+rules:
+  - id: volume-leads-speed
+    when: "weekly volume rises"
+    then: "intensity may not rise in the same week; the intensity lever uses last week's volume"
+    severity: constraint
+    explain: "progression-tissue-lag"
+
+  - id: one-variable-per-week
+    when: "planning a week"
+    then: "change at most one of {volume, intensity, frequency, long-run length}; the rest hold"
+    severity: constraint
+    explain: "progression-one-variable"
+    note: "The same principle as load.yaml#weekly_load_change_max_pct, applied to plan construction rather than to logged history."
+
+  - id: age-changes-the-ramp-not-the-goal
+    when: "progression_rate_by_age < 1.0"
+    then: "apply to the ramp only; goal feasibility stays a conversation about evidence (pace-model.yaml); language-guardrails.yaml#no_demographic_stereotypes applies"
+    severity: hard-stop
+    explain: "progression-age-is-ramp"

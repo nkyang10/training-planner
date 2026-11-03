@@ -1,0 +1,176 @@
+schema_version: 1
+id: workout-dosage
+status: draft
+owner: plan-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/plan-construction/key-workout-dosage.md]
+  sources: [PLAN-S8, PLAN-S11]
+applies_to: [all]
+
+notes: >
+  Dosage is expressed in **time in zone**, not in repetitions, because time in zone is comparable across
+  paces, surfaces, and fitness levels, and it degrades gracefully when the runner walks a rep. Every
+  session in the library must fit `warmup + reps + recovery ≤ durationCeilingMin`; if it cannot, the
+  session is wrong, not the runner.
+
+knobs:
+  wo_time_in_zone_min:
+    value: {novice: 12, recreational: 18, competitive: 24}
+    range: {novice: [6, 16], recreational: [10, 22], competitive: [12, 30]}
+    unit: map-minutes
+    confidence: medium
+    rationale: "plan-construction/key-workout-dosage.md; total time at V̇O₂max intensity across the reps. PLAN-S8's coaching ceiling is ≈ 5% of weekly distance and ≈ 1000 m per session at I pace — grade C, used as a shape check, not a formula. Above 30 min the quality of the reps collapses."
+    persona_overridable: true
+  wo_rep_max_min:
+    value: 5
+    range: [3, 8]
+    unit: minutes
+    confidence: medium
+    rationale: "Longer continuous reps belong to threshold work; V̇O₂max reps stay short so pace stays honest."
+    persona_overridable: false
+  wo_recovery_ratio:
+    value: work_1_to_rest_1
+    range: [1:0.5, 1:1, 1:1.5, 1:2]
+    unit: enum
+    confidence: medium
+    rationale: "1:1 keeps heart rate elevated but lets each rep be run at the right effort; shorter rest turns the session into a threshold session with a misleading name."
+    persona_overridable: true
+  threshold_continuous_min:
+    value: 20
+    range: [10, 40]
+    unit: minutes
+    confidence: medium
+    rationale: "20 min continuous at threshold, or 2 × 10 with ≤ 2 min recovery — the T-dose convention in PLAN-S8 (grade C); PLAN-S4's threshold-heavy arm ran far more than this weekly and improved less."
+    persona_overridable: true
+  cruise_interval_continuous_min:
+    value: 15
+    range: [8, 25]
+    unit: minutes
+    confidence: medium
+    rationale: "Cruise intervals are threshold work in pieces; the total must stay near the continuous dose or the session is a different stimulus."
+    persona_overridable: true
+  cruise_recovery_max_min:
+    value: 1
+    range: [0.5, 3]
+    unit: minutes
+    confidence: medium
+    rationale: "Long recovery lets lactate clear and destroys the point of the interval structure."
+    persona_overridable: false
+  mp_run_min:
+    value: 60
+    range: [30, 110]
+    unit: minutes
+    confidence: medium
+    rationale: "Marathon pace becomes trainable in continuous blocks of an hour; PLAN-S11 builds MP into progression long runs rather than standalone sessions. Capped by long_run_share and by weekly hard-day caps."
+    persona_overridable: true
+  mp_run_max_share_of_long_run:
+    value: 55
+    range: [30, 70]
+    unit: percent
+    confidence: medium
+    rationale: "Keeps MP work from silently becoming the long run and then the whole plan."
+    persona_overridable: false
+  strides_dose:
+    value: {reps: 6, seconds: 20, gradient: "build to smooth fast, not a sprint", recovery: "walk or jog 60 s"}
+    range: {reps: [4, 10], seconds: [15, 30]}
+    unit: object
+    confidence: medium
+    rationale: "Neuromuscular stimulus at almost no systemic cost — the safe way to keep sharpness in taper and in maintenance."
+    persona_overridable: true
+  hill_reps_dose:
+    value: {reps: 6, seconds: 45, gradient_pct_min: 4, recovery: "jog down"}
+    range: {reps: [4, 12], seconds: [20, 90], gradient_pct_min: [3, 8]}
+    unit: object
+    confidence: medium
+    rationale: "Hills are the cheapest quality session: high intensity, low impact, no pace anxiety. First choice for time-poor and novice personas."
+    persona_overridable: true
+  session_duration_ceiling_min:
+    value: {novice: 60, recreational: 90, competitive: 120, time_poor: 50}
+    range: {novice: [40, 75], recreational: [60, 110], competitive: [80, 150], time_poor: [35, 70]}
+    unit: map-minutes
+    confidence: high
+    rationale: "The hard constraint every session must fit inside; also the reason a session may be shortened rather than skipped."
+    persona_overridable: true
+  first_week_of_phase_reduction:
+    value: 75
+    range: [60, 90]
+    unit: percent-of-target-dose
+    confidence: medium
+    rationale: "Introduce a new session kind at three-quarters dose; the first week of a new stimulus is a test, not a performance."
+    persona_overridable: false
+
+rules:
+  - id: dose-must-fit-ceiling
+    when: "warmupMin + reps + recovery > session_duration_ceiling_min"
+    then: "reduce_rep_count_until_fits; never shorten_warmup_below_10_min"
+    severity: constraint
+    explain: "dose-fits-session"
+
+  - id: one-new-stimulus-at-a-time
+    when: "a session kind has never appeared in the log"
+    then: "schedule_on_an_easy_adaptation_day_at_first_week_of_phase_reduction; not in race week; not within 3 days of a race"
+    severity: constraint
+    explain: "dose-introduce-gently"
+
+  - id: dose-prescription-language
+    when: "measurementConfidence.paces == unknown"
+    then: "prescribe_by(rpe, duration, distance); paceTargets := false"
+    severity: constraint
+    explain: "dose-no-pace-targets-without-evidence"
+    note: "The rule behind the novice golden plan's paceTargetsPresent: false."
+
+  - id: quality-degrades-to-volume
+    when: "a quality session cannot be completed as prescribed (weather, time, legs)"
+    then: "offer_fallback_ladder[strides_then_hills_then_easy_volume]; never mark it done"
+    severity: advise
+    explain: "dose-fallback-ladder"
+
+
+## Contract aliases
+contract_aliases:
+  i_pace_week_pct:
+    value: 4
+    range: [2, 8]
+    unit: "percent of weekly volume at vo2max-interval pace, reps plus rest"
+    confidence: medium
+    rationale: "key-workout-dosage.md. Counting reps and rest keeps the dose honest: 5x1000 m with floating recovery is not 5 km of work."
+    persona_overridable: true
+  t_pace_week_pct:
+    value: 8
+    range: [4, 12]
+    unit: "percent of weekly volume at threshold and tempo"
+    confidence: medium
+    rationale: "key-workout-dosage.md and tempo-cruise-intervals.md; the larger share of the quality slice because threshold work tolerates volume better than vo2max work."
+    persona_overridable: true
+  mp_week_pct:
+    value: 15
+    range: [10, 25]
+    unit: "percent of weekly volume at marathon pace, inside the long run"
+    confidence: medium
+    rationale: "competitive-amateur-marathon.md; the marathon-specific slice, placed inside a long run rather than as a standalone quality day, and grown at the rate in progression.yaml#structural_tissue_lag_factor."
+    persona_overridable: true
+  mp_continuous_min:
+    value: 45
+    range: [20, 100]
+    unit: "minutes of marathon pace run continuously"
+    confidence: medium
+    rationale: "The practical ceiling for one unbroken stretch; beyond it, split the block and keep the total."
+    persona_overridable: true
+  strides_per_week:
+    home: "#strides_dose"
+    note: "count form used by strides.md and key-workout-dosage.md (1-4 sessions per week)"
+  no_stack_same_stress_h:
+    value: 72
+    range: [24, 96]
+    unit: hours_between_same_stimulus
+    confidence: medium
+    rationale: "recovery.yaml#hard_day_gap_hours spaces hard days; this spaces repeats of the same stimulus (two threshold sessions, two mp blocks), the pairing that stalls adaptation without causing injury."
+    persona_overridable: true
+  max_quality_minutes_week:
+    value: 90
+    range: [40, 160]
+    unit: minutes
+    confidence: medium
+    rationale: "An absolute ceiling on quality minutes per week, independent of percentages, because a percentage cap scales with volume the runner may have inflated themselves."
+    persona_overridable: true

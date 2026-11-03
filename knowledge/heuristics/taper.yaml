@@ -1,0 +1,134 @@
+schema_version: 1
+id: taper
+status: draft
+owner: plan-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/plan-construction/taper-and-peak.md]
+  sources: [PLAN-S5, PLAN-S10, PLAN-S11]
+applies_to: [race-targeted]
+
+notes: >
+  The taper is the best-evidenced part of this file. PLAN-S5 (grade A meta-analysis) concludes verbatim
+  that "a 2-wk taper during which training volume is exponentially reduced by 41-60% seems to be the most
+  efficient strategy to maximize performance gains", and the studies behind it reduced **volume**, not
+  intensity or frequency. That single sentence is why `volume_trajectory` is exponential, why
+  `intensity_preserved` is `true`, and why "3 weeks, halve everything, stop running" is treated as a folk
+  rule that discards the stimulus the runner paid for. PLAN-S10 (Hansons) deliberately taper differently —
+  longer, deeper, with quality on tired legs — which is why every length here is a range with a persona
+  override. Novelty, not sharpness, is what ruins race weeks. (Naming
+  note: the bibliography entry for PLAN-S5 points at `taper.yaml#taper_days` and `#volume_cut_pct`; the
+  canonical knobs here are `taper_length_days` and `taper_volume_end_pct`.)
+
+knobs:
+  taper_length_days:
+    value: {marathon: 14, half_marathon: 10, ten_k: 7, five_k: 5, ultra_over_50k: 21}
+    range: {marathon: [7, 21], half_marathon: [5, 14], ten_k: [4, 10], five_k: [3, 7], ultra_over_50k: [14, 28]}
+    unit: map-days
+    confidence: medium
+    rationale: "PLAN-S5 names ~2 weeks as most efficient; ≥ 2 weeks for the biggest efforts is PLAN-S11 coaching practice rather than a measured optimum. Shorter is safer than longer."
+    persona_overridable: true
+  volume_trajectory:
+    value: exponential_decay_tau_days
+    range: [linear, step, exponential_decay_tau_days]
+    unit: enum
+    confidence: medium
+    rationale: "PLAN-S5's conclusion names the exponential reduction explicitly; pooled performance effects are modest and the underlying studies differ in sport and duration, so linear is allowed but never preferred."
+    persona_overridable: false
+  taper_volume_end_pct:
+    value: 45
+    range: [30, 70]
+    unit: percent-of-peak-week
+    confidence: medium
+    rationale: "PLAN-S5: volume exponentially reduced by 41–60% over 2 weeks, i.e. race week ≈ 40–59% of peak. Above 70% there is no taper; below 30% the runner arrives stale."
+    persona_overridable: true
+  intensity_preserved:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "The defining feature: keep race-pace touches and short sharp reps at full effort, just far fewer of them."
+    persona_overridable: false
+  frequency_preserved_pct:
+    value: 90
+    range: [70, 100]
+    unit: percent-of-normal-sessions
+    confidence: medium
+    rationale: "Trim sessions before removing days; days off for 5 days straight produces a flat, uncertain feeling at the start line."
+    persona_overridable: true
+  last_quality_session_before_race_days:
+    value: 4
+    range: [3, 7]
+    unit: days
+    confidence: medium
+    rationale: "Enough recovery, recent enough to feel ready. Masters uses the upper end via individual-baselines.yaml."
+    persona_overridable: true
+  final_week_strides:
+    value: {sessions: 2, strides: "4-6 × 20 s @ 5K effort, full recovery", on_easy_days: true}
+    range: {sessions: [1, 3]}
+    unit: object
+    confidence: medium
+    rationale: "Neuromuscular maintenance at negligible cost; also the best available 'does my body feel like running?' test."
+    persona_overridable: true
+  taper_novelty_policy:
+    value: nothing_untested
+    range: null
+    unit: rule
+    confidence: high
+    rationale: "No new shoes, no new foods, no new course, no new session kind. phase-transitions.yaml#race-week-is-not-a-phase-change."
+    persona_overridable: false
+  masters_taper_extension_days:
+    value: 3
+    range: [0, 7]
+    unit: days
+    confidence: low
+    rationale: "Recovery-lag reasoning, not a taper trial in masters athletes. Ours, clamped."
+    persona_overridable: true
+  no_taper_when:
+    value: {horizon_days_max: 21, goal_distance_max_km: 5, training_age_weeks_max: 8}
+    range: {horizon_days_max: [14, 28], training_age_weeks_max: [4, 12]}
+    unit: object
+    confidence: medium
+    rationale: "A novice running their first 5 km needs volume trimmed and one short sharp session, not a taper — expect.json in the golden fixture asserts this."
+    persona_overridable: false
+
+rules:
+  - id: taper-reduces-and-never-adds
+    when: "in taper"
+    then: "volume monotone_non_increasing; intensity_preserved; any proposed volume increase is rejected"
+    severity: constraint
+    explain: "taper-monotone"
+
+  - id: taper-does-not-fix-a-bad-block
+    when: "readiness_criteria_failed_before_taper"
+    then: "hold_taper_as_planned_and_set_expectation_in_review; do not compress training into the taper to 'catch up'"
+    severity: constraint
+    explain: "taper-cannot-rescue"
+    note: "The most tempting and most damaging automatic behaviour. Saying 'we arrived under-prepared and that is now fixed' is better coaching than a broken race week."
+
+  - id: taper-guardrail-on-symptoms
+    when: "a red flag or pain >= 4 during taper"
+    then: "safety layer wins; race participation becomes the runner's decision with a referral, never ours"
+    severity: hard-stop
+    explain: "taper-yields-to-safety"
+
+  - id: post-race-week
+    when: "the day after a race"
+    then: "no structured session for 7 days; easy movement only; then restart from the current capacity, not from the pre-race block"
+    severity: advise
+    explain: "post-race-reset"
+
+
+## Contract aliases
+## Names the prose docs use that resolve to a knob or rule declared above. `home` is where the number
+## lives; nothing below is a second copy of it (knowledge/MAINTENANCE.md, one number one home).
+## `derived` means computed from the home at read time.
+
+contract_aliases:
+  taper_days: {home: "#taper_length_days"}
+  volume_cut_pct: {home: "#taper_volume_end_pct", derived: "100 minus taper_volume_end_pct"}
+  frequency_floor_pct: {home: "#frequency_preserved_pct"}
+  last_hard_session_days_out: {home: "#last_quality_session_before_race_days"}
+  keep_intensity: {home: "#intensity_preserved"}
+  trigger: {home: "#taper_length_days", note: "the taper starts by countdown to race day, never from a form number (performance-management.yaml#tsb_prescription_allowed)"}
+  naming_note: "the PLAN-S5 bibliography names #taper_days and #volume_cut_pct; they are declared above, so the older 'not yet declared' remark earlier in this file is superseded."

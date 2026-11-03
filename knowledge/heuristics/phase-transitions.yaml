@@ -1,0 +1,122 @@
+schema_version: 1
+id: phase-transitions
+status: draft
+owner: plan-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/periodization/phase-transition-rules.md, knowledge/plan-construction/inputs-and-output.md]
+  sources: [PLAN-S2, PLAN-S8, PLAN-S11, FB-S1]
+applies_to: [all]
+
+notes: >
+  A phase boundary is where the plan changes *shape*, and it should be earned by evidence rather than by
+  the calendar. The transition criteria below are deliberately boring: completion, tolerance, and no
+  escalating pain. The failure mode we are avoiding is the plan that advances because it says week 5.
+
+knobs:
+  phase_order_default:
+    value: [adaptation, building, race-prep, taper, race]
+    range: null
+    unit: list
+    confidence: high
+    rationale: "Names are ours, not canonical — the runner-facing explanation must always say what the phase means, never the label alone."
+    persona_overridable: true
+  adaptation_min_weeks:
+    value: 4
+    range: [3, 12]
+    unit: weeks
+    confidence: medium
+    rationale: "Longer when history is thin (< 8 measured weeks) or after > 3 weeks off; restart-after-layoff.yaml may override upward only."
+    persona_overridable: true
+  building_weeks:
+    value: 6
+    range: [4, 16]
+    unit: weeks
+    confidence: medium
+    rationale: "Derived from horizon_to_race minus prep and taper; this is a default, not an addition."
+    persona_overridable: true
+  race_prep_min_weeks:
+    value: 4
+    range: [3, 10]
+    unit: weeks
+    confidence: medium
+    rationale: "PLAN-S8/PLAN-S11 put most race-specific work in the final third of a 12–18-week build; PLAN-S12 bounds the realistic weekly *time* a marathon block costs, which is what makes a 4-week prep feasible or not."
+    persona_overridable: true
+  transition_criteria:
+    value: {completion_rate_28d_min: 0.8, rpe_gap_max: 1.5, pain_max: 3, escalating_pain: false, review_open: false}
+    range: {completion_rate_28d_min: [0.6, 0.95], rpe_gap_max: [1, 2.5], pain_max: [2, 4]}
+    unit: object
+    confidence: medium
+    rationale: "Four boring checks. All must pass; failing one extends the phase rather than reducing its intensity."
+    persona_overridable: false
+  extend_block_action:
+    value: repeat_phase_hold_load
+    range: [repeat_phase_hold_load, repeat_phase_reduce_10pct, advance_anyway_with_warning]
+    unit: enum
+    confidence: medium
+    rationale: "Extending is safer than intensifying; the third option exists only for a runner-initiated review."
+    persona_overridable: true
+  race_spacing_min_weeks:
+    value: {same_or_smaller_distance: 4, larger_distance: 8, hard_race_as_hard_day: true}
+    range: {same_or_smaller_distance: [2, 8], larger_distance: [6, 16]}
+    unit: object
+    confidence: medium
+    rationale: "A race consumes a hard-session slot and costs recovery like one; the week after a race is easy volume, full stop."
+    persona_overridable: true
+  min_weeks_in_phase_before_review_can_restructure:
+    value: 2
+    range: [1, 4]
+    unit: weeks
+    confidence: medium
+    rationale: "Prevents a review from dissolving a phase before it can produce evidence."
+    persona_overridable: false
+
+rules:
+  - id: no-advance-on-unlogged
+    when: "loggedDayRatio28d < 0.6"
+    then: "hold_phase; request_review(kind: stale-evidence); never advance"
+    severity: constraint
+    explain: "phase-advance-needs-evidence"
+
+  - id: no-advance-with-escalating-pain
+    when: "painTrend == rising and pain_max_violation"
+    then: "hold_phase_and_constrain(per injury-risk-and-pain-triage.md)"
+    severity: hard-stop
+    explain: "phase-advance-blocked-by-pain"
+
+  - id: no-two-boundaries-one-week
+    when: "a phase boundary and a step-down week and a race all land within 7 days"
+    then: "spread_across_two_weeks_or_drop_the_boundary"
+    severity: constraint
+    explain: "phase-boundary-stack"
+
+  - id: race-week-is-not-a-phase-change
+    when: "in race week"
+    then: "no new session kinds; nothing untested; race itself satisfies the quality slot"
+    severity: constraint
+    explain: "race-week-no-novelty"
+    note: "knowledge/plan-construction/taper-and-peak.md — the runner must not meet a new workout in race week."
+
+  - id: between-races-rebuild
+    when: "a race completes and another race exists within race_spacing_min_weeks"
+    then: "convert_to_maintenance_volume_with_strides; no new build block"
+    severity: advise
+    explain: "between-races-hold"
+
+
+## Contract aliases
+contract_aliases:
+  base_long_run_min:
+    value: 60
+    range: [40, 110]
+    unit: minutes
+    confidence: medium
+    rationale: "The long-run floor a base block must hold before a specific block may open (phase-transition-rules.md): the specific block's quality work presumes an aerobic base measurable as duration, not as pace."
+    persona_overridable: true
+  specific_block_weeks:
+    value: 8
+    range: [6, 12]
+    unit: weeks
+    confidence: medium
+    rationale: "Race-specific work needs two full progression steps plus a down week to count as a block; below 6 weeks the runner gets the fatigue without the adaptation (fitness-fatigue.yaml#adaptation_floor_weeks is the floor this clamps to)."
+    persona_overridable: true

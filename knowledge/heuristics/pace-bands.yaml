@@ -1,0 +1,157 @@
+schema_version: 1
+id: pace-bands
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/pace-models.md, knowledge/signals-and-metrics/measurement-and-testing.md]
+  sources: [PLAN-S8, PLAN-S11, PHYS-S43, PHYS-S44]
+applies_to: [all]
+
+notes: >
+  Bands are derived from **evidence with a stated age**, never from a race predicted from another race.
+  The rule that matters most: if `measurementConfidence.paces == unknown`, the planner emits **no pace
+  targets at all** and prescribes by effort and time. That is the single most common way running apps
+  hand a novice a meaningless number
+  ([../plan-construction/measurement-and-testing.md](../plan-construction/measurement-and-testing.md)).
+
+knobs:
+  evidence_max_age_weeks:
+    value: 12
+    range: [6, 26]
+    unit: weeks
+    confidence: medium
+    rationale: "A 5 km race time older than a season describes a different runner, especially after a layoff or a change in volume."
+    persona_overridable: true
+  bands:
+    value:
+      easy: {pct_of_hmp_slower_s_per_km: [25, 60], rpe: [2, 4], talk: "full sentences"}
+      marathon: {anchor: "recent marathon or 2 × 90 min @ MP evidence", rpe: [5, 6]}
+      half_marathon: {anchor: "recent race or 60 min threshold test", rpe: [6, 7]}
+      threshold: {anchor: "30-min test (Leeper/Conklin) or recent 10–15 km race", rpe: [7, 8]}
+      interval: {anchor: "recent 5 km race", rpe: [8, 9]}
+      repetition_or_strides: {anchor: "none required — effort-based", rpe: [8, 9], note: "form, not physiology"}
+    range: null
+    unit: map
+    confidence: medium
+    rationale: "Each band names its own evidence anchor, so the plan can state where a pace came from (explainMustReference)."
+    persona_overridable: false
+  band_width_s_per_km:
+    value: 6
+    range: [3, 12]
+    unit: seconds
+    confidence: medium
+    rationale: "Paces are bands, not points. A single-number pace teaches the runner to chase it; a ±6 s band teaches effort."
+    persona_overridable: false
+  prediction_model:
+    value: riegel
+    range: [riegel, riegel-0.07, daniels-vdot-conversions, none]
+    unit: enum
+    confidence: low
+    rationale: "Riegel's exponent was fitted on homogenised race data across distances; individual error is large. Display only, never a training input."
+    persona_overridable: true
+  riegel_exponent:
+    value: 0.106
+    range: [0.06, 0.18]
+    unit: exponent
+    confidence: low
+    rationale: "PLAN/physiology note: the exponent drifts with duration and training bias; treat any prediction as ±2–3% at best."
+    persona_overridable: true
+  prediction_max_extrapolation_ratio:
+    value: 1.6
+    range: [1.2, 2.2]
+    unit: distance-ratio
+    confidence: medium
+    rationale: "Predicting a marathon from a 5 km (ratio 8.4) is fiction. Beyond this ratio, refuse and ask for a longer test."
+    persona_overridable: false
+  weather_adjustment:
+    value: {heat_above_c: 15, slack_s_per_km_per_degree: 1.0, wind_note: "descriptive only"}
+    range: {heat_above_c: [10, 22], slack_s_per_km_per_degree: [0.4, 2.0]}
+    unit: object
+    confidence: low
+    rationale: "Direction is solid; the coefficient varies enormously with humidity, which we cannot measure. Effort-based coaching is the honest answer."
+    persona_overridable: true
+  altitude_note_threshold_m:
+    value: 1200
+    range: [800, 2000]
+    unit: metres
+    confidence: low
+    rationale: "Onset of measurable effect on V̇O₂max is context-dependent; used only to switch pace targets off, not to compute a correction."
+    persona_overridable: true
+
+rules:
+  - id: no-pace-band-without-anchor
+    when: "a band has no evidence within evidence_max_age_weeks"
+    then: "emit_effort_targets_only; state why in the plan explanation"
+    severity: constraint
+    explain: "pace-bands-no-anchor"
+    note: "safety-hard-stops.yaml#no-pace-target-from-prediction makes this non-overridable."
+
+  - id: bands-are-bands
+    when: "rendering a pace target to the runner"
+    then: "render_range(band_width_s_per_km); never a single pace"
+    severity: constraint
+    explain: "pace-bands-rendered-as-range"
+
+  - id: no-chasing
+    when: "runner reports running a pace target as a ceiling to beat"
+    then: "comment_once(effort_first); if easy-day pace keeps exceeding the band, treat as distribution-easy-drift"
+    severity: advise
+    explain: "pace-bands-effort-first"
+
+
+contract_aliases:
+  riegel_exponent_alpha: {home: "#riegel_exponent"}
+  pace_source_staleness_days:
+    home: "#evidence_max_age_weeks"
+    derived: "evidence_max_age_weeks x 7"
+    note: "56 days default (21-120 allowed); the days form exists because pace-model docs count in days."
+  band_width_pct:
+    home: "#band_width_s_per_km"
+    derived: "band_width_s_per_km / reference_pace_s_per_km"
+    note: "0.04-0.08 at common paces. Storing seconds is deliberate: a percentage of pace compounds into absurd widths at sprint paces."
+  conflict_policy:
+    value: {prefer: "conversion_input_priority order", on_conflict: "show both with dates and ask which race to plan from", never: "silently average two race-derived paces"}
+    range: null
+    unit: policy
+    confidence: high
+    rationale: "A March 5K and a September marathon disagree by construction; averaging them yields a pace nobody ever ran."
+    persona_overridable: false
+  prediction_allowed_for:
+    value: [easy, long, marathon, half_marathon, threshold]
+    range: [easy, long, marathon, half_marathon, threshold, vo2max_pace, sprint]
+    unit: list
+    confidence: medium
+    rationale: "Extrapolation is trusted for aerobic paces and refused for vo2max and sprint, where race-to-race variance is largest and model error is unbounded."
+    persona_overridable: false
+  grade_adjustment_per_pct:
+    value: 1.0
+    range: [0.5, 2.0]
+    unit: "percent effort cost per 1 percent average grade"
+    confidence: low
+    rationale: "Grade-cost work (PHYS-S44) is about energy, not pace equivalence: this annotates a hilly session as harder and never converts a hill rep into a flat pace target."
+    persona_overridable: false
+  threshold_fraction_of_vvo2max:
+    value: 0.9
+    range: [0.88, 0.96]
+    unit: ratio
+    confidence: low
+    rationale: "Grade-C range from Daniels-class sources (PHYS-S8); used to sanity-check a threshold pace that came from nowhere else, never to set one."
+    persona_overridable: false
+  threshold_change_min_pct: {home: "field-tests.yaml#min_change_to_reband_pct", note: "3 percent, below which a threshold re-band is inside test-to-test error"}
+  test_conditions_required:
+    value: [date, course_or_treadmill, temperature, wind_or_none, device]
+    range: null
+    unit: list
+    confidence: high
+    rationale: "field-tests.yaml#rules: test-requires-protocol. A pace recorded at 30 C must not re-band a winter plan."
+    persona_overridable: false
+  easy_band: {home: "#bands", note: "the `easy` entry of the bands map"}
+  pace_band_s: {home: "#band_width_s_per_km"}
+  pace_source_priority:
+    value: [race_result, field_test, recent_verified_run, device_estimate, age_predicted]
+    range: null
+    unit: ordered list
+    confidence: high
+    rationale: "The order in which a pace anchor may be taken from evidence, freshest and most direct first; a device estimate never outranks a race the runner actually ran, and an age-predicted number never sets a target at all (safety-hard-stops.yaml#no_pace_target_from_prediction)."
+    persona_overridable: false

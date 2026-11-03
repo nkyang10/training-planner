@@ -1,0 +1,92 @@
+schema_version: 1
+id: load
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/session-load-metrics.md]
+  sources: [PHYS-S5, PHYS-S6, PHYS-S7, PHYS-S8, PHYS-S9, PHYS-S13]
+applies_to: [device-connected, manual-logged]
+
+notes: >
+  One counter per user, chosen at onboarding, versioned forever. The weekly **change** in that counter is
+  the actionable quantity in this product — it replaces ACWR as the thing the engine reacts to
+  ([acwr.yaml](acwr.yaml)). Session load itself carries a typical error of ≈ 12% (PHYS-S9), which is why
+  the minimum detectable weekly change sits well above it and why no single session ever moves a plan.
+
+knobs:
+  primary_counter:
+    value: srpe
+    range: [srpe, trimp_exp, zone_minutes]
+    unit: enum
+    confidence: high
+    rationale: "sRPE (duration × RPE, Foster) is the only counter robust to bad heart-rate data, and it needs no device — the default for a runner who logs by feel. Fallback zone_minutes; store counter_version with every value."
+    persona_overridable: true
+  trimp_coefficients:
+    value: {base: 0.64, b_male: 1.92, b_female: 1.67}
+    range: {base: [0.4, 0.9], b_male: [1.5, 2.3], b_female: [1.3, 2.0]}
+    unit: map
+    confidence: low
+    rationale: "PHYS-S5/S7, **primary source not abstract-verified**; clamped to range and re-validated before any user-visible number depends on them. TRIMP also under-weights intervals (PHYS-S7)."
+    persona_overridable: false
+  weekly_load_change_max_pct:
+    value: 10
+    range: [5, 15]
+    unit: percent
+    confidence: medium
+    rationale: "The primary guard, applied *subtractively*: where the planned week-to-week change is too large, downgrade rather than shuffle days."
+    persona_overridable: true
+  weekly_change_max_pct:
+    value: "*weekly_load_change_max_pct"
+    range: null
+    unit: alias
+    confidence: medium
+    rationale: "Alias of the knob above (acute-chronic-workload.md names it this way). One number, one home."
+    persona_overridable: false
+  min_detectable_weekly_change_pct:
+    value: 15
+    range: [10, 25]
+    unit: percent
+    confidence: medium
+    rationale: "≈ 1.5 × the 12% typical error of session load (PHYS-S9). Smaller changes may not trigger any rule."
+    persona_overridable: false
+  interval_correction:
+    value: "sessions classed interval or fartlek use srpe when available, else load_low_confidence"
+    range: null
+    unit: rule
+    confidence: medium
+    rationale: "PHYS-S8: heart-rate–based counters systematically under-count intermittent work."
+    persona_overridable: false
+  monotony_flag:
+    value: 1.8
+    range: [1.4, 2.5]
+    unit: ratio
+    confidence: low
+    rationale: "Daily-load SD ÷ mean (Foster). Display + suggestion only: the cut-point is contested, so monotony never restructures a week by itself."
+    persona_overridable: true
+  monotony_flag_range:
+    value: "*monotony_flag"
+    range: null
+    unit: alias
+    confidence: low
+    rationale: "Alias, for the same reason as weekly_change_max_pct."
+    persona_overridable: false
+
+rules:
+  - id: cross-counter-mixing
+    when: "a trend or ratio would combine values with different counter_version"
+    then: "build_time_rejection"
+    severity: hard-stop
+    explain: "load-no-counter-mixing"
+
+  - id: one-session-is-not-a-trend
+    when: "a single session's load looks extreme"
+    then: "no_plan_change; may appear in the day comment as a fact with its counter and date"
+    severity: constraint
+    explain: "load-session-no-verdict"
+    note: "noise.yaml#wait-by-default is the general form."
+
+
+contract_aliases:
+  cross_counter_mixing: {home: "#rules: cross-counter-mixing"}
+  weekly_change_max_pct: {home: "#weekly_load_change_max_pct"}

@@ -1,0 +1,81 @@
+schema_version: 1
+id: medical-flags
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/risk-and-safety/red-s-and-beyond.md, knowledge/physiology/demographics-and-context.md, knowledge/signals-and-metrics/hr-zone-models.md]
+  sources: [FB-S2, FB-S3, FB-S4, PHYS-S2]
+applies_to: [all]
+
+notes: >
+  A medical flag is a **switch that turns the planner down**, never a diagnosis and never a topic the app
+  comments on. Two flags matter most: medications or conditions that make heart-rate data meaningless (the
+  whole HR half of the product must switch itself off), and pregnancy/postpartum, where the system must stop
+  setting performance goals at all. Flags are self-entered, stored with the `user_id`, never inferred, and
+  never surfaced back as medical language
+  ([../risk-and-safety/red-s-and-beyond.md](../risk-and-safety/red-s-and-beyond.md)).
+
+knobs:
+  hr_zones_invalid:
+    value: false
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "Set by beta-blockers, calcium-channel blockers, pacemaker, chronotropic medication, or an unexplained HR anomaly. When true: every HR-derived auto-adjustment is off; RPE and effort-based pace are used; zone display is hidden rather than shown wrong."
+    persona_overridable: false
+  hrv_signals_suppressed:
+    value: false
+    range: null
+    unit: bool
+    confidence: medium
+    rationale: "Atrial fibrillation or ectopy makes HR-derived nightly indices uninterpretable. Suppression is kind as well as correct."
+    persona_overridable: false
+  pregnancy_postpartum_lock:
+    value: false
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "When true: no race-goal scheduling, no interval loading, no intensity-increasing review action without a recorded clearance acknowledgement. Subtractive edits only. Postpartum return is guided by the user's own clinician clearance field, never by weeks-since-birth arithmetic the app invents."
+    persona_overridable: false
+  low_energy_availability_watch:
+    value: {inputs: [unexplained_performance_drop, missed_periods_flag, recurrent_injury_flag, elevated_resting_hr], action: offer_clinician_referral_page, action_plan: subtract_only}
+    range: null
+    unit: policy
+    confidence: medium
+    rationale: "The REDs picture is a clinical judgement (FB-S2/FB-S3). The app's job is to notice a pattern, subtract load, and point at a clinician — not to name the syndrome to the runner."
+    persona_overridable: false
+  resting_hr_alert_delta_bpm:
+    value: 7
+    range: [5, 15]
+    unit: bpm-above-own-baseline
+    confidence: low
+    rationale: "Sustained elevation is a reason to suggest a clinician conversation, not a reason to say anything about illness. Low confidence on purpose: it is a screening nicety, not a validated threshold."
+    persona_overridable: false
+  fever_rule:
+    value: {below_neck: no_training_days_until_symptom_free, above_neck: effort_capped_easy_only}
+    range: null
+    unit: policy
+    confidence: medium
+    rationale: "The 'neck check' is folk practice with no good trial; it survives here only as a conservative subtraction, and the copy says so rather than sounding clinical."
+    persona_overridable: false
+
+rules:
+  - id: no-medical-advice
+    when: "any flag is set"
+    then: "no explanation of the condition, no medication commentary, no dosing, no diet; subtract_and_refer only"
+    severity: hard-stop
+    explain: "medical-no-advice"
+
+  - id: flag-switches-are-silent
+    when: "a flag disables a feature"
+    then: "say what the app now uses instead (effort instead of HR), never why in clinical terms"
+    severity: constraint
+    explain: "medical-flags-no-clinical-copy"
+
+  - id: clearance-is-recorded-not-assumed
+    when: "an intensity-increasing action is requested while pregnancy_postpartum_lock or a cardiac flag is true"
+    then: "require an explicit recorded acknowledgement before the change; otherwise subtract only"
+    severity: hard-stop
+    explain: "medical-clearance-required"
+    note: "Same shape as AGENTS.md rule 3: hard stops are not one-tap overridable."

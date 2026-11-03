@@ -1,0 +1,133 @@
+schema_version: 1
+id: recovery
+status: draft
+owner: plan-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/physiology/fatigue-fitness-recovery.md, knowledge/risk-and-safety/injury-risk-and-pain-triage.md]
+  sources: [FB-S1, PLAN-S1]
+applies_to: [all]
+
+notes: >
+  Recovery rules are where a planner earns or loses trust, because they are the part a runner can feel.
+  The governing asymmetry: an unnecessary easy day costs almost nothing, an unnecessary hard day can cost
+  a season. So recovery is scheduled **before** it is needed, and the structure protects it even when the
+  runner reports feeling fine — a good feeling is not evidence against a spacing rule.
+
+knobs:
+  hard_day_gap_hours:
+    value: 48
+    range: [24, 96]
+    unit: hours
+    confidence: high
+    rationale: "The default spacing between hard days, for every persona. fatigue-fitness-recovery.md is the reasoning home: below 48 h a second hard day is not a second stimulus, it is the first one again. missed-session-rules.yaml, session-substitution.yaml, weekly-templates.yaml and progression.yaml#hard_day_separation_h point here instead of restating a number."
+    persona_overridable: false
+  hard_day_gap_hours_after_quality:
+    value: 72
+    range: [48, 120]
+    unit: hours
+    confidence: high
+    rationale: "The wider gap after intervals or a race, the two stressors whose real cost is not visible in the session that produced it. A time-poor runner trades this gap down before trading down the number of hard days, and the trade is recorded as a review change with its stated cost (docs/ux/review-flow.md)."
+    persona_overridable: true
+  easy_day_after_hard:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "weekly-templates.yaml#easy_day_after_hard — no exceptions, including race week and taper."
+    persona_overridable: false
+  masters_hard_day_gap_hours:
+    value: 96
+    range: [72, 144]
+    unit: hours
+    confidence: medium
+    rationale: "Direction is well established (slower clearance and remodelling); the number is ours. See demographics-and-context.md."
+    persona_overridable: true
+  long_run_recovery_days:
+    value: {long_run_min_over_h: 90, days: 1, long_run_min_over_h_2: 150, days_2: 2}
+    range: {days: [1, 2], days_2: [1, 3]}
+    unit: object
+    confidence: medium
+    rationale: "Two hours on feet is a systemic event for a recreational runner even when the pace is easy."
+    persona_overridable: true
+  rest_days_per_week_min:
+    value: 1
+    range: [0, 2]
+    unit: days
+    confidence: medium
+    rationale: "Zero rest days is never prescribed, even for 6-day templates (the sixth day is easy and optional)."
+    persona_overridable: false
+  return_from_pain:
+    value: {pain_during_max: 2, next_morning_max: 2, gait_change: false, test_volume_pct: 80, hold_days: 3}
+    range: {pain_during_max: [0, 3], test_volume_pct: [50, 95], hold_days: [2, 7]}
+    unit: object
+    confidence: medium
+    rationale: "Load-tolerating test, not a calendar. Order of re-entry: easy volume → strides/hills → one quality session → ramp."
+    persona_overridable: false
+  return_from_illness:
+    value: {symptom_free_hours: 48, first_session: "easy 20 min", build_back_days: 5, quality_gate_days: 7}
+    range: {symptom_free_hours: [24, 96], build_back_days: [3, 14], quality_gate_days: [4, 14]}
+    unit: object
+    confidence: medium
+    rationale: "safety-hard-stops.yaml#resume_after_illness owns the 48 h number; this file owns the build-back shape. Never restart at the pre-illness session."
+    persona_overridable: false
+  sleep_protection:
+    value: {late_hard_session_policy: avoid_after_19h_when_sleep_window_short, note: "we do not diagnose sleep; we avoid scheduling a hard interval session at 21:30 for a runner with 6 h available"}
+    range: null
+    unit: rule
+    confidence: low
+    rationale: "Sleep-restriction studies are not training-scheduling studies; the caution is ours, the mechanism is suggestive."
+    persona_overridable: true
+  deload_trigger_after_hard_block:
+    value: {consecutive_hard_weeks_max: 3, reduction_pct: 30}
+    range: {consecutive_hard_weeks_max: [2, 5], reduction_pct: [15, 40]}
+    unit: object
+    confidence: medium
+    rationale: "load-progression.yaml#step_cycle is the same idea; this is the recovery-side statement so both engines agree."
+    persona_overridable: false
+
+rules:
+  - id: recovery-is-scheduled-not-earned
+    when: "building any week"
+    then: "place easy and rest days first, then fit quality sessions into what remains"
+    severity: constraint
+    explain: "recovery-first-layout"
+
+  - id: good-feelings-do-not-remove-recovery
+    when: "runner reports legs <= 2 and asks for a second hard day in a week that already has one"
+    then: "refuse_and_explain_spacing; offer strides or a slightly longer easy run instead"
+    severity: constraint
+    explain: "recovery-holds-against-enthusiasm"
+
+  - id: sleep-and-life-load-count
+    when: "profile.lifeLoad == high or sleepHoursMedian7d < 6.5"
+    then: "hard_days_per_week := 1; session_duration_ceiling_min := min(ceiling, 60); flagReview(kind: life-changed) if persistent"
+    severity: constraint
+    explain: "recovery-life-load-lowers-ceiling"
+    note: "This is a capacity reduction, not a punishment, and the comment must not frame it as either."
+
+  - id: never-recover-by-adding
+    when: "any state the planner recognises"
+    then: "no rule in this file may raise volume or intensity; the only additive action available is a review option proposed by the runner"
+    severity: hard-stop
+    explain: "recovery-subtract-only"
+
+
+## Contract aliases
+contract_aliases:
+  post_race_easy_days:
+    value: {distance_5k: 2, distance_10k: 3, distance_half: 4, distance_marathon: 7, unit: days_of_easy_or_rest_after}
+    range: {distance_5k: [1, 4], distance_10k: [1, 5], distance_half: [2, 7], distance_marathon: [3, 14]}
+    unit: map
+    confidence: medium
+    rationale: "Post-race days are not a claim about how long damage lasts - nobody can measure that from here - they are the conservative floor before the next hard session. A race counts as the hardest session of the week (field-tests.yaml#rules: test-is-a-hard-session is the same idea for tests)."
+    persona_overridable: true
+  missed_session_policy: {home: "missed-session-rules.yaml", note: "spacing and substitution live there; this file only states what recovery needs after a hard day"}
+  return-from-pain: {home: "#return_from_pain"}
+  hard_day_gap_ownership:
+    value: "this file owns the gap; missed-session-rules.yaml#min_gap_hard_days_h, session-substitution.yaml#min_gap_hard_days_h, weekly-templates.yaml#min_gap_hard_days_h and progression.yaml#hard_day_separation_h all point here"
+    range: null
+    unit: statement
+    confidence: high
+    rationale: "Four files once carried four different gaps. One owner, four pointers."
+    persona_overridable: false

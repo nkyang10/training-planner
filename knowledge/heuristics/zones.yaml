@@ -1,0 +1,113 @@
+schema_version: 1
+id: zones
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/hr-zone-models.md]
+  sources: [PHYS-S2, PHYS-S5, PHYS-S7, PHYS-S45]
+applies_to: [all]
+
+notes: >
+  Zone *boundaries* are set from measured anchors when they exist and from a stated estimate when they do
+  not — and the UI must always show which of the two the runner is looking at
+  ([../signals-and-metrics/hr-zone-models.md](../signals-and-metrics/hr-zone-models.md)). A 3-zone model
+  is the planning primitive (it matches how sessions are classified in
+  [intensity-distribution.yaml](intensity-distribution.yaml)); a 5- or 7-zone display is a convenience
+  layered on top and must never feed the planner. The `[PHYS-S45]` drift literature is device-convention
+  grade, so nothing here sets a boundary from a decoupling threshold.
+
+knobs:
+  model:
+    value: 3-zone-hr
+    range: [3-zone-hr, 5-zone-hr, 7-zone-pace, hr-reserve]
+    unit: enum
+    confidence: medium
+    rationale: "The planner needs easy / moderate / hard. More zones on a screen do not create more trainable states."
+    persona_overridable: false
+  anchor_priority:
+    value: [measured_threshold_hr, measured_hrmax_plus_lactate_or_field, measured_hrmax_only, predicted_hrmax]
+    range: null
+    unit: list
+    confidence: high
+    rationale: "Same principle as pace-model.yaml#conversion_input_priority: highest evidence wins, and the weakest entry may not drive a decision."
+    persona_overridable: false
+  zone1_upper_hr:
+    value: "threshold_hr − 10"
+    range: ["threshold_hr − 15", "threshold_hr − 5"]
+    unit: bpm
+    confidence: medium
+    rationale: "The top of easy must sit clearly below threshold; 10 bpm is a compromise, and the ±5 is the honest uncertainty."
+    persona_overridable: true
+  zone2_upper_hr:
+    value: measured_threshold_hr
+    range: [measured_threshold_hr, "threshold_hr + 4"]
+    unit: bpm
+    confidence: medium
+    rationale: "Zone 2 exists only if the boundary is measured or field-tested; derived from a percentage of a predicted HRmax it is decoration."
+    persona_overridable: false
+  zone3_lower_hr:
+    value: "threshold_hr + 3"
+    range: ["threshold_hr", "threshold_hr + 8"]
+    unit: bpm
+    confidence: low
+    rationale: "The 'hard' boundary is fuzzy; intervals are prescribed by session structure, not by catching a heart-rate crossing."
+    persona_overridable: true
+  derived_from_predicted_hrmax_allowed_for:
+    value: [display, easy-ceiling-warning]
+    range: null
+    unit: list
+    confidence: high
+    rationale: "PHYS-S2: 13 equations × 4,043 runners, RMSE 9.1–10.5 bpm — a predicted HRmax cannot support a ±5 bpm decision."
+    persona_overridable: false
+  zone_display_uncertainty_bpm:
+    value: 9
+    range: [5, 15]
+    unit: bpm
+    confidence: medium
+    rationale: "The typical error must be visible whenever the anchor is predicted (see noise.yaml). PHYS-S4's SEE of 10.8 bpm is the reference spread."
+    persona_overridable: false
+
+rules:
+  - id: one-anchor-per-plan-version
+    when: "a plan version is generated"
+    then: "record the anchor, its method, its date and its age in plan.explain; re-anchoring is a review"
+    severity: constraint
+    explain: "zones-anchor-versioned"
+
+  - id: no-zone-decision-from-predicted-hrmax
+    when: "anchor_priority == predicted_hrmax"
+    then: "zones_may_display_only; session classification falls back to rpe_and_structure"
+    severity: constraint
+    explain: "zones-no-decision-from-prediction"
+    note: "The complement of safety-hard-stops.yaml#no-pace-target-from-prediction — the same humility applied to heart rate."
+
+  - id: device-zone-defaults-are-not-ours
+    when: "a connected device exports its own zone boundaries"
+    then: "keep_for_display; recompute for planning from our own anchor; disclose the difference if it is > 5 bpm"
+    severity: advise
+    explain: "zones-device-not-authority"
+
+
+contract_aliases:
+  min_reband_bpm:
+    value: 5
+    range: [3, 10]
+    unit: bpm
+    confidence: medium
+    rationale: "A new anchor must move a zone boundary by at least 5 bpm before the zone is redrawn; below that the runner is told 'no measurable change' (field-tests.yaml#min_change_to_reband_pct is the pace-side twin)."
+    persona_overridable: false
+  hard_session_zone_floor:
+    value: {zone2: "zone1_upper_hr - 5", zone3: "zone2_upper_hr + 3"}
+    range: null
+    unit: bpm
+    confidence: low
+    rationale: "Effort floors for quality sessions when heat drifts heart rate upward: never chase a zone number into a hard session, cap the effort instead (context.yaml#heat_handling)."
+    persona_overridable: false
+  data_quality_gate:
+    value: {min_valid_pct: 70, max_gap_min: 10, exclude: [chest_band_dropout, static_spikes]}
+    range: {min_valid_pct: [50, 90], max_gap_min: [5, 30]}
+    unit: object
+    confidence: medium
+    rationale: "A zone minute counted from a dropped chest strap is not a minute of that intensity; excluded minutes show as a gap, never filled in."
+    persona_overridable: false

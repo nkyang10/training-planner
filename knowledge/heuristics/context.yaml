@@ -1,0 +1,75 @@
+schema_version: 1
+id: context
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/physiology/demographics-and-context.md, knowledge/physiology/individual-differences.md]
+  sources: [PHYS-S3, PHYS-S11, PHYS-S17, PHYS-S44]
+applies_to: [all]
+
+notes: >
+  Context is **input the runner gives us**, used to change the shape of a session, never a verdict about
+  the runner. Heat, altitude, terrain, sleep and life stress change what a day should look like; sex, age,
+  and cycle change nothing in the plan by themselves (the cycle-phase literature is close to null, which is
+  why it is context the user may mention rather than a planner input). The rule that keeps this honest is
+  directional: context may only make a day *easier or effort-based*, never a reason to add work
+  ([../physiology/demographics-and-context.md](../physiology/demographics-and-context.md)).
+
+knobs:
+  heat_handling:
+    value: {trigger: environment_flag_or_forecast, action_effort_cap: true, suppress_pace_targets: true, downgrade_if: [heat_index_high, first_exposure_week]}
+    range: null
+    unit: policy
+    confidence: medium
+    rationale: "In heat, a pace target is a lie: the same effort costs more. Convert quality to effort-capped, keep the structure, drop the number."
+    persona_overridable: true
+  altitude_mode:
+    value: {threshold_m: 1200, replace_pace_with: effort_band, suppress_pb_language: true}
+    range: {threshold_m: [500, 2000]}
+    unit: policy
+    confidence: medium
+    rationale: "Above ~1200 m pace targets are not comparable to sea-level evidence; effort and structure survive, the number does not."
+    persona_overridable: true
+  terrain_handling:
+    value: {trail_or_hilly: effort_only, grade_cost_note: true}
+    range: null
+    unit: policy
+    confidence: medium
+    rationale: "PHYS-S44's grade-cost work is about energy, not pace equivalence: an 'easy' trail run is not a slow road run."
+    persona_overridable: false
+  life_stress_handling:
+    value: {user_flag: life_stress, effect: "may downgrade one session per week; never surfaces in a comment as advice about their life"}
+    range: null
+    unit: policy
+    confidence: medium
+    rationale: "The system may notice that a hard week is unrealistic; it must not lecture. The comment says what changed in the plan, not what is wrong with the runner's job."
+    persona_overridable: false
+  cycle_context:
+    value: user_supplied_display_and_flag_only
+    range: [user_supplied_display_and_flag_only, hidden]
+    unit: enum
+    confidence: medium
+    rationale: "McNulty 2021 (78 studies) puts cycle-phase training effects near null (EF vs other ES −0.06, CrI −0.16–0.04). The user may carry it as a confound flag on a day; the planner never plans around it."
+    persona_overridable: false
+  never_inferred:
+    value: [sex, gender, cycle_phase, income, profession, race, "any attribute not explicitly entered"]
+    range: null
+    unit: list
+    confidence: high
+    rationale: "Inference is the fastest route to a stereotype in a comment, and it is invisible to the runner until it is wrong about them."
+    persona_overridable: false
+
+rules:
+  - id: context-changes-shape-not-load
+    when: "any context flag is set"
+    then: "may convert pace to effort, shorten, or move a session; may never increase volume or intensity"
+    severity: hard-stop
+    explain: "context-subtracts"
+
+  - id: context-is-not-destiny
+    when: "a comment explains a context adjustment"
+    then: "name the observable condition and its effect on today's session; never a claim about what a group of people can achieve"
+    severity: hard-stop
+    explain: "context-not-destiny"
+    note: "language-guardrails.yaml#no_demographic_stereotypes is the wording half of this rule."

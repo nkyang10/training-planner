@@ -1,0 +1,78 @@
+schema_version: 1
+id: pace-model
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/pace-models.md]
+  sources: [PLAN-S8, PLAN-S11, PHYS-S43]
+applies_to: [all]
+extends: pace-bands
+
+notes: >
+  Thin file on purpose: the numbers live in **pace-bands.yaml** (one number, one home). This file owns
+  only the *conversion* behaviour — how a band becomes a prescription on a given day, and when the model
+  must refuse to convert at all.
+
+knobs:
+  conversion_input_priority:
+    value: [measured_session_effort, recent_race, field_test, demographic_estimate]
+    range: null
+    unit: list
+    confidence: high
+    rationale: "Highest evidence wins; demographic estimates never produce a pace band, only an effort band."
+    persona_overridable: false
+  min_sessions_for_effort_fit:
+    value: 4
+    range: [3, 10]
+    unit: sessions
+    confidence: medium
+    rationale: "Below this the effort–pace relationship is a straight line drawn through two points."
+    persona_overridable: true
+  effort_fit_window_days:
+    value: 56
+    range: [28, 120]
+    unit: days
+    confidence: medium
+    rationale: "Long enough for stability, short enough to notice adaptation. Read with pace-bands.yaml#evidence_max_age_weeks."
+    persona_overridable: true
+  surface_correction:
+    value: {trail_vs_road: "effort-only, no pace target", track: "pace allowed, no correction", treadmill: "see session-substitution.yaml#treadmill_equivalence"}
+    range: null
+    unit: map
+    confidence: medium
+    rationale: "Trail pace is not a fitness measure; comparing trail and road paces is the fastest way to demoralise a trail runner."
+    persona_overridable: false
+  refusal_messages:
+    value: {no_anchor: "I don't have a recent test to base paces on — let's use effort.", stale: "That race is {age} old, so I'm coaching by feel until we re-test."}
+    range: null
+    unit: map
+    confidence: high
+    rationale: "A refusal must be useful: it names the missing thing and offers the alternative, in the runner's language."
+    persona_overridable: false
+
+rules:
+  - id: refuse-rather-than-invent
+    when: "conversion_input_priority would land on demographic_estimate for a pace band"
+    then: "refuse_and_request_test(field-tests.yaml#suggested)"
+    severity: constraint
+    explain: "pace-model-refuses"
+
+  - id: one-model-per-plan-version
+    when: "a plan version is generated"
+    then: "record conversion inputs, model, and ages in plan.explain; a later change of model is a review, not a silent recompute"
+    severity: constraint
+    explain: "pace-model-versioned"
+
+
+contract_aliases:
+  evidence_max_age_days: {home: "pace-bands.yaml#evidence_max_age_weeks", derived: "x 7", note: "one home for the staleness number, in pace-bands.yaml"}
+  band_half_width_s: {home: "pace-bands.yaml#band_width_s_per_km", derived: "band_width_s_per_km / 2"}
+  pace_band_s: {home: "pace-bands.yaml#band_width_s_per_km"}
+  easy_band:
+    value: {define_by: "conversational effort plus the lower hr zones", never_by: "a single pace number"}
+    range: null
+    unit: policy
+    confidence: high
+    rationale: "easy-run.md asks what the easy band is; the effort definition is a model rule (here), while the seconds width is a display parameter (pace-bands.yaml)."
+    persona_overridable: false

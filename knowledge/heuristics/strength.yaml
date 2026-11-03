@@ -1,0 +1,66 @@
+schema_version: 1
+id: strength
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/physiology/vo2max-threshold-economy.md, knowledge/workout-library/strength-for-runners.md]
+  sources: [PHYS-S42]
+applies_to: [all]
+
+notes: >
+  Strength work earns its place in a running plan on tendon, hip and economy grounds, and the evidence for
+  it is good enough that the disagreement here is about *dosing*, not whether. This file deliberately
+  prescribes **sessions, not exercises**: a general strength class on an easy day, with no load prescription
+  and no rehab claims, keeps us inside what we can justify
+  ([../workout-library/strength-for-runners.md](../workout-library/strength-for-runners.md)).
+
+knobs:
+  strength_sessions_per_week:
+    value: 1
+    range: [0, 3]
+    unit: sessions
+    confidence: medium
+    rationale: "1–2 in practice; scheduled on aerobic days, never the day before a quality session, and never introduced in the same week as a volume increase."
+    persona_overridable: true
+  introduction_weeks:
+    value: 2
+    range: [1, 6]
+    unit: weeks
+    confidence: medium
+    rationale: "Bodyweight, technique first. A runner who is sore from new strength work cannot tell us whether the run went badly or the gym did."
+    persona_overridable: true
+  not_counted_as_running_volume:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "Strength load is tracked separately; folding it into running volume would corrupt every running-derived series."
+    persona_overridable: false
+  counts_toward_hard_day_budget:
+    value: false
+    range: null
+    unit: bool
+    confidence: medium
+    rationale: "It is a different stress; but a heavy leg day may move a *quality run* by one day — spacing, not subtraction."
+    persona_overridable: true
+  class_content:
+    value: [hinge, squat_pattern, single_leg, calf, hip, upper_body_maintenance]
+    range: null
+    unit: list
+    confidence: medium
+    rationale: "Pattern categories, not exercises or loads: the app can describe a class honestly and stays out of physiotherapy."
+    persona_overridable: true
+
+rules:
+  - id: strength-is-not-rehab
+    when: "a runner reports pain or an injury"
+    then: "no therapeutic exercise prescription; refer to a clinician; strength content stays general fitness"
+    severity: hard-stop
+    explain: "strength-not-rehab"
+
+  - id: never-competes-with-running-quality
+    when: "the week is tight (≤3 running days) and the runner is time-poor"
+    then: "offer strength as an explicit trade-off with its visible cost; never schedule it silently"
+    severity: advise
+    explain: "strength-is-a-choice"

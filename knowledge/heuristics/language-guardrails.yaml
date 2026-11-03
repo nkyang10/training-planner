@@ -1,0 +1,108 @@
+schema_version: 1
+id: language-guardrails
+status: draft
+owner: language
+last_reviewed: 2026-11-03
+provenance:
+  docs: [docs/ux/feedback-microcopy.md, knowledge/physiology/individual-differences.md, knowledge/signals-and-metrics/hr-zone-models.md]
+  sources: [PHYS-S2, PHYS-S19, FB-S7]
+applies_to: [comment, review, plan_text]
+
+notes: >
+  These are output constraints, enforced in the comment generator and in the message catalogues, and they
+  are the reason the LLM can be used at all: the facts come from the engine, and this file decides which
+  sentences may never be built from them. The pattern to avoid is a **derived number spoken as a natural
+  property of the person** — "your fitness is 47", "you didn't respond", "you've lost your base"
+  ([../physiology/individual-differences.md](../physiology/individual-differences.md),
+  [../../docs/ux/feedback-microcopy.md](../../docs/ux/feedback-microcopy.md)).
+
+knobs:
+  label_derived_numbers:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "Every derived figure in user-facing text carries its counter, formula family, and date in the fact object; the template must render at least the date."
+    persona_overridable: false
+  no_responder_language:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "PHYS-S19-class findings are group averages with overlapping intervals. 'You didn't respond to tempo' is unfalsifiable and untrue; 'no measurable change over these 6 weeks' is both."
+    persona_overridable: false
+  no_population_shaming:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "No comparison to a demographic group's average, ever; comparisons are only to this runner's own recorded history."
+    persona_overridable: false
+  no_demographic_stereotypes:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "A comment may not attribute performance to sex, age, or cycle. Context is named as a condition ('it was 28 °C and humid'), never as an identity."
+    persona_overridable: false
+  no_recovery_percentage:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "'You are 68% recovered' is a number with no measurement behind it. Use a state plus the reason ('easy day — three hard days in five')."
+    persona_overridable: false
+  no_durability_score:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "Vendor 'durability' and 'marathon fitness' style scores are grade D; they imply a precision the inputs do not have."
+    persona_overridable: false
+  zone_uncertainty_disclosure:
+    value: above_threshold_predictions
+    range: [never, above_threshold_predictions, always]
+    unit: enum
+    confidence: medium
+    rationale: "When zones come from a predicted HRmax, the UI states the band (zones.yaml#zone_display_uncertainty_bpm). Hiding an honest ±10 bpm is how a wrong zone becomes a belief."
+    persona_overridable: false
+  no_guarantee_language:
+    value: [guarantee, will_get, promise, ensures, "you will qualify"]
+    range: null
+    unit: list
+    confidence: high
+    rationale: "AGENTS.md rule 6. Goal language is 'this is what the evidence supports', never a contract."
+    persona_overridable: false
+  allowed_number_source:
+    value: engine_fact_object
+    range: null
+    unit: policy
+    confidence: high
+    rationale: "If a number is in an LLM output and not in the fact object, the build fails (AGENTS.md rule 2). This knob is that rule expressed as a generator constraint."
+    persona_overridable: false
+  locale:
+    value: [en, zh-Hant]
+    range: null
+    unit: list
+    confidence: high
+    rationale: "Every guardrail must hold in both catalogues; a rule enforced only in English leaks through the other."
+    persona_overridable: false
+
+rules:
+  - id: observed-or-nothing
+    when: "a sentence would describe a trait, potential, or response"
+    then: "rewrite as an observation with its window, or drop it"
+    severity: hard-stop
+    explain: "language-observed-or-nothing"
+
+  - id: escalation-copy-is-fixed
+    when: "a red-flag or stop condition is reached"
+    then: "use the canonical text at docs/ux/feedback-microcopy.md#stop verbatim in both locales; no generated variants"
+    severity: hard-stop
+    explain: "language-stop-is-fixed"
+
+  - id: numbers-have-dates
+    when: "any figure is rendered"
+    then: "render its as_of date and source label beside it; stale figures keep their date, not a fresh one"
+    severity: constraint
+    explain: "language-numbers-have-dates"

@@ -1,0 +1,86 @@
+schema_version: 1
+id: field-tests
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/decoupling-and-field-tests.md, knowledge/signals-and-metrics/measurement-and-testing.md]
+  sources: [PHYS-S2, PHYS-S38, PHYS-S43, PHYS-S45]
+applies_to: [all]
+
+notes: >
+  A test is a **session with a protocol**, and the system's job is to refuse sloppy ones. Every re-banding
+  of paces or zones must trace to a test with a recorded warm-up, course, conditions and date; a test that
+  moved the number by less than the measurement noise changes nothing except the record
+  ([../signals-and-metrics/decoupling-and-field-tests.md](../signals-and-metrics/decoupling-and-field-tests.md)).
+  Tests are hard sessions: they obey spacing and taper rules like any other.
+
+knobs:
+  catalogue:
+    value: [race_5k, race_10k, field_test_3k_all_out, threshold_30_min, test_6min_effort, progression_long_run_mp, decoupling_run]
+    range: null
+    unit: list
+    confidence: medium
+    rationale: "Each entry has a protocol in ../signals-and-metrics/decoupling-and-field-tests.md; the engine offers tests it can actually interpret."
+    persona_overridable: true
+  retest_interval_days:
+    value: 49
+    range: [28, 90]
+    unit: days
+    confidence: medium
+    rationale: "Seven weeks is roughly one adaptation block; a test inside 28 days is recorded but does not re-band."
+    persona_overridable: true
+  min_change_to_reband_pct:
+    value: 3
+    range: [2, 6]
+    unit: percent
+    confidence: medium
+    rationale: "Below 3% the change is inside test-to-test error: keep the old paces and say 'no measurable change' — an honest sentence runners trust."
+    persona_overridable: false
+  no_test_within_days_of_race:
+    value: 14
+    range: [7, 21]
+    unit: days
+    confidence: high
+    rationale: "A maximal test is a hard session; a hard session inside the taper contradicts taper.yaml."
+    persona_overridable: false
+  no_test_in_weeks_after_layoff:
+    value: 4
+    range: [2, 8]
+    unit: weeks
+    confidence: medium
+    rationale: "A post-layoff test measures deconditioning and would set the runner's paces from their worst week."
+    persona_overridable: false
+  eligible_decoupling_session:
+    value: {min_duration_min: 30, max_mean_grade_pct: 2, max_hr_pct_hrmax: 85, require_session_class: [easy, aerobic, long]}
+    range: {min_duration_min: [20, 60], max_mean_grade_pct: [0, 4], max_hr_pct_hrmax: [70, 90]}
+    unit: object
+    confidence: medium
+    rationale: "Decoupling is only interpretable on flat, steady, sub-threshold running; anything else returns null rather than a number."
+    persona_overridable: false
+  decoupling_band_pct:
+    value: 6
+    range: [3, 12]
+    unit: percent
+    confidence: low
+    rationale: "No population-validated cut-point exists (PHYS-S45's device-convention spread is the reason); use the weekly median of ≥2 eligible sessions, never one run."
+    persona_overridable: true
+
+rules:
+  - id: test-requires-protocol
+    when: "a test result would re-band paces or zones"
+    then: "require warm-up, course, conditions, date and device; missing fields ⇒ record_only"
+    severity: constraint
+    explain: "field-tests-protocol-required"
+
+  - id: test-is-a-hard-session
+    when: "a test is scheduled"
+    then: "count as a hard day for spacing (recovery.yaml#hard_day_gap_hours) and obey taper.yaml#last_hard_session_days_out"
+    severity: constraint
+    explain: "field-tests-count-as-hard"
+
+  - id: no-responder-claim-from-one-test
+    when: "a test shows no change"
+    then: "report the observation with its window; language-guardrails.yaml#no_responder_language applies"
+    severity: hard-stop
+    explain: "field-tests-no-responder-language"

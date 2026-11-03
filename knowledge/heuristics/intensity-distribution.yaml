@@ -1,0 +1,95 @@
+schema_version: 1
+id: intensity-distribution
+status: draft
+owner: plan-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/periodization/intensity-distribution.md]
+  sources: [PLAN-S1, PLAN-S2, PLAN-S3, PLAN-S4]
+applies_to: [all]
+
+notes: >
+  There is no optimal distribution constant. What the evidence supports is a *shape* — a large easy
+  zone, a deliberately small moderate zone, a small but real high zone — measured on 28-day windows, not
+  weekly, because one hard weekend makes a week look polarized by accident
+  ([../periodization/intensity-distribution.md](../periodization/intensity-distribution.md)). The
+  population caveat travels with the numbers: PLAN-S1 is junior skiers, PLAN-S4 is n = 12 competitive
+  runners. These are ranges, never targets to hit to one decimal.
+
+knobs:
+  window_days:
+    value: 28
+    range: [14, 56]
+    unit: days
+    confidence: high
+    rationale: "PLAN-S1 measured 32 days; shorter windows are dominated by the calendar, not by behaviour."
+    persona_overridable: false
+  pct_easy_zone:
+    value: 80
+    range: [70, 88]
+    unit: percent-of-session-time-or-sessions
+    confidence: medium
+    rationale: "75 ± 3% in PLAN-S1 (HR), 80.5 ± 1.8% in PLAN-S4's pyramidal arm. 88 is a ceiling: beyond it the plan has no stimulus."
+    persona_overridable: true
+  pct_moderate_zone:
+    value: 10
+    range: [5, 15]
+    unit: percent
+    confidence: medium
+    rationale: "PLAN-S4's threshold-heavy arm sat at 24.7% and improved less (−121 s vs −157 s over 10 km, p = 0.03); PLAN-S3 pooled ES −0.66 favouring the more pyramidal/polarized grouping. The ceiling here is the junk-mile rule."
+    persona_overridable: false
+  pct_high_zone:
+    value: 10
+    range: [5, 15]
+    unit: percent
+    confidence: medium
+    rationale: "17 ± 4% (Z3-by-HR, PLAN-S1) — but that z3 mixes threshold work; 5–15% of *time* is the honest band for true high-zone work."
+    persona_overridable: true
+  measure_by:
+    value: time-in-zone
+    range: [time-in-zone, session-count, s-rpe-weighted]
+    unit: enum
+    confidence: medium
+    rationale: "Session count overstates easy share (a 20-min easy jog equals a 2-h long run); time-in-zone is the plan's real shape."
+    persona_overridable: false
+  easy_band_upper_boundary:
+    value: "zone1_upper = threshold_hr - 10bpm (or 'can hold a full sentence'), never within 10 s/km of half-marathon pace"
+    range: null
+    unit: definition
+    confidence: medium
+    rationale: "PLAN-S4's pyramidal arm; the 'easy day within 10 s/km of half pace' rule is a generator bug, not a training choice."
+    persona_overridable: false
+  hard_days_cap:
+    value: 2
+    range: [1, 3]
+    unit: sessions-per-week
+    confidence: high
+    rationale: "3 only when the persona gate in session-classes.yaml passes and history ≥ 12 weeks at volume."
+    persona_overridable: false
+  junk_week_definition:
+    value: {monotony_gt: 2.0, moderate_share_gt: 30, min_sessions: 4}
+    range: {monotony_gt: [1.5, 3.0], moderate_share_gt: [20, 45]}
+    unit: object
+    confidence: medium
+    rationale: "A week where everything is medium is the most common failure in self-coached running."
+    persona_overridable: false
+
+rules:
+  - id: moderate-zone-ceiling
+    when: "moderate_share(window_days) > pct_moderate_zone.range[1]"
+    then: "flagReview(kind: distribution, proposals: [move_one_session_to_easy, move_one_to_high]); never auto-edit"
+    severity: warn
+    explain: "distribution-junk-week"
+
+  - id: easy-days-must-be-easy
+    when: "a session labelled easy has medianRpe >= 6 or pace within easy_band_upper_boundary violation"
+    then: "relabel_in_log(as: moderate); count_against(moderate_share); comment(once, non-judgemental)"
+    severity: advise
+    explain: "distribution-easy-drift"
+
+  - id: stimulus-floor
+    when: "high_zone_share(window_days) < pct_high_zone.range[0] and phase in [building, race-prep]"
+    then: "flagReview(kind: under-stimulated, proposals: [add_one_quality, add_strides])"
+    severity: advise
+    explain: "distribution-no-stimulus"
+    note: "This is the only place the system may propose *adding* intensity, and only as a review option — never from the safety layer."

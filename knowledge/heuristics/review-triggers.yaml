@@ -1,0 +1,155 @@
+schema_version: 1
+id: review-triggers
+status: draft
+owner: fb-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs:
+    - docs/engine/review-trigger-policy.md
+    - knowledge/feedback-and-autoregulation/interpretation-windows.md
+    - knowledge/feedback-and-autoregulation/review-policy-evidence.md
+  sources: [FB-S1, PLAN-S7, FB-S9]
+applies_to: [all]
+
+notes: >
+  A review is an *offer to look*, not an automatic rewrite: the runner chooses among keep / conservative
+  / aggressive, sees the diff, and the cost of each option is stated. Triggers here raise candidates;
+  they never edit the plan. Every trigger names the window it needs
+  (interpretation-windows.md) — a signal that has not reached `review_ready_on` cannot open one.
+  Manual triggers are always available and are the majority in practice.
+
+knobs:
+  max_changes_per_review:
+    value: 2
+    range: [1, 3]
+    unit: changes
+    confidence: high
+    rationale: "AGENTS.md rule 5. One is the norm; two is the ceiling; a third means the plan is wrong, not the week."
+    persona_overridable: false
+  dwell_days:
+    value: 7
+    range: [3, 14]
+    unit: days-before-the-same-trigger-may-fire-again
+    confidence: high
+    rationale: "Hysteresis: without dwell the system re-reviews on the same stale evidence and trains the runner to ignore it."
+    persona_overridable: false
+  cooldown_after_accepted_review_days:
+    value: 10
+    range: [5, 21]
+    unit: days
+    confidence: medium
+    rationale: "An accepted change needs time to produce evidence before it can be judged."
+    persona_overridable: false
+  max_prompts_per_week:
+    value: 1
+    range: [0, 2]
+    unit: review-invitations-per-week
+    confidence: high
+    rationale: "Notification fatigue converts a good review into a reason to mute the app."
+    persona_overridable: true
+  horizon_days:
+    value: 14
+    range: [7, 28]
+    unit: days-of-future-visible-to-the-review
+    confidence: high
+    rationale: "Two weeks is enough to re-sequence a week and short enough that the runner still believes it."
+    persona_overridable: false
+  freeze_window_days:
+    value: 2
+    range: [0, 4]
+    unit: days-before-tomorrow-with-no-changes
+    confidence: high
+    rationale: "docs/engine/review-trigger-policy.md#freeze — a review never edits today or tomorrow."
+    persona_overridable: false
+  plan_too_big_thresholds:
+    value: {completion_rate_lt: 0.7, window_days: 14, quality_misses_ge: 2}
+    range: {completion_rate_lt: [0.5, 0.85], window_days: [7, 28], quality_misses_ge: [1, 4]}
+    unit: object
+    confidence: medium
+    rationale: "Two independent shapes of the same problem: chronic under-completion, or specifically the hard days not happening."
+    persona_overridable: true
+  rpe_gap_threshold:
+    value: 1.5
+    range: [0.8, 2.5]
+    unit: rpe-points-over-median-for-class
+    confidence: medium
+    rationale: "Per-session noise is large; three consecutive readings are required."
+    persona_overridable: true
+  monotony_band:
+    value: 2.0
+    range: [1.5, 3.0]
+    unit: sd-of-daily-load-over-mean-7d
+    confidence: medium
+    rationale: "A >mean-hard-every-day week; see signals-and-metrics/session-load-metrics.md."
+    persona_overridable: true
+  performance_decline_sessions:
+    value: 3
+    range: [2, 6]
+    unit: sessions-below-band
+    confidence: medium
+    rationale: "pace-at-HR or Riegel estimate drifting down across sessions of the same class."
+    persona_overridable: true
+  goal_date_min_weeks:
+    value: 6
+    range: [4, 12]
+    unit: weeks-of-horizon-required-for-a-race-goal
+    confidence: high
+    rationale: "Below this the honest review is 'change the goal date or the goal', not a plan tweak."
+    persona_overridable: false
+
+rules:
+  - id: plan-too-big
+    when: "completion_rate(window plan_too_big_thresholds.window_days) < completion_rate_lt or quality_misses(7d) >= quality_misses_ge"
+    then: "flagReview(kind: plan-too-big, proposals: [reduce_hard_days, shorten_sessions, persona: time-poor-3-days])"
+    severity: flag
+    explain: "review-plan-too-big"
+
+  - id: load-rising-too-fast
+    when: "ramp_pct(rolling 2 wk) > load-progression.weekly_increment_pct_effective or monotony(7d) > monotony_band"
+    then: "flagReview(kind: load-shape, proposals: [insert_down_week, cap_long_run, hold_ramp_2wk])"
+    severity: flag
+    explain: "review-load-shape"
+
+  - id: response-not-landing
+    when: "consecutive(rpe_gap > rpe_gap_threshold, 3) and performance_decline_sessions >= 3 and no_confounding_event(7d)"
+    then: "flagReview(kind: overreach-check, proposals: [down_week, drop_one_quality, extend_block])"
+    severity: flag
+    explain: "review-overreach-check"
+    note: "If the safety layer's overreach-pattern fires, this becomes a `constrain`, not a review."
+
+  - id: goal-feasibility
+    when: "weeks_to_race < goal_date_min_weeks or (target_pace_gap > band and weeks_to_race < 8)"
+    then: "flagReview(kind: goal-conversation, proposals: [keep_goal_and_accept_band, choose_b_race, shift_date, finish_only])"
+    severity: flag
+    explain: "review-goal-conversation"
+    note: "Never states that the goal is impossible; states the band and the evidence age."
+
+  - id: life-changed
+    when: "profile.constraints.availableDays drops >= 1 or user requests review after travel/work flag"
+    then: "flagReview(kind: capacity-change, proposals: [rebuild_week_template, reanchor_volume])"
+    severity: flag
+    explain: "review-capacity-change"
+
+  - id: stale-evidence
+    when: "pace_anchor.age_days > pace-bands.evidence_max_age_days and horizon contains quality sessions with prescribed paces"
+    then: "flagReview(kind: re-test, proposals: [field_test, keep_effort_bands])"
+    severity: flag
+    explain: "review-stale-anchor"
+
+  - id: suppression-and-dwell
+    when: "trigger.kind fired within dwell_days, or within cooldown_after_accepted_review_days of an accepted review, or prompts_this_week >= max_prompts_per_week"
+    then: "suppress(prompt); keep_candidate_in_inbox(quietly)"
+    severity: constraint
+    explain: "review-fatigue-guard"
+
+  - id: rejected-review-is-data
+    when: "user declines all options on a review"
+    then: "record(rejected, reason_if_given); raise_that_trigger's_threshold_for_30d; never_re_offer_the_identical_option_set"
+    severity: constraint
+    explain: "review-rejection-respected"
+
+  - id: manual-always-allowed
+    when: "user opens a review"
+    then: "run(regardless of triggers, dwell, or cooldown); freeze_window still applies"
+    severity: constraint
+    explain: "review-manual-allowed"

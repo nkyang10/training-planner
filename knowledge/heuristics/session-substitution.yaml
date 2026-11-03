@@ -1,0 +1,90 @@
+schema_version: 1
+id: session-substitution
+status: draft
+owner: plan-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/workout-library/README.md, knowledge/feedback-and-autoregulation/missed-session-handling.md]
+  sources: [FB-S6, FB-S7]
+applies_to: [all]
+
+notes: >
+  Equivalence is about the **stimulus class**, not the workout name. Substitutions are the planner's
+  day-to-day tool and are deliberately weaker than a review: they keep the week's shape when a day is
+  lost, and they never improve a week. The sources here are grade-C autoregulation practice `[FB-S6]`
+  ([../sources/bibliography.md](../sources/bibliography.md)).
+
+knobs:
+  substitute_window_days:
+    value: 6
+    range: [3, 7]
+    unit: days
+    confidence: medium
+    rationale: "Inside the same training week; across a week boundary it becomes a review, not a swap."
+    persona_overridable: false
+  min_gap_hard_days_h:
+    value: 72
+    range: [48, 96]
+    unit: hours
+    confidence: high
+    rationale: "Shared with missed-session-rules.yaml — one number, one home; the substitution engine reads the same knob."
+    persona_overridable: false
+  equivalence_max_drop_pct:
+    value: 35
+    range: [10, 50]
+    unit: percent-stimulus
+    confidence: low
+    rationale: "How much of the intended stimulus a substitute may deliver. A guess; the reason substitutions may only preserve a week."
+    persona_overridable: true
+  treadmill_equivalence:
+    value: {grade_pct: 1.0, rpe_drift: +0.5, note: "indoor heat and no wind make the same pace feel harder; prescribe by effort"}
+    range: {grade_pct: [0, 2], rpe_drift: [0, 1]}
+    unit: object
+    confidence: low
+    rationale: "The '1% grade' convention is grade C folklore; we use effort-matched treadmill work and label the uncertainty."
+    persona_overridable: true
+  heat_adjustment:
+    value: {above_20c_pace_slack_s_per_km: 4, above_28c_policy: effort_only_or_cross_train, hydration_note: once_per_session_max}
+    range: {above_20c_pace_slack_s_per_km: [0, 12]}
+    unit: object
+    confidence: medium
+    rationale: "Pace is meaningless in heat; effort or time is not. heat-and-altitude in safety-hard-stops.yaml may cancel the session outright."
+    persona_overridable: false
+
+rules:
+  - id: substitute-by-class
+    when: "a session must change but the day still exists"
+    then: "pick_from(equivalent_class) preferring [same_class_different_shape, lower_impact_same_class, easy_volume]"
+    severity: constraint
+    explain: "substitute-class-match"
+
+  - id: hills-replace-intervals
+    when: "intervals impossible (no route, unsafe dark, travel) and hills available"
+    then: "swap_to(hill_reps) as class-equivalent; do not count it as pace-specific preparation in race-prep"
+    severity: advise
+    explain: "substitute-hills-for-intervals"
+
+  - id: pool-and-bike-keep-aerobic-only
+    when: "running impossible but movement desired (illness recovering, pain below the triage threshold)"
+    then: "allow_zero_impact_option(class: aerobic-time, hard: false); never as a hard-day substitute in race-prep"
+    severity: advise
+    explain: "substitute-cross-train"
+    note: "cross-training preserves aerobic load and does nothing for running-specific tolerance — the comment must not imply otherwise."
+
+  - id: no-upgrade-on-a-good-day
+    when: "runner reports unusually good feelings and asks to add intensity"
+    then: "allow_swap_only_if_spacing_legal_and_week_total_unchanged; never add volume or a second hard day"
+    severity: constraint
+    explain: "substitute-no-upgrade"
+    note: "The system's job is to keep tomorrow from becoming a surprise; enthusiasm is not a training input."
+
+  - id: substitution-keeps-week-total
+    when: "any substitution is applied"
+    then: "week_volume_change := 0 ± one_step_tolerance; hard_session_count_unchanged_or_lower"
+    severity: constraint
+    explain: "substitute-neutral"
+
+
+contract_aliases:
+  missed_key_rule: {home: "missed-session-rules.yaml#rules", note: "what happens to a skipped quality session: substitute within the week at reduced dose, or drop it; never stack two substitutes, never add volume to make up the loss"}
+  min_gap_hard_days_h: {home: "recovery.yaml#hard_day_gap_hours"}

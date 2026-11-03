@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://training-planner.local/schemas/day-entry.schema.json",
+  "title": "DayEntry",
+  "description": "The runner's daily feedback — the input the whole product depends on. Design constraint: tier 1 (status, RPE, legs) is enough to generate a comment and a micro-adjustment, so the minimum viable save is 3 taps. Everything deeper is optional and progressively disclosed. Corrections never overwrite: they create a new revision with superseded_by (AGENTS.md rule 4).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["day", "status", "revision", "tzAtEvent"],
+  "properties": {
+    "entryId": { "type": "string", "format": "uuid" },
+    "userId": { "type": "string", "format": "uuid", "description": "Server-assigned from session; ignored if sent by the client (RLS is the enforcement, not this field)." },
+    "day": { "type": "string", "format": "date", "description": "Training day per calendar-and-time.md#1, i.e. the day whose 04:00 boundary contains the activity — not the calendar date of the timestamp." },
+    "revision": { "type": "integer", "minimum": 1 },
+    "supersededBy": { "type": ["string", "null"], "format": "uuid" },
+    "correctedFromRevision": { "type": ["integer", "null"], "minimum": 1 },
+    "correctionReason": { "type": ["string", "null"], "maxLength": 280, "description": "Required when correcting a day older than 72 h (feedback-loop.md backfill rule)." },
+
+    "tzAtEvent": { "type": "string", "description": "IANA zone at the time of the activity; makes travel honest." },
+    "clientSubmittedAt": { "type": ["string", "null"], "format": "date-time" },
+    "serverReceivedAt": { "type": ["string", "null"], "format": "date-time" },
+    "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 128, "description": "Offline-safe resubmission; unique per (userId, day, revision)." },
+
+    "status": {
+      "enum": ["done", "partial", "skipped", "rest-as-planned", "alternate-taken", "extra-activity", "unlogged"],
+      "description": "'unlogged' is the system's absence marker, never submitted by a user. 'partial' means meaningful work was done but less than prescribed. 'alternate-taken' means the planned alternate was chosen — a success, not a failure."
+    },
+    "statusDetail": {
+      "enum": ["illness", "travel", "work", "family", "sleep", "motivation", "pain", "weather", "equipment", "social", "just-didnt", "other", null],
+      "description": "One tap. Highest-value/lowest-cost field in the product: intent changes the decision more than the miss itself (missed-session-rules.yaml)."
+    },
+    "completedKm": { "type": ["number", "null"], "minimum": 0, "maximum": 250, "description": "If omitted, the planner uses distanceKm from the linked activity, then prescribed distance with lower confidence." },
+    "durationMin": { "type": ["number", "null"], "minimum": 0, "maximum": 1500 },
+    "rpe": { "type": ["integer", "null"], "minimum": 1, "maximum": 10, "description": "Session RPE, Borg CR10. Drives load_sRPE and the rpe_gap signal. Not the same as 'legs'." },
+    "legs": { "type": ["integer", "null"], "minimum": 1, "maximum": 5, "description": "1 feathered · 2 normal · 3 heavy · 4 very heavy · 5 wrecked. The most plan-relevant single subjective item for runners." },
+    "mood": { "type": ["integer", "null"], "minimum": 1, "maximum": 5, "description": "Displayed, and used only as a weak tiebreaker. Never used to judge or to nudge (feedback-microcopy.md#never-say)." },
+
+    "wellness": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "description": "Tier 2. Collapsed in the UI and remembers yesterday's value.",
+      "properties": {
+        "sleepHours": { "type": ["number", "null"], "minimum": 0, "maximum": 16 },
+        "sleepQuality": { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
+        "restingHr": { "type": ["integer", "null"], "minimum": 25, "maximum": 140 },
+        "hrvLnRMSSD": { "type": ["number", "null"], "minimum": 0, "maximum": 12, "description": "ln-transformed; the metric contract expects natural-log RMSSD (metric-definitions.md#hrv_lnrmssd_dev)." },
+        "stress": { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
+        "fatigue": { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
+        "musoreSoreness": { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
+        "illnessSymptoms": { "type": "array", "items": { "enum": ["none", "above-neck", "below-neck", "fever", "GI", "chest", "other"] }, "classification": "health-sensitive", "description": "Drives the safety layer: 'below-neck' or 'fever' is a hard stop, non-overridable (safety-layer.md#1)." },
+        "fuelingNote": { "type": ["string", "null"], "maxLength": 280, "classification": "health-sensitive", "description": "Free text only. We never respond with calorie or weight guidance; long-run fueling guidance is generic and product-agnostic." }
+      }
+    },
+
+    "pain": {
+      "type": "array",
+      "maxItems": 5,
+      "description": "Body-map or text. The triage input for injury-risk-and-pain-triage.md; drives constrain/advise/hard_stop.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["site", "intensity"],
+        "properties": {
+          "site": { "type": "string", "maxLength": 60, "description": "Controlled body-part code preferred; free text allowed and normalised." },
+          "side": { "enum": ["left", "right", "central", null] },
+          "intensity": { "type": "integer", "minimum": 0, "maximum": 10 },
+          "duringRun": { "type": "boolean" },
+          "nextMorningWorse": { "type": "boolean", "description": "The single most useful pain question we ask." },
+          "affectsGait": { "type": "boolean", "description": "true => immediate constrain at minimum; night pain or gait change escalates." },
+          "nightPain": { "type": "boolean", "description": "Bone-stress red flag: non_overridable referral (safety-layer.md#1)." },
+          "duration": { "enum": ["today", "few-days", "1-2-weeks", "over-2-weeks", "recurring"] },
+          "knownInjury": { "type": "boolean" }
+        }
+      }
+    },
+
+    "note": { "type": ["string", "null"], "maxLength": 2000, "classification": "health-sensitive", "description": "Sent to the narrator only as intent codes unless aiNarratorEnabled and minimisation rules pass (ADR-0006)." },
+    "intent": { "type": ["string", "null"], "enum": ["as-planned", "listened-to-body", "pushed-anyway", "just-move", "training-for-race", "just-check-me", "other", null], "description": "'just-check-me' produces a read-only verdict with no action; the highest-signal reason a runner opens the app." },
+
+    "source": { "enum": ["mobile", "web", "offline-queue", "import-assistant", "voice"], "description": "How it was captured. 'offline-queue' entries replay with their original idempotency key." },
+    "linkedActivityIds": { "type": "array", "items": { "type": "string", "format": "uuid" }, "description": "Set by the identity matcher or the runner, never assumed: autoLinked requires confidence above threshold, else 'suggested' (integrations.md#import-pipeline)." }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "skipped" } } },
+      "then": { "required": ["statusDetail"], "properties": { "statusDetail": { "type": "string" } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "partial" } } },
+      "then": { "anyOf": [ { "required": ["completedKm"] }, { "required": ["durationMin"] } ] }
+    }
+  ]
+}

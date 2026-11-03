@@ -1,0 +1,122 @@
+schema_version: 1
+id: periodization-models
+status: draft
+owner: plan-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/periodization/models-comparison.md]
+  sources: [PLAN-S2, PLAN-S3, PLAN-S8, PLAN-S10, PLAN-S11]
+applies_to: [all]
+
+notes: >
+  Model choice is the most consequential plan decision and the **least evidenced** thing in this
+  register. There is no head-to-head trial of periodization *models* in runners in
+  [../sources/bibliography.md](../sources/bibliography.md): PLAN-S2 (grade A review) and PLAN-S3 (grade A
+  meta) compare **intensity distributions**, not block names, and PLAN-S4 is n = 12 runners on the same
+  question. The named models below are coaching schools — PLAN-S8 Daniels, PLAN-S10 Hansons, PLAN-S11
+  Pfitzinger, all grade C. So: choose the model that survives the runner's life, and say plainly in the
+  plan explanation that the choice is a hypothesis about this person, not a proven method. The one thing
+  the evidence does license is a strong claim about distribution (threshold-heavy weeks fail), which is
+  enforced in intensity-distribution.yaml before any model is even chosen.
+
+knobs:
+  default_model:
+    value: daniels-style-concurrent
+    range: [linear, block, reverse-block, daniels-style-concurrent, undulating-minimal]
+    unit: enum
+    confidence: low
+    rationale: "Concurrent development with a shifting emphasis fits multi-pace recreational runners and degrades gracefully when a week is lost. No comparative trial of models exists in this register, so robustness is the tie-breaker."
+    persona_overridable: true
+  model_by_persona:
+    value:
+      novice-first-5k: undulating-minimal
+      time-poor-3-days: undulating-minimal
+      competitive-amateur-marathon: daniels-style-concurrent
+      marathon-sub-three: block
+      trail-ultra-hybrid: block
+      masters-40plus: reverse-block
+      returning-after-layoff-or-injury: undulating-minimal
+    range: null
+    unit: map
+    confidence: low
+    rationale: "Reverse-block for masters keeps neuromuscular work present while volume stays modest; block for high-volume goals where one emphasis at a time is manageable."
+    persona_overridable: true
+  macro_weeks:
+    value: {from_goal_date: true, min: 6, max: 32}
+    range: {min: [4, 8], max: [20, 40]}
+    unit: weeks
+    confidence: high
+    rationale: "Horizon comes from the goal date; below 6 weeks there is no periodization, only preparation."
+    persona_overridable: false
+  block_min_weeks:
+    value: 4
+    range: [3, 8]
+    unit: weeks
+    confidence: medium
+    rationale: "Adaptation windows are weeks-to-months; a 2-week 'block' is a mood."
+    persona_overridable: false
+  quality_sessions_max_by_model:
+    value: {linear: 2, block: 2, reverse-block: 2, daniels-style-concurrent: 2, undulating-minimal: 1}
+    range: null
+    unit: map
+    confidence: medium
+    rationale: "Every model needs a spacing guarantee; undulating-minimal trades a second hard day for reliability."
+    persona_overridable: false
+  emphasis_shift:
+    value: {trigger: phase_boundary, max_pace_specificity_share_pct: 60}
+    range: {max_pace_specificity_share_pct: [30, 80]}
+    unit: object
+    confidence: medium
+    rationale: "PLAN-S8/PLAN-S11 shift emphasis at phase boundaries rather than weekly; PLAN-S12's marathon-week data is a bound on realistic time demand, not a phase schedule."
+    persona_overridable: true
+  race_count_max_per_12_weeks:
+    value: 2
+    range: [1, 4]
+    unit: races
+    confidence: medium
+    rationale: "A race is a hard session with consequences; two 10 km races can coexist, a half and a marathon cannot."
+    persona_overridable: true
+
+rules:
+  - id: choose-model-by-life
+    when: "selecting a model"
+    then: "rank candidates by (days available, recovery history, injury history), then apply model_by_persona as tie-breaker"
+    severity: constraint
+    explain: "model-choice"
+    note: "Ambition is not an input to model selection; it chooses the goal, not the structure."
+
+  - id: no-model-switch-mid-block
+    when: "a review proposes changing model inside an active block"
+    then: "refactor_at_next_phase_boundary_or_reject"
+    severity: constraint
+    explain: "model-stability"
+
+  - id: taper-is-always-last
+    when: "any model is selected"
+    then: "append taper per taper.yaml unless horizon_to_race < 3 weeks, in which case hold and note it"
+    severity: constraint
+    explain: "model-taper-required"
+
+  - id: non-periodized-is-a-choice
+    when: "persona == maintenance or goal == health-only"
+    then: "use undulating-minimal with no phase boundaries; do not manufacture blocks"
+    severity: advise
+    explain: "model-flat-maintenance"
+    note: "PLAN-S10's school deliberately runs a high-frequency, no-down-week plan for some athletes: a flat structure can be a considered choice, not an omission. It is not a generator default."
+
+
+## Contract aliases
+contract_aliases:
+  macro_length_weeks: {home: "#macro_weeks", note: "same knob, plural spelling used by models-comparison.md"}
+  quality_sessions_per_week:
+    home: "session-classes.yaml#hard_days_per_week_default"
+    range: [0, 3]
+    note: "one home, so a model definition cannot quietly authorise a third hard day"
+  max_quality_sessions: {home: "#quality_sessions_per_week", note: "ceiling form used by models-comparison.md"}
+  default_model:
+    value: linear-phased-concurrent
+    range: [linear-phased-concurrent, block, undulating, hybrid]
+    unit: enum
+    confidence: medium
+    rationale: "v1 ships one model: the phased shape of Daniels-class periodisation with the concurrent emphasis of the evidence in PLAN-S2. The alternatives stay declared so the choice is visible rather than implicit."
+    persona_overridable: true

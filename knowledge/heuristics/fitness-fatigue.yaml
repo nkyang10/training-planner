@@ -1,0 +1,74 @@
+schema_version: 1
+id: fitness-fatigue
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/physiology/fatigue-fitness-recovery.md, knowledge/signals-and-metrics/performance-management.md]
+  sources: [PHYS-S5, PHYS-S11, PHYS-S22]
+applies_to: [all]
+
+notes: >
+  The two-exponent model (Banister, PHYS-S5) is a *description* of a real asymmetry — fitness decays
+  slowly, fatigue quickly — and that asymmetry is the reason a taper works. It is not a control system:
+  per-user τ estimation on consumer data is unstable, and re-fitting it monthly invites the model to chase
+  noise. This file therefore keeps the model off by default, while
+  [progression.yaml](progression.yaml) and [restart-after-layoff.yaml](restart-after-layoff.yaml) use the
+  underlying physiology as plain time windows.
+
+knobs:
+  enabled:
+    value: false
+    range: [false, display_only]
+    unit: enum
+    confidence: high
+    rationale: "Off for pace setting and for any plan decision. Display-only is allowed for a user who asks for the curve and can read it as narrative."
+    persona_overridable: true
+  fatigue_tau_days:
+    value: 10
+    range: [5, 25]
+    unit: days
+    confidence: low
+    rationale: "If display is enabled, τ is estimated per user and re-estimated **no more than monthly**; weekly re-fitting tracks noise and moves the curve the runner is watching."
+    persona_overridable: true
+  fitness_tau_days:
+    value: 40
+    range: [20, 80]
+    unit: days
+    confidence: low
+    rationale: "Same constraint as fatigue_tau_days. The wide range is honest: the published fits in runners are not tight."
+    persona_overridable: true
+  detraining_plateau_days:
+    value: 90
+    range: [60, 180]
+    unit: days
+    confidence: medium
+    rationale: "PHYS-S22: loss grows with time off but plateaus around ~90 days, so time off is bucketed, never scaled linearly. Used by restart-after-layoff.yaml#detraining_bucket_es."
+    persona_overridable: false
+  adaptation_floor_weeks:
+    value: 4
+    range: [3, 8]
+    unit: weeks
+    confidence: medium
+    rationale: "Aerobic adaptation needs ≥4 weeks to be measurable at all; below that a block swap is churn, expressed here as the floor progression.yaml#adaptation_block_weeks clamps to."
+    persona_overridable: false
+  freshness_is_fatigue_decay:
+    value: true
+    range: null
+    unit: statement
+    confidence: high
+    rationale: "The sharpness of a taper week is mostly fast-decaying fatigue leaving. Saying so stops the system from claiming credit for it."
+    persona_overridable: false
+
+rules:
+  - id: no-implicit-model
+    when: "enabled == false"
+    then: "no hidden fitness/fatigue term may influence a session; if the engine wants one, it must be this knob, visible"
+    severity: constraint
+    explain: "fitness-fatigue-no-hidden-term"
+
+  - id: time-off-is-bucketed
+    when: "computing a restart from time off"
+    then: "use buckets from restart-after-layoff.yaml#layoff_bucket_days; never a linear function of days"
+    severity: constraint
+    explain: "fitness-fatigue-buckets"

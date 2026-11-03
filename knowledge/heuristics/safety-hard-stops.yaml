@@ -1,0 +1,157 @@
+schema_version: 1
+id: safety-hard-stops
+status: draft
+owner: fb-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs:
+    - knowledge/risk-and-safety/overreach-vs-overtraining.md
+    - knowledge/risk-and-safety/red-s-and-relative-energy-deficiency.md
+    - knowledge/risk-and-safety/injury-risk-and-pain-triage.md
+    - docs/engine/safety-layer.md
+  sources: [FB-S1, FB-S2, FB-S3, FB-S4, FB-S5]
+applies_to: [all]
+subtract_only: true          # validated: no rule below may add distance, duration, or intensity
+non_overridable: true        # the `non_overridable: true` rules are not tap-overridable, ever
+
+notes: >
+  Structural guarantees first (from docs/engine/safety-layer.md#1): the planner's output type cannot
+  represent adding volume from inside this layer, so no rule here needs to be perfect. What follows are
+  the *symptom* stops, ordered by precedence. `hard_stop` removes today's session and every remaining
+  quality session until the entry clears; it never proposes a substitute workout.
+
+invariants:
+  - id: no-pace-target-from-prediction
+    statement: "a session may not carry a prescribed pace when pace_source is a prediction with no dated evidence anchor"
+    severity: constraint
+  - id: ratio-can-remove-only
+    statement: "any rule whose `when` cites acwr/tsb may only downgrade, relocate, or delete"
+    severity: constraint
+  - id: no-diet-or-weight-language
+    statement: "neither this layer nor the narrator may emit energy-availability guidance, targets, or estimates"
+    severity: constraint
+  - id: max-hard-sessions
+    statement: "hardSessionsPerWeek <= 2 (3 only when the persona gate in session-classes.yaml passes) and always >= 72 h apart"
+    severity: constraint
+
+rules:
+  - id: chest-cardiac
+    when: "entry.pain.site in [chest] or symptoms includes [chest-pain, syncope, near-syncope, palpitations-with-dizziness, breathless-at-rest]"
+    then: "hard_stop(all_future_sessions_in_phase); referral('urgent'); no_training_suggestion: true"
+    severity: hard_stop
+    non_overridable: true
+    confidence: high
+    explain: "stop-cardiac-red-flag"
+    note: "First sentence of the comment is the instruction. No training content in the same comment."
+
+  - id: fever-or-below-neck-illness
+    when: "wellness.illnessSymptoms in [fever, below-neck, chest, GI] and status != rest-as-planned"
+    then: "hard_stop(today); downgrade(all_quality_within_next_3d); resume_rule('48h-symptom-free-easy-first')"
+    severity: hard_stop
+    non_overridable: true
+    confidence: high
+    explain: "stop-fever"
+
+  - id: night-pain-or-bone-tenderness
+    when: "pain.nightPain == true or (pain.affectsGait == true and pain.duration in [1-2-weeks, over-2-weeks, recurring])"
+    then: "hard_stop(all_sessions); advise('load-tolerating-test-and-clinician'); referral('routine-urgent')"
+    severity: hard_stop
+    non_overridable: true
+    confidence: high
+    explain: "stop-bone-stress-red-flag"
+    provenance: [knowledge/risk-and-safety/injury-risk-and-pain-triage.md#red-flags]
+
+  - id: pain-escalation
+    when: "pain.intensity >= 7 or (pain.intensity >= 4 and pain.nextMorningWorse == true and trend == rising over 3 reports)"
+    then: "hard_stop(today); constrain(next_7d: no_intensity, long_run_km_capped)"
+    severity: hard_stop
+    non_overridable: true
+    confidence: medium
+    explain: "stop-pain-high"
+
+  - id: reds-flag-pattern
+    when: "3 of [persistent_performance_decline_21d, elevated_rhr_7d, sleep_disturbance_7d, mood_decline_7d, appetite_change_reported, missed_periods_reported, recurrent_illness] AND energy_availability_risk_screen == positive"
+    then: "hard_stop(all_quality_sessions); subtract(next_14d: volume_pct 60, intensity none); referral('clinician-with-sports-medicine'); escalate_language: 'recovery-and-fuelling-conversation'"
+    severity: hard_stop
+    non_overridable: false          # runner may keep easy runs at their own recorded effort; volume is still subtracted
+    confidence: medium
+    explain: "stop-reds-pattern"
+    note: "We subtract and refer. We never name the condition to the runner and never discuss food or weight (AGENTS.md rule 6, FB-S2)."
+
+  - id: overreach-pattern
+    when: "performance_decrement >= 2 sessions_in_week AND legs >= 4 for 3 consecutive days AND load_monotony(7d) > band"
+    then: "constrain(next_7d: volume_pct 70, intensity none); flagReview('overreach-check')"
+    severity: constrain
+    non_overridable: false
+    confidence: medium
+    explain: "constrain-overreach"
+    note: "FB-S1: the only established treatment is reduced load. We never claim to diagnose OTS (FB-S5)."
+
+  - id: pregnancy-postpartum-lock
+    when: "profile.health.flags includes [pregnant, postpartum] and medical-flags.yaml#lock_phase == true"
+    then: "lock(phase: maintenance, no_intensity_progression: true); forbid_sessionKinds([vo2Intervals, threshold, race-pace-long]); max_intensity_rpe(7)"
+    severity: constrain
+    non_overridable: true
+    confidence: high
+    explain: "constrain-medical-lock"
+    note: "Phase may not be advanced by ambition or by a goal date; see knowledge/personas/postpartum-return.md."
+
+  - id: heat-and-altitude
+    when: "forecast.tempC >= 28 or forecast.wbgtC >= 26 or (altitude_change_m >= 1200 and days_at_altitude < 5)"
+    then: "relocate(quality_sessions: earliest_slot_or_indoor); convert(quality_session -> effort_band); no_pace_target: true"
+    severity: constrain
+    confidence: medium
+    explain: "constrain-heat"
+    note: "Effort replaces pace. Never the runner's fault when the plan loses a session to heat."
+
+  - id: no-double-hard-weekend
+    when: "two quality sessions with gap < 72 h in the remaining horizon"
+    then: "relocate_or_delete(the_lower_priority_session); priority_order_for_deletion: [quality_newest_added, long_run_extension, extra_easy, strides_last]"
+    severity: constraint
+    confidence: high
+    explain: "constraint-spacing"
+
+  - id: unlogged-days-disable-load-rules
+    when: "unlogged_days(rolling 7) >= 3"
+    then: "disable(all rules whose `when` cites load metrics); flag('need-logs'); comment: gathering"
+    severity: constrain
+    confidence: high
+    explain: "constrain-insufficient-data"
+    note: "Absence of data is never treated as absence of training (feedback-loop.md#2)."
+
+knobs:
+  min_confirmations:
+    value: 3
+    range: [1, 4]
+    unit: observations
+    confidence: high
+    rationale: "Red-flag symptoms use 1; everything else needs corroboration (physiology/individual-differences.md)."
+    persona_overridable: false
+  hard_stop_cooldown_days:
+    value: 2
+    range: [0, 7]
+    unit: days-before-a-new-stop-can-escalate
+    confidence: medium
+    rationale: "Prevents a stop from flipping to a constrain and back between two entries on the same day."
+    persona_overridable: false
+  resume_after_illness:
+    value: {symptom_free_hours: 48, first_session: "easy-20min", backfill_days_pct: 100}
+    range: {symptom_free_hours: [24, 96], backfill_days_pct: [50, 100]}
+    unit: object
+    confidence: medium
+    rationale: "Return-to-train after illness is conservative and never a catch-up."
+    persona_overridable: false
+
+
+## Contract aliases (names the metric docs use for rules declared above)
+contract_aliases:
+  grade_a_or_b_only: {home: "metric-catalog.yaml#grade_gate", note: "stated from the safety side: a signal graded C or D may not reach a planner branch"}
+  no_ratio_only_edits: {home: "acwr.yaml#rules: no-ratio-only-edit"}
+  no_pace_target_from_prediction:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "A pace derived from a predicted hrmax or an extrapolated race is a display, not a target the runner is held to; when a prediction is the only evidence the session is effort-based (pace-bands.yaml#prediction_allowed_for)."
+    persona_overridable: false
+  resume_after_illness: {home: "#return_from_illness"}

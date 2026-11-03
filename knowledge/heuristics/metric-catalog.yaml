@@ -1,0 +1,61 @@
+schema_version: 1
+id: metric-catalog
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/metric-catalog.md]
+  sources: [PHYS-S2, PHYS-S9, PHYS-S12, PHYS-S13, PHYS-S15, PHYS-S30, PHYS-S32, PHYS-S43]
+applies_to: [all]
+
+notes: >
+  The gate every metric must pass before it may influence a plan. The per-metric table — formula, unit,
+  minimum history, grade, and what each metric may and may not be used for — is the home of those values
+  in [../signals-and-metrics/metric-catalog.md](../signals-and-metrics/metric-catalog.md); this file owns
+  only the three policies that apply to the whole table. The build must fail on a grade violation rather
+  than degrade quietly: a grade-D vendor score in a planner branch is the single easiest way to make this
+  product confidently wrong.
+
+knobs:
+  grade_gate:
+    value: {planner_branches: [A, B], narrative_facts: [A, B, C], conditions_from_D: forbidden, mode: build_time_error}
+    range: null
+    unit: policy
+    confidence: high
+    rationale: "Grade D (vendor composites, blogs, single anecdotes) may motivate a display, never a branch — the grading rule in ../MAINTENANCE.md made executable."
+    persona_overridable: false
+  staleness_days:
+    value: {race: 365, field_test: 84, critical_speed: 56, model_estimate: 28, hr_proxy: 28, vendor_vo2max: 90}
+    range: {race: [180, 540], field_test: [56, 180], critical_speed: [28, 112], model_estimate: [14, 90], hr_proxy: [14, 90], vendor_vo2max: [30, 180]}
+    unit: map(days)
+    confidence: medium
+    rationale: "A stale source is excluded from decisions but still displayed with its date — hiding it would make the plan inexplicable."
+    persona_overridable: true
+  min_series_days:
+    value: {hrv: 14, acwr: 28, ctl: 84, weekly_load_change: 28, wellness: 7, decoupling: 14}
+    range: {hrv: [7, 60], acwr: [14, 56], ctl: [28, 180], weekly_load_change: [14, 84], wellness: [3, 30], decoupling: [7, 60]}
+    unit: map(days)
+    confidence: medium
+    rationale: "Below the minimum the metric returns null — not a default, not a zero. See individual-baselines.yaml#cold_start_behaviour."
+    persona_overridable: false
+  excluded_from_decisions_by_default:
+    value: [training_effect, load_impact, vendor_readiness_score, vendor_vo2max, acwr, tsb, decoupling_pct]
+    range: null
+    unit: list
+    confidence: high
+    rationale: "Display-only list, mostly grade C/D in runners; each entry is named in the catalog's 'must not be used for' column."
+    persona_overridable: false
+
+rules:
+  - id: metric-identity-is-versioned
+    when: "any derived series is stored"
+    then: "store counter_version + series_version + source + as_of date; mixing versions in one series is a build-time rejection"
+    severity: constraint
+    explain: "metrics-versioned"
+    note: "load.yaml#cross_counter_mixing is the load-series half of this."
+
+  - id: null-not-zero
+    when: "history is insufficient or >25% of samples are bad"
+    then: "return null; exclude the session from derived series; keep the activity itself"
+    severity: constraint
+    explain: "metrics-null-not-zero"

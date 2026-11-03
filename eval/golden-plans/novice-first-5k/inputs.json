@@ -1,0 +1,63 @@
+{
+  "$comment": "Generation inputs for the novice-first-5k golden plan.",
+  "clock": {
+    "now": "2026-11-16T21:00:00+08:00",
+    "timezone": "Asia/Taipei",
+    "dayStartHour": 4
+  },
+  "seed": "golden-novice-first-5k-v1",
+  "knowledgeBundle": {
+    "$comment": "Pinned bundle; the hash below is what makes this fixture reproducible.",
+    "version": "0.1.0",
+    "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "files": [
+      "knowledge/heuristics/weekly-templates.yaml#novice_3_day",
+      "knowledge/heuristics/load-progression.yaml",
+      "knowledge/heuristics/weekly-templates.yaml#run_walk_progression",
+      "knowledge/heuristics/load-progression.yaml#novice-conservative",
+      "knowledge/heuristics/safety-hard-stops.yaml"
+    ]
+  },
+  "plannerVersion": "0.1.0",
+  "horizonDays": 98,
+  "state": {
+    "activePlanVersionId": null,
+    "lastReviewAt": null,
+    "loggedDayRatio28d": null,
+    "signals": null
+  },
+  "evidence": {
+    "activities": [
+      { "date": "2026-11-10", "kind": "run", "durationMin": 30, "distanceKm": 4.1, "rpe": 5, "legs": 2, "source": "manual" },
+      { "date": "2026-11-12", "kind": "run", "durationMin": 28, "distanceKm": 3.8, "rpe": 5, "legs": 3, "source": "manual" },
+      { "date": "2026-11-14", "kind": "run", "durationMin": 42, "distanceKm": 6.0, "rpe": 6, "legs": 3, "source": "manual" }
+    ],
+    "entries": [
+      { "date": "2026-11-10", "status": "done", "rpe": 5, "legs": 2 },
+      { "date": "2026-11-12", "status": "done", "rpe": 5, "legs": 3 },
+      { "date": "2026-11-14", "status": "done", "rpe": 6, "legs": 3, "note": "last kilometre felt hard but I finished smiling" }
+    ],
+    "painReports": [
+      { "date": "2026-11-15", "site": "right knee (lateral)", "intensity": 2, "duringRun": true, "nextMorning": false, "gaitChange": false }
+    ],
+    "tests": [],
+    "measurementConfidence": {
+      "hrMax": "unknown",
+      "paces": "unknown",
+      "weeklyVolume": "measured-3-weeks-only",
+      "expiresAt": "2026-12-14"
+    }
+  },
+  "constraints": {
+    "maxHardDaysPerWeek": 1,
+    "hardDaySpacingHours": 48,
+    "volumeRampPctCeiling": 8,
+    "longestRunCapKm": 9,
+    "allowStrideSessionsOnly": true,
+    "forbidSessionKinds": ["threshold", "vo2Intervals", "trackRepeats", "tempo"],
+    "noPaceTargets": true,
+    "prescriptionPrimaryTarget": ["rpe", "duration", "distance"],
+    "nonNegotiablePerWeekMax": 1
+  },
+  "revisionRequest": null
+}

@@ -1,0 +1,76 @@
+schema_version: 1
+id: acwr
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/acute-chronic-workload.md]
+  sources: [PHYS-S12, PHYS-S13, PHYS-S15]
+applies_to: [device-connected]
+extends: [load, noise]
+
+notes: >
+  The acute:chronic ratio is the most cited and least reproducible number in running apps. In runners the
+  published ratios disagree with each other constantly (33.4% vs 16.2% of sessions flagged, depending on
+  variant, PHYS-S15), and the famous 0.8–1.3 "sweet spot" does not survive that disagreement
+  ([../signals-and-metrics/acute-chronic-workload.md](../signals-and-metrics/acute-chronic-workload.md)).
+  So the ratio is a *display*, the weekly change in load is the *guard*, and no plan branch may read the
+  ratio alone.
+
+knobs:
+  display_only:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "May appear in the fact object handed to the comment generator; must not be an input to any planner branch."
+    persona_overridable: false
+  variant:
+    value: ewma_7_28
+    range: [ewma_7_28, ra_7_28_coupled, ra_7_28_uncoupled]
+    unit: enum
+    confidence: medium
+    rationale: "Pinned per user with a series_version; the variants disagree, so switching mid-history would look like a change in the runner."
+    persona_overridable: false
+  min_history_days:
+    value: 28
+    range: [14, 56]
+    unit: days
+    confidence: high
+    rationale: "Below it return null and hide the widget — a default ACWR of 1.0 would silently read as 'safe'."
+    persona_overridable: false
+  corroboration_required:
+    value: 1
+    range: [1, 3]
+    unit: count
+    confidence: high
+    rationale: "Any load-related downgrade needs ≥1 independent signal: spacing violation, RPE rise, session failure, or a missed-day streak."
+    persona_overridable: false
+  sweet_spot_language_allowed:
+    value: false
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "Never show a green band or say 'you are in the safe zone'; the band is not validated in runners."
+    persona_overridable: false
+  actionable_quantity:
+    value: "load.yaml#weekly_load_change_max_pct"
+    range: null
+    unit: pointer
+    confidence: high
+    rationale: "Where the real guard lives; this pointer exists so a reader cannot conclude ACWR was simply forgotten."
+    persona_overridable: false
+
+rules:
+  - id: no-ratio-only-edit
+    when: "a planner rule's only trigger is a derived ratio (ACWR, form, composite readiness)"
+    then: "build_time_rejection"
+    severity: hard-stop
+    explain: "acwr-never-alone"
+    note: "safety-hard-stops.yaml#no_ratio_only_edits is the same gate stated from the safety side."
+
+  - id: ratio-phrase-limits
+    when: "a comment mentions the ratio"
+    then: "state it as 'the ratio between your last week and your recent average', with its variant and date; no risk verdict"
+    severity: constraint
+    explain: "acwr-plain-language"

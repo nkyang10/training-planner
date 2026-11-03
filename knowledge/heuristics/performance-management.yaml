@@ -1,0 +1,96 @@
+schema_version: 1
+id: performance-management
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/performance-management.md]
+  sources: [PHYS-S5, PHYS-S6, PHYS-S32]
+applies_to: [device-connected]
+
+notes: >
+  Chronic load ("fitness"), acute load ("fatigue") and their difference (form/TSB) are **descriptive
+  narratives**, not prescription. Two structural facts decide this: TSB is mathematically ≈ 0 at training
+  equilibrium, so "get your form positive" is a tautology; and the freshness a runner feels in a taper is
+  mostly acute load decaying, which the model reports as a rise in form whether or not anything real
+  happened. The values are the same EMA constants the catalog uses, kept here so the narrative is
+  reproducible, and a plan version is never built on a TSB target
+  ([../signals-and-metrics/performance-management.md](../signals-and-metrics/performance-management.md)).
+
+knobs:
+  ctl_tau_days:
+    value: 42
+    range: [21, 90]
+    unit: days
+    confidence: medium
+    rationale: "The 42-day EMA (α = 0.0483) — one number, stored here; every consumer points at this knob. Requires ≥ 12 weeks of history before it means anything."
+    persona_overridable: true
+  atl_tau_days:
+    value: 7
+    range: [4, 14]
+    unit: days
+    confidence: medium
+    rationale: "The 7-day EMA (α = 0.2571). Short enough that a taper shows up within days, which is exactly why it is narrative."
+    persona_overridable: true
+  tsb_prescription_allowed:
+    value: false
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "PHYS-S5's own framing is descriptive; TSB → 0 at equilibrium, so prescribing a form number prescribes nothing."
+    persona_overridable: false
+  ctl_narrative_only:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "Say 'your recent average load', never 'your fitness is 47'. The unit is arbitrary and derived from a counter that may change underneath it."
+    persona_overridable: false
+  min_history_weeks:
+    value: 12
+    range: [6, 26]
+    unit: weeks
+    confidence: high
+    rationale: "Below 12 weeks CTL is a smoothed ramp, not a level; display nothing rather than a misleading trend."
+    persona_overridable: false
+  weekly_ctl_delta_formula:
+    value: "(weekly_load − 7 × CTL) / 42"
+    range: null
+    unit: formula
+    confidence: medium
+    rationale: "Kept explicit so the UI can explain *why* CTL rose; a derived number nobody can derive is a black box with a chart attached."
+    persona_overridable: false
+  load_counter_required:
+    value: "load.yaml#primary_counter"
+    range: null
+    unit: pointer
+    confidence: high
+    rationale: "CTL/ATL/TSB are meaningless across counters; the series identity is (counter_version, series_version, user_id)."
+    persona_overridable: false
+
+rules:
+  - id: no-form-target
+    when: "a plan would be shaped to reach a TSB value"
+    then: "reject; shape the plan around race day and the taper, and let form be reported"
+    severity: constraint
+    explain: "performance-management-no-form-target"
+
+  - id: counter-change-resets-series
+    when: "the load counter or its version changes"
+    then: "start a new series; never splice; annotate the break in the chart"
+    severity: constraint
+    explain: "performance-management-series-break"
+
+
+## Contract aliases (doc names resolving to knobs declared above)
+contract_aliases:
+  ctl_window_days: {home: "#ctl_tau_days", note: "tau = 42 days, so the daily weight is 0.0111; the window is a decay constant, not a cutoff"}
+  atl_window_days: {home: "#atl_tau_days", note: "tau = 7 days"}
+  min_series_weeks: {home: "#min_history_weeks"}
+  missing_session_policy:
+    value: zero_fill_unlogged_days
+    range: [zero_fill_unlogged_days, skip_and_shrink_denominator]
+    unit: enum
+    confidence: medium
+    rationale: "An unlogged day is a rest day for load arithmetic because it truly carried no training, but the gap stays visible so a runner who stopped logging does not appear to be tapering. missed-session-rules.yaml#unlogged-is-not-zero is the comment-side statement."
+    persona_overridable: false

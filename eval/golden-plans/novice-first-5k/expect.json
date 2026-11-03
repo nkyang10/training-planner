@@ -1,0 +1,83 @@
+{
+  "$comment": "What a coach would sign off on. Ranges wherever the planner may legitimately vary. See ../README.md#golden-plan-format-assert-properties-not-bytes",
+
+  "season": {
+    "phases": ["adaptation", "building", "race-prep", "race"],
+    "firstSessionDate": "2026-11-17",
+    "raceDate": "2027-02-21",
+    "totalWeeksBetween": [13, 14],
+    "bufferWeekBeforeRace": true
+  },
+
+  "weeklyVolumeKm": [
+    { "week": 1, "between": [11, 14] },
+    { "week": 4, "between": [14, 19] },
+    { "week": 8, "between": [19, 26] },
+    { "week": 12, "between": [22, 30] }
+  ],
+  "weeklyRampPctMax": 8,
+  "stepDownCadence": { "everyWeeks": [3, 4], "reductionPct": [15, 30] },
+
+  "sessionsPerWeek": { "exact": 3, "days": ["Tue", "Thu", "Sat"] },
+  "hardSessionsPerWeek": { "max": 1 },
+  "hardDaySpacingHoursMin": 48,
+
+  "sessionKinds": {
+    "mustContain": ["easyRun", "longRun", "runWalkIntervalsOrStrides"],
+    "mustNotContain": ["threshold", "tempo", "vo2Intervals", "trackRepeats"],
+    "firstFourWeeksOnly": ["easyRun", "runWalkIntervals", "longRun"]
+  },
+
+  "longRun": {
+    "week1Km": [5, 6.5],
+    "peakKm": [8, 9],
+    "peakWeeksFromRace": [2, 4],
+    "progressionRule": "no single jump above 1.5 km"
+  },
+
+  "prescription": {
+    "primaryTargetOnEasyDays": "rpe",
+    "paceTargetsPresent": false,
+    "heartRateTargetsPresent": false,
+    "talkTestOrRPELanguageRequired": true,
+    "runWalkStructureExample": "6 × (90s run / 60s walk) — intervals are intensity-light, density-forward",
+    "alternateSessionRequired": true
+  },
+
+  "constraintRespect": {
+    "noSessionOn": ["2027-01-16"],
+    "conflictHandling": "shift or drop only — must NOT create a make-up session on 2027-01-17 or inflate that week above the ramp ceiling",
+    "nonNegotiableCountPerWeekMax": 1,
+    "nonNegotiableIsSaturday": true
+  },
+
+  "painAwareness": {
+    "$comment": "Grade-2 lateral knee pain during running, resolves next morning: not a hard stop, but it must show up in the plan.",
+    "hardStops": [],
+    "constrains": ["knee-monitoring"],
+    "weeklyVolumeCapApplies": true,
+    "mustIncludeEntryPromptFor": ["pain"],
+    "reviewFlagMustNotFire": true
+  },
+
+  "taper": {
+    "structuredTaper": false,
+    "$comment": "A novice 5K goal does not need a taper; the final week simply trims volume and keeps one short sharp-ish session.",
+    "finalWeekVolumeDropPct": [20, 40],
+    "raceWeekHardSessions": [1, 1]
+  },
+
+  "openQuestionsMin": 2,
+  "openQuestionsMustInclude": [
+    "no pace or HR data — how do we know the easy effort is easy? (asks for a talk-test or a 6-min test)",
+    "goal date gives 13–14 weeks with only 3 measured weeks of history — confirm 3 days/week is stable"
+  ],
+
+  "explainRequired": true,
+  "explainMustReference": [
+    "knowledge/heuristics/weekly-templates.yaml#novice_3_day",
+    "knowledge/heuristics/load-progression.yaml#novice-conservative"
+  ],
+  "noGuaranteeLanguage": true,
+  "expectedPlanVersionHashNote": "Recorded separately in expect.hash for silent-change detection only."
+}

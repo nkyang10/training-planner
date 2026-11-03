@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://training-planner.local/schemas/json/review.schema.json",
+  "title": "Review",
+  "description": "One review of the future plan: the question the system asked, the options it offered, what the runner chose, and what happened after. A review is an option set with a 'keep as is' first option (docs/ux/review-flow.md), not a notification with a single accept button.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "review_id", "user_id", "opened_at_day", "trigger", "horizon_days", "options", "status"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "review_id": { "type": "string", "format": "uuid" },
+    "user_id": { "type": "string", "format": "uuid" },
+    "opened_at_day": { "type": "string", "format": "date", "description": "Training day the review opened. One review prompt per rolling week at most (review-triggers.yaml#dwell_days and #max_prompts_per_week)." },
+    "opened_by": { "enum": ["system_signal", "user_request", "post_race", "post_layoff", "phase_boundary"], "description": "User-triggered reviews are first-class: the button exists so a runner can be the one who notices." },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal_ids", "rule_ids", "evidence_grade_max"],
+      "properties": {
+        "signal_ids": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "Concrete observations, e.g. 'rhr_delta_sd:3' or 'feedback:motivation:low:streak4'. Never a device composite (metric-catalog.yaml#grade_gate)." },
+        "rule_ids": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "heuristic rule ids that fired, kebab-case, so the UI can show which rule asked." },
+        "evidence_grade_max": { "enum": ["A", "B", "C"], "description": "Highest grade among the cited sources. D-graded evidence cannot open a review (safety-hard-stops.yaml#grade_a_or_b_only)." },
+        "streak_days": { "type": "integer", "minimum": 1, "description": "Consecutive confirming readings; a single bad day never opens a review (noise.yaml#min_consecutive_observations)." }
+      }
+    },
+    "horizon_days": { "type": "integer", "minimum": 3, "maximum": 28, "description": "How far into the future the options may reach. Default 14 (review-triggers.yaml#horizon_days)." },
+    "freeze_days": { "type": "integer", "minimum": 0, "maximum": 7, "description": "Tomorrow and the day after are off limits to a review; those belong to micro-adjust (docs/adr/0005)." },
+    "options": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 4,
+      "description": "Option 0 is always keep_as_is. Order is fixed by the engine, never by persuasion.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["option_id", "label_key", "keep_as_is", "diff_id", "cost_summary", "expires_after_day"],
+        "properties": {
+          "option_id": { "type": "string" },
+          "label_key": { "type": "string", "description": "Message-catalogue key (AGENTS rule 8); the label is translated, not generated." },
+          "keep_as_is": { "type": "boolean" },
+          "diff_id": { "type": ["string", "null"], "format": "uuid", "description": "Null for keep_as_is: no diff, no change, no version bump." },
+          "cost_summary": { "type": "string", "maxLength": 200, "description": "Stated cost in the runner's terms, e.g. 'the Tuesday intervals move to Sunday and the long run shortens by 4 km'." },
+          "expires_after_day": { "type": "string", "format": "date", "description": "An unanswered review expires rather than nagging; expiry is recorded, not deleted." }
+        }
+      }
+    },
+    "status": { "enum": ["open", "accepted", "rejected", "expired", "superseded"] },
+    "chosen_option_id": { "type": ["string", "null"] },
+    "decided_at_day": { "type": ["string", "null"], "format": "date" },
+    "result_diff_id": { "type": ["string", "null"], "format": "uuid", "description": "Set only on accept. A rejection records no diff but does raise the trigger threshold for the next 30 days." },
+    "rejected_threshold_raise_days": { "type": "integer", "minimum": 0, "maximum": 90, "description": "After a rejection the same trigger waits longer before asking again (review-triggers.yaml#rejection_cooldown_days). The runner chose the current plan; the system does not ask twice in a week." },
+    "outcome_check_day": { "type": ["string", "null"], "format": "date", "description": "Day the review is scored against feedback, so 'did that help?' becomes an answer instead of a memory." },
+    "narrative": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["locale", "text", "allowed_numbers", "generated"],
+      "properties": {
+        "locale": { "enum": ["en", "zh-Hant"] },
+        "text": { "type": "string", "maxLength": 1200 },
+        "allowed_numbers": { "type": "array", "items": { "type": "number" }, "description": "Every number the narrative may contain, supplied by the engine. A validator rejects any numeric token not in this list (AGENTS rule 2)." },
+        "generated": { "type": "boolean", "description": "False when the template fallback produced the text, which is the normal path for short strings." }
+      }
+    }
+  }
+}

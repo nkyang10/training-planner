@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://training-planner.local/schemas/signal.schema.json",
+  "title": "Signal",
+  "description": "A computed signal with its window, confidence, and permitted uses — the runtime instance of docs/data/metric-definitions.md. 'mayDrive' is machine-enforced: a policy that consumes a signal for a channel the signal is not allowed to drive fails validation, which is how 'ACWR is display-only' stays true after we forget why.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["key", "userId", "asOfDay", "window", "value", "confidence", "mayDrive", "computedAt", "inputsHash", "knowledgeHash"],
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Registry key from metric-definitions.md. Adding a key requires a definition there first.",
+      "enum": ["load_sRPE", "load_trimp", "load_normalized", "weekly_load", "load_monotony", "strain", "ctl", "atl", "tsb", "acwr", "ramp_rate", "hrv_lnrmssd_dev", "hrv_data_sufficiency", "rhr_dev", "sleep_debt", "wellness_index", "vdot_equivalent", "pace_bands", "pace_at_hr_easy", "hr_drift", "threshold_hr_est", "durability", "economy_proxy", "completion_rate", "rpe_gap", "log_continuity", "log_quality_by_daytype", "device_coverage", "pain_trend", "adherence_intent_mix"]
+    },
+    "userId": { "type": "string", "format": "uuid" },
+    "asOfDay": { "type": "string", "format": "date", "description": "Training day the signal describes (inclusive end of its window)." },
+
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "description": "Part of the metric's identity: acwr(7/28) and acwr(28/28) are different metrics that happen to share a name.",
+      "properties": {
+        "kind": { "enum": ["rolling-ema", "rolling-days", "iso-week", "phase", "since-event", "single-day"] },
+        "days": { "type": ["integer", "null"], "minimum": 1, "maximum": 365 },
+        "tauDays": { "type": ["number", "null"], "minimum": 0.5, "maximum": 120 },
+        "startDay": { "type": ["string", "null"], "format": "date" },
+        "endDay": { "type": ["string", "null"], "format": "date" }
+      }
+    },
+
+    "value": { "type": ["number", "boolean", "string", "object", "array", "null"], "description": "null is a real answer: we prefer an honest null to a guessed number (metric-definitions.md rule 1)." },
+    "unit": { "type": ["string", "null"], "description": "AU · bpm · sec/km · % · score. Never inferred downstream." },
+    "baselineValue": { "type": ["number", "null"], "description": "The user's own baseline for deviation-type signals; never a population average." },
+    "deviationPct": { "type": ["number", "null"], "minimum": -100, "maximum": 500 },
+    "direction": { "enum": ["stable", "rising", "falling", "volatile", "unknown"] },
+
+    "confidence": { "enum": ["low", "medium", "high", "insufficient"], "description": "Computed as the minimum confidence of the inputs, never the maximum." },
+    "confidenceNote": { "type": ["string", "null"], "maxLength": 200, "description": "Surfaced in reviews: 'no HR data on 2 of 4 sessions' is what makes a verdict believable." },
+
+    "mayDrive": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Allowed consumers. Display-only metrics carry ['display'] and any policy that reads them for another channel is rejected.",
+      "items": { "enum": ["display", "micro", "review", "safety", "narrator"] }
+    },
+
+    "consecutiveDays": { "type": ["integer", "null"], "minimum": 0, "maximum": 60, "description": "Supports the 3-consecutive-reading rule for HRV/RHR without re-scanning history." },
+    "crossedThreshold": { "type": ["boolean", "null"], "description": "Set by the hysteresis pair (metric-definitions.md rule 3), so a signal that flaps around its cut does not flap the policy." },
+
+    "dataQuality": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "expectedDays": { "type": "integer", "minimum": 0 },
+        "presentDays": { "type": "integer", "minimum": 0 },
+        "coveragePct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "source": { "enum": ["manual", "device", "import", "mixed", "assumed"], "description": "'assumed' means filled by a documented default (e.g. load_sRPE with RPE 5 when RPE is missing) and is always labelled." },
+        "exclusions": { "type": "array", "items": { "type": "string" }, "description": "e.g. 'non-representative: 1200 km travel day' — excluded from baselines, retained in history." }
+      }
+    },
+
+    "computedAt": { "type": "string", "format": "date-time" },
+    "inputsHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "knowledgeHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "formulaVersion": { "type": "string", "description": "Which definition produced this value; lets us recompute selectively after a metric change." }
+  }
+}

@@ -1,0 +1,87 @@
+schema_version: 1
+id: noise
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/noise-and-individuality.md, knowledge/signals-and-metrics/hrv-and-rhr.md]
+  sources: [PHYS-S9, PHYS-S12, PHYS-S45]
+applies_to: [all]
+extends: individual-baselines
+
+notes: >
+  This file owns the answer to "how big does a change have to be before it means anything?". Consumer
+  metrics carry typical errors of 5–15% (session load ≈ 12%, PHYS-S9) and night-to-night HRV swings that
+  dwarf any training effect, so the system's default verb is **wait**. Where a decision cannot wait — a
+  hard stop — the rule is deliberately one-directional: noise may justify stopping, it may never justify
+  adding.
+
+knobs:
+  min_consecutive_observations:
+    value: 3
+    range: [2, 7]
+    unit: days
+    confidence: high
+    rationale: "Three consecutive mornings in the same direction is the minimum before an HRV or resting-HR change is treated as a trend (mirrors daily-feedback-rules.yaml#hrv-trend-not-day)."
+    persona_overridable: false
+  min_change_to_act_on:
+    value: "1.0 × within-person sd (or the metric's own typical error, whichever is larger)"
+    range: ["0.75 × sd", "2.0 × sd"]
+    unit: rule
+    confidence: medium
+    rationale: "Acting inside the noise floor converts measurement error into training decisions — the single most common failure of a consumer readiness score."
+    persona_overridable: false
+  metric_typical_error_pct:
+    value: {weekly_load: 12, session_duration: 5, distance_gps: 3, rhr_bpm: 3, hrv_lnrmssd: 10, wellness_composite: 15}
+    range: null
+    unit: map
+    confidence: low
+    rationale: "PHYS-S9's 12.2% session-load typical error is the only measured entry; the rest are our working placeholders pending a real source."
+    persona_overridable: true
+  hrv_noise_reality_check:
+    value: "night-to-night sd commonly exceeds the training-induced shift over weeks"
+    range: null
+    unit: statement
+    confidence: medium
+    rationale: "The reason HRV may only ever shift a session down and never raise one; see readiness.yaml#direction_policy."
+    persona_overridable: false
+  asymmetric_interpretation:
+    value: {bad_direction: "1 observation may subtract (safety), N must confirm (everything else)", good_direction: "no action, ever"}
+    range: null
+    unit: rule
+    confidence: high
+    rationale: "The governing asymmetry of the whole product, stated where the noise budget lives."
+    persona_overridable: false
+  no_composite_score:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "Averaging four noisy inputs into one 'readiness %' hides which input moved and manufactures false precision. Show the signals, name the one that matters."
+    persona_overridable: false
+
+rules:
+  - id: wait-by-default
+    when: "|change| < min_change_to_act_on"
+    then: "no_interpretation; comment_only_on_subjective_if_it_agrees"
+    severity: constraint
+    explain: "noise-wait"
+
+  - id: no-stacking-of-uncertain-signals
+    when: "two sub-threshold signals point the same way"
+    then: "still_sub_threshold; mention at most one in a comment"
+    severity: constraint
+    explain: "noise-not-additive"
+    note: "Two halves of an uncertain signal do not make a certain one; stacking is how a system learns to see a pattern that is only two devices disagreeing."
+
+  - id: good-news-is-not-a-reason-to-add
+    when: "all signals look unusually good"
+    then: "no_volume_or_intensity_increase_from_signals; a strong day may be mentioned, nothing more"
+    severity: constraint
+    explain: "noise-no-upside-action"
+
+
+contract_aliases:
+  min_effect_pct:
+    home: "#min_change_to_act_on"
+    note: "same quantity as a percent instead of an sd multiple: 10 (range 5-20) for weekly load, 3 for duration. Use the sd multiple when a per-user typical error exists, the percent when it does not."

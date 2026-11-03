@@ -1,0 +1,161 @@
+schema_version: 1
+id: load-progression
+status: draft
+owner: fb-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs:
+    - knowledge/plan-construction/mileage-and-progression.md
+    - knowledge/feedback-and-autoregulation/interpretation-windows.md
+    - knowledge/physiology/fatigue-fitness-recovery.md
+  sources: [PLAN-S7, FB-S1]
+applies_to: [all]
+notes: >
+  The ramp is the single most common cause of a plan that reads well and injures people. Two
+  independent safeguards are intentional: a percentage ceiling AND an absolute ceiling, because 8% of
+  20 km/wk and 8% of 90 km/wk are different questions. One variable per week: this file may not be the
+  only thing moving — see rules.one-variable-per-week.
+
+knobs:
+  weekly_increment_pct:
+    value: 8
+    range: [3, 12]
+    unit: percent-per-week
+    confidence: medium
+    rationale: "Upper bound for recreational runners below ~50 km/wk; 3–5% for masters, returning runners, and anyone with an active pain report."
+    persona_overridable: true
+  weekly_increment_pct_conservative:
+    value: 5
+    range: [2, 8]
+    unit: percent-per-week
+    confidence: medium
+    rationale: "The band selected by at-risk personas and by any profile with a bone-stress or tendinopathy history."
+    persona_overridable: false
+  weekly_increment_km_abs:
+    value: 5
+    range: [1, 8]
+    unit: km-per-week
+    confidence: medium
+    rationale: "Absolute ceiling so a percentage never compounds on a large base. Novice setting is 1.5–2."
+    persona_overridable: true
+  increment_rule:
+    value: "delta_km <= max(novice_floor_km, min(weekly_increment_pct/100 * prev_km, weekly_increment_km_abs))"
+    range: null
+    unit: formula
+    confidence: high
+    rationale: "documented in plan-construction/mileage-and-progression.md#2"
+    persona_overridable: false
+  novice_floor_km:
+    value: 1.5
+    range: [0.5, 3]
+    unit: km
+    confidence: medium
+    rationale: "Rounding granularity: below this the increase is not perceptible and only creates bookkeeping."
+    persona_overridable: true
+  step_cycle:
+    value: 3
+    range: [2, 4]
+    unit: "build-weeks-per-down-week"
+    confidence: medium
+    rationale: "2 for at-risk/new, 3 default, 4 for high-volume veterans. Set by persona, never by ambition."
+    persona_overridable: true
+  down_week_pct:
+    value: 70
+    range: [55, 80]
+    unit: percent-of-previous-peak
+    confidence: medium
+    rationale: "Recovery weeks must be a real reduction; <55% risks detraining in a short plan, >80% is not a recovery week."
+    persona_overridable: true
+  down_week_keeps_intensity:
+    value: true
+    range: null
+    unit: bool
+    confidence: medium
+    rationale: "Volume drops, one short quality exposure stays — the stimulus is not withdrawn, only the load."
+    persona_overridable: false
+  long_run_share_pct:
+    value: 32
+    range: [20, 40]
+    unit: percent-of-weekly-volume
+    confidence: medium
+    rationale: "Above ~35–40% the long run stops being trainable without wrecking the rest of the week."
+    persona_overridable: true
+  long_run_increment_km:
+    value: 3
+    range: [1, 5]
+    unit: km-per-week
+    confidence: medium
+    rationale: "Grow by distance OR duration, never both in the same week."
+    persona_overridable: true
+  long_run_increment_min:
+    value: 10
+    range: [5, 15]
+    unit: min-per-week
+    confidence: medium
+    rationale: "Alternate axis; time-based growth is the safer axis for ultra and heavier runners."
+    persona_overridable: true
+  review_latency_days:
+    value: 7
+    range: [3, 14]
+    unit: days
+    confidence: high
+    rationale: "Load questions are weekly; see feedback-and-autoregulation/interpretation-windows.md"
+    persona_overridable: false
+  min_weeks_at_load_before_step:
+    value: 2
+    range: [1, 4]
+    unit: weeks
+    confidence: medium
+    rationale: "If completion rate <80% at the current load, the step is held, not taken."
+    persona_overridable: true
+
+rules:
+  - id: one-variable-per-week
+    when: "proposed_week changes more than one of {weekly_km, hard_days, long_run_km, intensity_class}"
+    then: "reject_and_replan(keep_the_change_most_aligned_with_phase)"
+    severity: constraint
+    explain: "ramp-single-variable"
+
+  - id: never-add-to-make-up
+    when: "a previous day was skipped or partial"
+    then: "target_weekly_km := min(target_weekly_km, planned_weekly_km); no compensatory session may be created"
+    severity: constraint
+    explain: "no-compensatory-volume"
+    provenance: [knowledge/feedback-and-autoregulation/missed-session-handling.md]
+
+  - id: hold-step-on-poor-adherence
+    when: "completion_rate(rolling 14 d) < 0.8 or rpe_gap > 1.5 for 3 sessions"
+    then: "target_weekly_km := prev_week_km; flag_review_candidate('plan-too-big')"
+    severity: warn
+    explain: "ramp-held-adherence"
+
+  - id: novice-conservative
+    when: "persona in [novice-first-5k, returning-after-layoff-or-injury] or measured_history_weeks < 4 or age_band in [masters-40plus, postpartum-return]"
+    then: "weekly_increment_pct := weekly_increment_pct_conservative; weekly_increment_km_abs := 1.5; step_cycle := 2; long_run_increment_km := 1.5"
+    severity: constraint
+    explain: "ramp-novice-conservative"
+    provenance: [knowledge/personas/novice-first-5k.md]
+
+  - id: safety-ceiling-lowers-ramp
+    when: "safetyLayer.state in [advise, constrain] or age >= 40 or layoff_days > 7"
+    then: "weekly_increment_pct := weekly_increment_pct_conservative"
+    severity: constraint
+    explain: "ramp-conservative-band"
+
+  - id: max-step
+    when: "any single week's increase exceeds max(novice_floor_km, min(pct * prev_km, weekly_increment_km_abs))"
+    then: "clamp_and_record_trim('ramp-ceiling')"
+    severity: constraint
+    explain: "ramp-clamped"
+
+
+contract_aliases:
+  reset_volume_pct:
+    value: 60
+    range: [50, 80]
+    unit: "percent of the last full-load week"
+    confidence: medium
+    rationale: "Volume kept when entering a new phase (phase-transition-rules.md). The first week after a phase swap is a reset, not a continuation: the stimulus changes, so load restarts lower and rebuilds at weekly_increment_pct."
+    persona_overridable: true
+  review-latency: {home: "#review_latency_days"}
+  max-step: {home: "#weekly_increment_pct", note: "the syntax example in knowledge/MAINTENANCE.md; the real knob is this one"}

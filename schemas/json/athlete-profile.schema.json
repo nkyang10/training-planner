@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://training-planner.local/schemas/athlete-profile.schema.json",
+  "title": "AthleteProfile",
+  "description": "Who the runner is. Slowly changing and fully versioned: every edit becomes a profile_revision event, because plan generation must remain explainable months later. Paces and fitness are NOT stored here — they are derived evidence with their own confidence and expiry (pace_estimates, metric-definitions.md).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["userId", "revision", "availability", "goal", "preferences", "health"],
+  "properties": {
+    "userId": { "type": "string", "format": "uuid" },
+    "revision": { "type": "integer", "minimum": 1, "description": "Monotonic per user; part of the planner input hash." },
+    "displayName": { "type": "string", "maxLength": 120 },
+    "age": { "type": "number", "minimum": 12, "maximum": 110, "description": "Masters guardrails start at 40. Null is allowed; the planner then avoids age-dependent assumptions." },
+    "sex": { "enum": ["female", "male", "intersex", "unspecified", null], "description": "Used only for documented guardrails (RED-S prevalence, referral thresholds) and never for performance claims. 'unspecified' selects the conservative branch." },
+    "background": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Trusted self-report about current capacity. The planner uses the conservative reading when history and evidence disagree.",
+      "properties": {
+        "yearsRunning": { "type": "number", "minimum": 0, "maximum": 70 },
+        "currentWeeklyKm": { "type": "number", "minimum": 0, "maximum": 250, "description": "What they ACTUALLY did recently, not what they aspire to." },
+        "currentWeeklySessions": { "type": "integer", "minimum": 0, "maximum": 14 },
+        "longestRecentLongRunKm": { "type": ["number", "null"], "minimum": 0, "maximum": 160 },
+        "consecutiveWeeksConsistent": { "type": ["integer", "null"], "minimum": 0, "maximum": 520, "description": "Weeks at ~this volume. Drives restart-vs-progress decisions after layoff." },
+        "recentRaceEvidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["date", "distanceKm", "durationSec"],
+            "properties": {
+              "date": { "type": "string", "format": "date" },
+              "distanceKm": { "type": "number", "exclusiveMinimum": 0, "maximum": 350 },
+              "durationSec": { "type": "integer", "minimum": 1 },
+              "surface": { "enum": ["road", "track", "trail", "treadmill", "mixed"] },
+              "conditionsNote": { "type": "string", "maxLength": 280 },
+              "certified": { "type": "boolean" },
+              "expiresAt": { "type": "string", "format": "date", "description": "Prediction validity decays; default 12 months, 6 months after a layoff > 3 weeks." }
+            }
+          }
+        },
+        "priorStructuredTraining": { "type": "boolean", "description": "A layoff after structured training restarts differently than a first build." },
+        "runningHistoryNote": { "type": "string", "maxLength": 2000, "classification": "health-sensitive" }
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The highest-leverage input in the system. A plan placed on days the runner cannot train is wrong before intensity is considered.",
+      "required": ["days"],
+      "properties": {
+        "days": { "type": "array", "minItems": 1, "maxItems": 7, "uniqueItems": true, "items": { "enum": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] } },
+        "sessionBudgetMin": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 10, "maximum": 480 } },
+        "hardDaysAllowed": { "type": "integer", "minimum": 0, "maximum": 2, "description": "Structural ceiling, independent of goal. Most amateurs: 1–2." },
+        "nonNegotiableDays": { "type": "array", "maxItems": 2, "items": { "enum": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] }, "description": "The long run the runner will actually protect. Max 2 per week (planner rule)." },
+        "preferredLongRunDay": { "enum": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] },
+        "knownConflicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["date"],
+            "properties": {
+              "date": { "type": "string", "format": "date" },
+              "toDate": { "type": "string", "format": "date" },
+              "canTrain": { "type": "boolean" },
+              "reason": { "enum": ["work", "family", "travel", "illness", "injury", "holiday", "other"] },
+              "travelZones": { "type": "array", "maxItems": 2, "items": { "type": "string" }, "description": "Present for travel: enables jet-lag-aware placement (calendar-and-time.md#3)." }
+            }
+          }
+        }
+      }
+    },
+    "goal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["finish", "time", "experience", "fitness-maintenance", "return-to-running"], "description": "'fitness-maintenance' and 'return-to-running' have no race and therefore no taper phase." },
+        "event": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "maxLength": 120 },
+            "date": { "type": "string", "format": "date" },
+            "distanceKm": { "type": "number", "exclusiveMinimum": 0, "maximum": 350 },
+            "priority": { "enum": ["A", "B", "C"] },
+            "terrain": { "enum": ["road", "track", "trail", "mixed", "treadmill"] },
+            "elevationGainM": { "type": ["number", "null"], "minimum": 0 },
+            "expectedConditions": { "type": "string", "maxLength": 280 }
+          }
+        },
+        "targetStatement": { "type": "string", "maxLength": 200, "description": "Runner's words, e.g. 'sub-4:00 marathon'. Never converted into a promise by the narrator." },
+        "outcomeStatement": { "type": "string", "maxLength": 400, "description": "What success means if the time does not happen. Used by reviews to choose between options." },
+        "secondaryEvents": { "type": "array", "maxItems": 4, "items": { "type": "object", "additionalProperties": true } },
+        "flexibility": { "enum": ["fixed", "date-flexible", "distance-flexible", "both-flexible"] },
+        "planStyle": { "enum": ["structured", "flexible"], "description": "Flexible = fewer non-negotiables, more alternates, softer triggers." },
+        "riskAppetite": { "enum": ["conservative", "moderate", "aggressive"], "description": "Selects a knob band, never disables a safety rule (safety-layer.md)." }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Classification: health-sensitive. Excluded from analytics and from any LLM prompt body (codes only, ADR-0006).",
+      "properties": {
+        "flags": { "type": "array", "items": { "enum": ["cardiac-history", "hypertension", "asthma", "diabetes", "anaemia", "thyroid", "pregnant", "postpartum", "breastfeeding", "eating-disorder-history", "bone-stress-history", "menstrual-irregularity", "other"] }, "classification": "health-sensitive" },
+        "injuryHistory": { "type": "array", "items": { "type": "object", "additionalProperties": false, "properties": { "site": { "type": "string" }, "year": { "type": "integer" }, "resolved": { "type": "boolean" }, "loadSensitive": { "type": "boolean" } } } },
+        "clinicianClearance": { "type": ["boolean", "null"] },
+        "clinicianClearanceDate": { "type": ["string", "null"], "format": "date" },
+        "pregnancyPostpartum": { "enum": ["none", "pregnant", "postpartum", "breastfeeding", null], "description": "Selects the postpartum-return persona and its guardrails; diastasis/pelvic-floor guidance is referral-only." },
+        "smoker": { "type": ["boolean", "null"] },
+        "heatExposureDaily": { "type": "boolean", "description": "Outdoor work / hot climate: heat pacing guardrails become structural, not advisory." },
+        "altitudeResidence": { "enum": ["low", "moderate", "high"] }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Directly measured anchors only. Derived values live in pace_estimates with confidence + expiry, so a plan never silently inherits a stale formula.",
+      "properties": {
+        "hrMax": { "type": ["integer", "null"], "minimum": 100, "maximum": 230, "description": "Must be measured, not predicted: formula HRmax carries ~±9 bpm error (PHYS bibliography)." },
+        "restingHr": { "type": ["integer", "null"], "minimum": 25, "maximum": 120 },
+        "lactateThresholdHr": { "type": ["integer", "null"], "minimum": 100, "maximum": 220 },
+        "lactateThresholdPaceSecPerKm": { "type": ["number", "null"], "minimum": 100, "maximum": 900 },
+        "fieldTest": { "type": ["object", "null"], "additionalProperties": true },
+        "method": { "enum": ["lab", "field-test", "derived", "derivable-only", "none"] }
+      }
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["units", "locale", "timezone"],
+      "properties": {
+        "units": { "enum": ["metric", "imperial"] },
+        "locale": { "enum": ["en", "zh-Hant"] },
+        "timezone": { "type": "string", "description": "IANA zone name. Never an offset." },
+        "dayStartHour": { "type": "integer", "minimum": 0, "maximum": 11, "default": 4 },
+        "usesHeartRate": { "type": "boolean" },
+        "usesPower": { "type": "boolean" },
+        "aiNarratorEnabled": { "type": "boolean", "default": false, "description": "Consent gate (ADR-0006). false = deterministic template narrator; identical content, different phrasing." },
+        "nudgesEnabled": { "type": "boolean", "default": true },
+        "nudgeWallTime": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$", "description": "Wall time in the user's zone; survives DST changes (calendar-and-time.md#5)." },
+        "weeklySummaryDay": { "enum": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] },
+        "preferredSessionTypes": { "type": "array", "items": { "type": "string" } },
+        "dislikes": { "type": "array", "items": { "type": "string" }, "description": "Honoured within the session-allocation pass; adherence beats elegance." }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "onboardingComplete": { "type": "boolean" },
+        "consentIds": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

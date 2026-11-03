@@ -1,0 +1,103 @@
+schema_version: 1
+id: readiness
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/hrv-and-wellness.md, knowledge/physiology/fatigue-fitness-recovery.md]
+  sources: [PHYS-S12, PHYS-S19, PHYS-S20, FB-S1]
+applies_to: [device-connected]
+extends: [individual-baselines, noise]
+
+notes: >
+  Readiness exists in this product as **a reason to do less**, never as a reason to do more. HRV's
+  measured behaviour makes that structural rather than timid: a rise does not predict a better session, a
+  fall with corroboration does predict a bad one (PHYS-S19, PHYS-S20), and night-to-night noise exceeds the
+  multi-week training shift. So the engine reads HRV for *placement* and *subtraction*, and never unlocks
+  intensity from a good night ([../signals-and-metrics/hrv-and-wellness.md](../signals-and-metrics/hrv-and-wellness.md)).
+
+knobs:
+  primary_index:
+    value: lnRMSSD_nocturnal
+    range: [lnRMSSD_nocturnal, lnRMSSD_morning, rhr_only, wellness_only]
+    unit: enum
+    confidence: medium
+    rationale: "Nocturnal is measured during a steadier state than a morning spot check; store device_id and per-night valid_fraction with every value."
+    persona_overridable: true
+  min_valid_night_pct:
+    value: 60
+    range: [40, 80]
+    unit: percent
+    confidence: medium
+    rationale: "A night with less than 60% valid samples is not a physiological measurement; discarding it is the honest choice, and the discard is visible in the series."
+    persona_overridable: true
+  baseline_window_days:
+    value: 28
+    range: [14, 60]
+    unit: days
+    confidence: medium
+    rationale: "28 nights is the shortest window that stabilises an lnRMSSD baseline; below it, display-only."
+    persona_overridable: false
+  short_window_days:
+    value: 7
+    range: [3, 14]
+    unit: days
+    confidence: medium
+    rationale: "The 7-night mean is the comparator for 'is today abnormal for this person'."
+    persona_overridable: true
+  trigger_consecutive_days:
+    value: 3
+    range: [1, 5]
+    unit: nights-in-7
+    confidence: medium
+    rationale: "Three abnormal nights within seven, not one — the day-level reading is the classic consumer-app error."
+    persona_overridable: false
+  abnormal_z_threshold:
+    value: 0.5
+    range: [0.3, 1.5]
+    unit: z
+    confidence: low
+    rationale: "−0.5 z for lnRMSSD (a fall), +0.5 z for resting HR. Chosen as modest-on-purpose; the corroboration requirement, not the z, carries the safety."
+    persona_overridable: true
+  direction_policy:
+    value: {can_add_intensity: false, can_downgrade: true, requires_corroboration: true, may_move_session: true}
+    range: null
+    unit: policy
+    confidence: high
+    rationale: "PHYS-S19: a rising HRV never unlocks additional work; a *rise* never adds. The governing asymmetry in the file that is most tempted to break it."
+    persona_overridable: false
+  confound_flags:
+    value: [alcohol, illness, poor_sleep, heat, travel, menstrual]
+    range: null
+    unit: list
+    confidence: medium
+    rationale: "User-supplied, never inferred. A flag suppresses that day's downgrade and annotates the series rather than deleting points."
+    persona_overridable: false
+  vendor_composite_allowed:
+    value: display_only
+    range: [display_only, hidden]
+    unit: enum
+    confidence: high
+    rationale: "Garmin/WHOOP/Oura readiness scores are grade D: we do not know their inputs and cannot explain them months later. The runner may see them; the planner may not read them."
+    persona_overridable: false
+  local_readiness_inputs:
+    value: [sleep_flag, rhr_deviation, lnrmssd_deviation, session_rpe, life_stress]
+    range: null
+    unit: list
+    confidence: medium
+    rationale: "The only inputs the engine may weigh, each against its own per-user baseline, and none of them averaged into a single score (noise.yaml#no_composite_score)."
+    persona_overridable: false
+
+rules:
+  - id: readiness-subtracts-only
+    when: "readiness signals are abnormal"
+    then: "downgrade_or_move_a_session_only; never increase volume, intensity, or frequency"
+    severity: hard-stop
+    explain: "readiness-subtracts-only"
+
+  - id: no-readiness-diagnosis
+    when: "readiness is low for 7+ days with sleep, appetite or mood disturbance"
+    then: "offer_review; refer_to_clinician_language; never name overtraining or RED-S"
+    severity: hard-stop
+    explain: "readiness-refer-not-diagnose"
+    note: "FB-S1: there is no accepted marker or test. docs/ux/feedback-microcopy.md#stop is the canonical copy."

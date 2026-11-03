@@ -1,0 +1,17 @@
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
+
+# Diff hygiene: the corpus is the product, make its diffs readable
+*.md      text eol=lf diff=markdown
+*.yaml    text eol=lf
+*.yml     text eol=lf
+*.json    text eol=lf
+*.snap    text eol=lf
+
+# Golden plans are generated expectations: conflicts there are resolved by regenerating, not by hand
+eval/golden-plans/**/expected.* text eol=lf -diff

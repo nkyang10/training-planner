@@ -1,0 +1,80 @@
+schema_version: 1
+id: restart-after-layoff
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/physiology/aerobic-energy-and-adaptation.md, knowledge/physiology/fatigue-fitness-recovery.md]
+  sources: [PHYS-S11, PHYS-S22]
+applies_to: [all]
+
+notes: >
+  Time off is not a linear tax. Detraining loss grows quickly, then plateaus around 60–90 days
+  (PHYS-S22: VO₂max effect sizes ≈ −0.62 for short layoff, ≈ −1.42 for long, with the curve flattening),
+  which means **30 days and 90 days off get roughly the same restart depth** — and a runner returning after
+  three months must not be handed a plan proportional to three months. The engine buckets time off instead
+  of multiplying by it ([../physiology/fatigue-fitness-recovery.md](../physiology/fatigue-fitness-recovery.md)).
+
+knobs:
+  layoff_bucket_days:
+    value: [7, 14, 30, 90]
+    range: null
+    unit: boundaries
+    confidence: high
+    rationale: "Buckets 0–6 / 7–13 / 14–29 / 30–90 / >90 days. Boundaries are the bucket edges; the loss plateau after ~30 days is why the last two share a depth."
+    persona_overridable: false
+  detraining_bucket_es:
+    value: {short: -0.6, long: -1.4, plateau_days: 90}
+    range: {short: [-1.0, -0.3], long: [-2.0, -0.8], plateau_days: [60, 180]}
+    unit: map
+    confidence: medium
+    rationale: "PHYS-S22 effect sizes, used to set restart *depth* only. They describe a population average and must never be quoted to a runner as their loss."
+    persona_overridable: false
+  restart_volume_pct:
+    value: {bucket_0_6: 90, bucket_7_13: 80, bucket_14_29: 70, bucket_30_90: 65, bucket_gt_90: 60}
+    range: {bucket_0_6: [75, 100], bucket_7_13: [65, 95], bucket_14_29: [55, 85], bucket_30_90: [45, 80], bucket_gt_90: [40, 80]}
+    unit: "map(percent of pre-layoff weekly volume)"
+    confidence: medium
+    rationale: "The 30–90 and >90 entries are deliberately close (65 vs 60): the plateau is the finding, and a plan that pretends otherwise restarts too deep for the one-month runner and too shallow for the one-year runner."
+    persona_overridable: true
+  quality_session_delay_days:
+    value: 14
+    range: [10, 42]
+    unit: days
+    confidence: medium
+    rationale: "No race-pace or VO₂max session until ≥2 weeks of continuous aerobic volume are *completed*. Strides and short hills are allowed earlier — they are low-risk neuromuscular work."
+    persona_overridable: false
+  first_week_no_intervals:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "Intervals are the highest-load, lowest-adaptation thing a returning runner can do in week one."
+    persona_overridable: false
+  race_goal_recheck_days:
+    value: 14
+    range: [7, 42]
+    unit: days
+    confidence: high
+    rationale: "A layoff invalidates the evidence behind a goal; the goal is reopened as a conversation once there is fresh data, not cancelled by the system."
+    persona_overridable: false
+
+rules:
+  - id: no-linear-penalty
+    when: "days_off > 90"
+    then: "use bucket_gt_90; never scale depth by days beyond the plateau"
+    severity: constraint
+    explain: "restart-no-linear-penalty"
+
+  - id: restart-is-not-a-new-plan
+    when: "a runner returns from any layoff"
+    then: "keep the persona and the goal; rebuild volume through load-progression.yaml increments; do not reset the training-age clock"
+    severity: constraint
+    explain: "restart-keeps-context"
+    note: "Training age is what makes a returning experienced runner's tissue tolerate volume better than a novice's; wiping it would hurt the person it is meant to protect."
+
+  - id: injury-layoff-refers
+    when: "the layoff reason is injury and the runner requests a return plan"
+    then: "offer_a_conservative_aerobic_restart; no return-to-running timeline; clinician referral section"
+    severity: hard-stop
+    explain: "restart-injury-refers"

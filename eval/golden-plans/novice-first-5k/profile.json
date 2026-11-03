@@ -1,0 +1,59 @@
+{
+  "$comment": "Composite novice profile. Not a real person. See eval/golden-plans/README.md.",
+  "userId": "00000000-0000-4000-8000-000000000001",
+  "displayName": "Nora",
+  "age": 34,
+  "sex": "unspecified",
+  "background": {
+    "yearsRunning": 0.5,
+    "currentWeeklyKm": 12,
+    "currentWeeklySessions": 3,
+    "longestRecentLongRunKm": 6,
+    "recentRaceEvidence": [],
+    "consecutiveWeeksConsistent": 6,
+    "runningHistoryNote": "Started with couch-to-5k style run/walk, finished it, now jogs most of 4 km."
+  },
+  "availability": {
+    "days": ["Tue", "Thu", "Sat"],
+    "sessionBudgetMin": { "Tue": 40, "Thu": 40, "Sat": 75 },
+    "hardDaysAllowed": 1,
+    "nonNegotiableDays": ["Sat"],
+    "knownConflicts": [
+      { "date": "2027-01-16", "reason": "work trip", "canTrain": false }
+    ]
+  },
+  "goal": {
+    "type": "finish",
+    "event": { "date": "2027-02-21", "distanceKm": 5, "name": "Neighbourhood 5K", "priority": "A" },
+    "outcomeStatement": "Finish the 5K without walking, and keep running afterwards.",
+    "flexibility": "date and distance both flexible"
+  },
+  "health": {
+    "flags": [],
+    "injuryHistory": [{ "site": "right knee", "year": 2025, "resolved": true, "loadSensitive": true }],
+    "clinicianClearance": true,
+    "pregnancyPostpartum": null,
+    "smoker": false,
+    "heatExposureDaily": false,
+    "altitudeResidence": "low"
+  },
+  "preferences": {
+    "units": "metric",
+    "locale": "en",
+    "timezone": "Asia/Taipei",
+    "planStyle": "structured",
+    "riskAppetite": "conservative",
+    "usesHeartRate": false,
+    "usesPower": false,
+    "preferredSessionTypes": [],
+    "dislikes": ["sprints", "anything that feels like a test"]
+  },
+  "measurement": {
+    "hrMax": null,
+    "restingHr": null,
+    "lactateThresholdHr": null,
+    "recentTest": null,
+    "method": "derivable-only",
+    "note": "No HR device: prescription targets must be RPE/talk-test based."
+  }
+}

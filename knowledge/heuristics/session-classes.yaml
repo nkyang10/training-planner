@@ -1,0 +1,112 @@
+schema_version: 1
+id: session-classes
+status: draft
+owner: plan-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/workout-library/README.md, knowledge/periodization/weekly-templates.md]
+  sources: [PLAN-S8, PLAN-S2]
+applies_to: [all]
+
+notes: >
+  Every session in the library carries exactly one class. Classes exist so the engine can reason about a
+  week without knowing 40 workout names: how many hard days, what spacing, what counts toward which
+  capacity. `hard: true` means it consumes a hard-day slot and starts the spacing clock — it is **not** a
+  difficulty adjective and not a status.
+
+knobs:
+  classes:
+    value:
+      recovery: {hard: false, load_weight: 0.5, counts_toward_volume: true, can_follow_hard: true}
+      easy: {hard: false, load_weight: 1.0, counts_toward_volume: true, can_follow_hard: true}
+      strides: {hard: false, load_weight: 1.1, counts_toward_volume: true, adds_neuromuscular: true, can_follow_hard: true}
+      long: {hard: true, load_weight: 1.0, counts_toward_volume: true, cap_by: long_run_share_pct}
+      hills: {hard: true, load_weight: 1.2, counts_toward_volume: true, impact: moderate}
+      tempo: {hard: true, load_weight: 1.35, counts_toward_volume: true, zone: moderate}
+      cruise: {hard: true, load_weight: 1.35, counts_toward_volume: true, zone: moderate}
+      threshold: {hard: true, load_weight: 1.4, counts_toward_volume: true, zone: moderate-high}
+      interval: {hard: true, load_weight: 1.5, counts_toward_volume: true, zone: high}
+      mp: {hard: true, load_weight: 1.45, counts_toward_volume: true, zone: moderate}
+      race: {hard: true, load_weight: 1.6, counts_toward_volume: true, satisfies_quality_slot: true}
+      cross-train: {hard: false, load_weight: 0.6, counts_toward_volume: false, counts_toward_aerobic_time: true}
+    range: null
+    unit: map
+    confidence: medium
+    rationale: "Load weights are sRPE-style multipliers over time, ordered by systemic cost; they are ours (see session-load-metrics.md) and only used for monotony/ramp arithmetic."
+    persona_overridable: false
+  hard_days_per_week_default:
+    value: 1
+    range: [0, 2]
+    unit: sessions
+    confidence: high
+    rationale: "Two hard days requires the history gate below; three is out of scope for this product."
+    persona_overridable: false
+  second_hard_day_gate:
+    value: {training_age_weeks_min: 24, weeks_at_current_volume_min: 8, age_band_excluded: [masters-40plus, postpartum-return], pain_trend_required: none}
+    range: {training_age_weeks_min: [12, 52], weeks_at_current_volume_min: [4, 16]}
+    unit: object
+    confidence: medium
+    rationale: "The gate is capacity-based. Ambition never unlocks a second hard day on its own."
+    persona_overridable: false
+  session_kinds_forbidden_by_persona:
+    value:
+      novice-first-5k: [threshold, tempo, cruise, interval, track_repeats, mp]
+      returning-after-layoff-or-injury: [track_repeats]
+      postpartum-return: []
+    range: null
+    unit: map
+    confidence: high
+    rationale: "Novices need density and duration before intensity — the novice golden plan asserts mustNotContain for exactly these kinds."
+    persona_overridable: false
+  strides_never_hard:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "Fast, cheap, and safe. Making strides 'hard' would remove the only sharpness tool usable on an easy day."
+    persona_overridable: false
+
+rules:
+  - id: one-class-per-session
+    when: "a session is generated"
+    then: "assign exactly one class; unknown_class := reject_generation"
+    severity: constraint
+    explain: "classes-closed-set"
+
+  - id: hard-slot-accounting
+    when: "week.hard_session_count > hard_days_per_week_default"
+    then: "require(second_hard_day_gate) else drop_lowest_value_hard_session"
+    severity: constraint
+    explain: "classes-hard-cap"
+
+  - id: race-counts-as-hard
+    when: "a race is scheduled"
+    then: "consume_hard_slot; the following 2 days are easy-or-rest; no hard session within 72 h before it"
+    severity: constraint
+    explain: "classes-race-is-hard"
+
+  - id: easy-days-stay-easy
+    when: "class in [easy, recovery]"
+    then: "no intervals, no pace target, no 'progression' hidden inside; strides only as their own labelled add-on"
+    severity: constraint
+    explain: "classes-purity"
+    note: "The commonest way a plan secretly becomes hard: 'easy 40 min with 4 × 2 min at threshold' every week."
+
+
+## Contract aliases
+contract_aliases:
+  two_quality_rule: {home: "#second_hard_day_gate", note: "the gate that decides whether a second quality day exists at all"}
+  quality_session_share_max:
+    value: 20
+    range: [15, 25]
+    unit: "percent of weekly volume at threshold or above"
+    confidence: medium
+    rationale: "The ceiling that stops an 80/20-shaped week drifting to 60/40 through small accumulated additions (intensity-distribution.yaml holds the distribution; this caps the top slice)."
+    persona_overridable: false
+  threshold_session_minutes:
+    value: 30
+    range: [12, 45]
+    unit: minutes_at_threshold
+    confidence: medium
+    rationale: "Total time near threshold inside one session, warm-up excluded (vo2max-threshold-economy.md). Past about 40 minutes the stimulus degrades faster than the dose helps."
+    persona_overridable: true

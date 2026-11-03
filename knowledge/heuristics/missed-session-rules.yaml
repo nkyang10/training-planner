@@ -1,0 +1,129 @@
+schema_version: 1
+id: missed-session-rules
+status: draft
+owner: fb-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs:
+    - knowledge/feedback-and-autoregulation/missed-session-handling.md
+    - docs/engine/feedback-loop.md
+  sources: [FB-S8, FB-S1]
+confidence_ceiling: medium   # [FB-S8] is a placeholder citation — see sources/bibliography.md
+applies_to: [all]
+
+notes: >
+  The planner has no primitive that increases a future day's load because of a past miss; this file
+  encodes deletion and legal swaps only. Ordering is precedence-first. `alternate-taken` is a success
+  state, and `extra-activity` subtracts rather than earns credit.
+
+knobs:
+  min_gap_hard_days_h:
+    value: "recovery.yaml#hard_day_gap_hours"
+    range: null
+    unit: pointer
+    confidence: high
+    rationale: "Pointer, not a number: recovery.yaml owns 48 h as the default and #hard_day_gap_hours_after_quality owns 72 h after intervals or a race, with masters_hard_day_gap_hours as the 96 h persona override. This file decides what to do with a skipped session under that constraint, never the gap itself."
+    persona_overridable: false
+  swap_window_days:
+    value: 6
+    range: [3, 7]
+    unit: days-from-the-miss
+    confidence: medium
+    rationale: "A swap outside the same week changes the block's structure and is not a swap any more."
+    persona_overridable: false
+  race_week_no_long_run_swap_days:
+    value: 10
+    range: [7, 14]
+    unit: days-before-race
+    confidence: medium
+    rationale: "plan-construction/taper-and-peak.md — nothing long moves inside the taper."
+    persona_overridable: false
+  extra_activity_stack_guard_h:
+    value: 48
+    range: [24, 72]
+    unit: hours
+    confidence: medium
+    rationale: "Unplanned activity inside this window of a planned hard day makes that day easy."
+    persona_overridable: false
+  multi_miss_streak_days:
+    value: 3
+    range: [2, 7]
+    unit: consecutive-days
+    confidence: medium
+    rationale: "At 3 the plan's capacity assumption is stale; re-anchor volume to actual."
+    persona_overridable: false
+  restart_reanchor_pct:
+    value: 85
+    range: [60, 100]
+    unit: percent-of-actual-recent-load
+    confidence: medium
+    rationale: "Restart slightly below what they really did, never at the plan's number."
+    persona_overridable: true
+  unlogged_backfill_grace_hours:
+    value: 72
+    range: [24, 168]
+    unit: hours
+    confidence: high
+    rationale: "docs/engine/feedback-loop.md — silent backfill window, then a reason is required."
+    persona_overridable: false
+
+rules:
+  - id: never-make-up
+    when: "status in [skipped, partial, unlogged]"
+    then: "no_session_may_be_added; future_days_load_unchanged_or_lower"
+    severity: constraint
+    explain: "no-compensatory-volume"
+
+  - id: missed-easy-delete
+    when: "status == skipped and planned.class == easy"
+    then: "delete(missed); keep_remaining_week_as_written"
+    severity: advise
+    explain: "easy-miss-deleted"
+
+  - id: missed-quality-swap-if-legal
+    when: "status == skipped and planned.class == quality and exists(slot where spacing_rules_hold and not adjacent_to_long_run)"
+    then: "swap(missed -> nearest_legal_slot); record(reason: missed-quality-swap)"
+    severity: advise
+    explain: "quality-miss-swapped"
+
+  - id: missed-quality-drop-if-illegal
+    when: "status == skipped and planned.class == quality and no legal slot exists"
+    then: "delete(missed); keep_other_stimulus_in_week; flag_review_candidate_if(count(quality_misses, 7d) >= 2)"
+    severity: advise
+    explain: "quality-miss-dropped"
+
+  - id: alternate-counts-as-met
+    when: "status == alternate-taken"
+    then: "week_completion_counts_toward(met); exclude_from(running_load_series); no_extra_session"
+    severity: advise
+    explain: "alternate-counts-met"
+
+  - id: extra-activity-subtracts
+    when: "status == extra-activity and gap_to_next_quality_h <= extra_activity_stack_guard_h"
+    then: "downgrade(next_quality -> easy, effort_band); record(reason: unplanned-load)"
+    severity: warn
+    explain: "extra-activity-protects-quality"
+
+  - id: intent-rest-is-plan-evidence
+    when: "status == skipped and profile.intent.restRegistered == true"
+    then: "no_pushback_language; flagReview('plan-too-big'); delete(missed)"
+    severity: warn
+    explain: "rest-intent-honoured"
+
+  - id: motivation-miss-shrinks-friction
+    when: "statusDetail in [just-didnt, motivation, sleep] and misses(14d) >= 2"
+    then: "reduce(next_session.duration_pct 80); move(next_session.slot -> profile.preferredSlot); no_volume_change"
+    severity: advise
+    explain: "friction-reduced"
+
+  - id: streak-reanchors-volume
+    when: "consecutive_miss_days >= multi_miss_streak_days"
+    then: "reanchor(target_weekly_km := actual_recent_km * restart_reanchor_pct/100); hold_intensity(7d); flagReview('capacity-mismatch')"
+    severity: warn
+    explain: "streak-reanchor"
+
+  - id: unlogged-is-not-zero
+    when: "status == unlogged"
+    then: "load_series_treat(missing); week_mark(incomplete); disable(load_derived_rules_when_days >= 3); comment(gathering)"
+    severity: constraint
+    explain: "unlogged-missing-not-zero"

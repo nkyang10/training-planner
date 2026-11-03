@@ -1,0 +1,131 @@
+schema_version: 1
+id: weekly-templates
+status: draft
+owner: plan-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/periodization/weekly-templates.md, knowledge/personas/novice-first-5k.md]
+  sources: [PLAN-S1, PLAN-S11]
+applies_to: [all]
+
+notes: >
+  A template is a *slot skeleton*, not a workout list: which days exist, what class each slot may hold,
+  and what spacing must survive. The planner fills slots from the workout library and may delete, but may
+  not re-order in a way that breaks spacing. Templates are chosen by available days and persona first, and
+  by ambition never — capacity sets the shape, then the goal chooses within it.
+
+knobs:
+  novice_3_day:
+    value:
+      days: [Tue, Thu, Sat]
+      slots:
+        - {slot: 1, class: easy-or-interval, hard: false, notes: "run/walk intervals are allowed here — intensity-light, density-forward"}
+        - {slot: 2, class: easy, hard: false}
+        - {slot: 3, class: long, hard: true}
+      hardSessionsPerWeek: 1
+      runWalkAllowed: true
+      paceTargets: false
+      prescription: [rpe, duration, distance]
+      nonNegotiable: Sat
+    range: null
+    unit: object
+    confidence: high
+    rationale: "Three fixed days is the shape novice runners actually keep; Saturday is the day that survives a work week for most."
+    persona_overridable: false
+  recreational_5_day:
+    value:
+      days: [Mon-off, Tue-quality, Wed-easy, Thu-easy, Fri-off, Sat-long, Sun-easy-or-off]
+      hardSessionsPerWeek: 1
+      nonNegotiable: Sat
+    range: null
+    unit: object
+    confidence: medium
+    rationale: "One stimulus plus volume; the second quality slot is the first thing to delete when life compresses."
+    persona_overridable: true
+  marathon_6_day:
+    value:
+      days: [Mon-easy-or-off, Tue-quality, Wed-easy, Thu-quality, Fri-off, Sat-long, Sun-recovery-easy]
+      hardSessionsPerWeek: 2
+      nonNegotiable: [Thu, Sat]
+      mpContinuousMin: 60
+    range: {hardSessionsPerWeek: [1, 2]}
+    unit: object
+    confidence: medium
+    rationale: "plan-construction/weekly-templates.md; 2 hard days only when history supports it (session-classes.yaml)."
+    persona_overridable: false
+  time_poor_3_day:
+    value:
+      days: [Tue-quality-short, Thu-intervals-short, Sat-longest-available]
+      hardSessionsPerWeek: 2
+      sessionMinutesMax: 50
+      longSessionMinutesMax: 90
+      crossTrainSlots: 1
+      nonNegotiable: Sat
+    range: {hardSessionsPerWeek: [1, 2], sessionMinutesMax: [35, 70]}
+    unit: object
+    confidence: medium
+    rationale: "Frequency over duration; intensity carries the stimulus when volume cannot. Short reps beat skipping the session."
+    persona_overridable: true
+  masters_4_day:
+    value:
+      days: [Tue-quality, Thu-easy, Sat-long, Sun-or-Mon-easy]
+      hardSessionsPerWeek: 1
+      hardDayGapHours: 96
+      nonNegotiable: Sat
+    range: {hardSessionsPerWeek: [1, 2], hardDayGapHours: [72, 120]}
+    unit: object
+    confidence: medium
+    rationale: "Same stimulus, more recovery between; the second quality day is optional and often a strides session."
+    persona_overridable: true
+  run_walk_progression:
+    value: {structure: "N × (runMin/walkMin)", runMin_start: 1.5, walkMin_start: 1, ratio_progression: "increase run segment, never decrease walk", sessionRpeCeiling: 6, replaceWithContinuousRunAtMin: 25}
+    range: {runMin_start: [1, 3], walkMin_start: [0.5, 2], sessionRpeCeiling: [5, 7]}
+    unit: object
+    confidence: medium
+    rationale: "Density increases before intensity; continuous running replaces intervals once 25 min is comfortable."
+    persona_overridable: true
+  free_days_min_per_week:
+    value: 2
+    range: [1, 3]
+    unit: days
+    confidence: high
+    rationale: "Two unscheduled days is what makes a plan survive one bad week."
+    persona_overridable: false
+  easy_day_after_hard:
+    value: true
+    range: null
+    unit: bool
+    confidence: high
+    rationale: "plan-construction/weekly-templates.md; never negotiable, including for marathon templates."
+    persona_overridable: false
+
+rules:
+  - id: capacity-first-selection
+    when: "choosing a template"
+    then: "select by availableDays and persona; ambition may only choose among templates that fit the days"
+    severity: constraint
+    explain: "template-by-capacity"
+
+  - id: no-hard-day-before-long-run
+    when: "a quality slot lands within 24 h before the long-run slot"
+    then: "relocate_or_delete(the_quality_slot)"
+    severity: constraint
+    explain: "template-protects-long-run"
+
+  - id: template-may-shrink-not-squeeze
+    when: "a week loses an available day"
+    then: "delete_lowest_value_slot_first(easy, then extra_quality, then shorten_long); never move a deleted session onto a rest day"
+    severity: constraint
+    explain: "template-shrinks"
+
+  - id: non-negotiables-capped
+    when: "profile.nonNegotiablePerWeek > 1"
+    then: "accept_max(1) for novice and at-risk personas; warn_and_confirm for others"
+    severity: warn
+    explain: "template-non-negotiable-cap"
+
+
+contract_aliases:
+  hard_days_per_week: {home: "session-classes.yaml#hard_days_per_week_default", note: "templates describe a week's shape; the cap on hard days has one owner"}
+  min_gap_hard_days_h: {home: "recovery.yaml#hard_day_gap_hours"}
+  hardDayGapHours: {home: "recovery.yaml#masters_hard_day_gap_hours", note: "the camelCase key inside masters_4_day is a template-local override of that knob, not a separate number"}

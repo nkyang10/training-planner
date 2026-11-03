@@ -1,0 +1,103 @@
+schema_version: 1
+id: daily-feedback-rules
+status: draft
+owner: fb-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs:
+    - knowledge/feedback-and-autoregulation/daily-feedback-taxonomy.md
+    - knowledge/feedback-and-autoregulation/system-comment-playbook.md
+    - docs/ux/feedback-microcopy.md
+  sources: [FB-S9]
+applies_to: [all]
+
+notes: >
+  Two floors fight each other: the cost of reporting (drop-off is the failure mode of every training
+  app) and the information needed to interpret a day. These knobs encode the compromise: a 3-tap
+  minimum that always saves, plus conditional questions that appear only when they can change a plan.
+
+knobs:
+  minimum-viable-entry:
+    value: {taps: 3, fields: [status, rpe-or-duration], must_always_save: true}
+    range: {taps: [2, 6]}
+    unit: object
+    confidence: high
+    rationale: "daily-feedback-taxonomy.md#practice — never block a save on an optional field."
+    persona_overridable: false
+  pain-question-trigger:
+    value: {legs_gte: 4, rpe_gap_gte: 2, statusDetail: [pain, illness], first_time_injury_history: true}
+    range: {legs_gte: [3, 5], rpe_gap_gte: [1, 3]}
+    unit: object
+    confidence: medium
+    rationale: "Ask pain only when a report has already raised the probability; a 45-second questionnaire every evening is how you lose the log."
+    persona_overridable: false
+  comment-contract:
+    value: {parts: [acknowledge, interpret, recommend], max_words: 120, max_sentences: 4, honesty_line_required: true, generable_without_llm: true}
+    range: {max_words: [60, 160], max_sentences: [2, 6]}
+    unit: object
+    confidence: high
+    rationale: "system-comment-playbook.md#the-contract — the stop template overrides length."
+    persona_overridable: false
+  comment-language:
+    value: {en: {register: "coach-to-runner", exclamation_max: 1}, zh-Hant: {register: "你", exclamation_max: 0, no_japanese_kanji: true}}
+    range: null
+    unit: object
+    confidence: high
+    rationale: "docs/ux/feedback-microcopy.md"
+    persona_overridable: false
+  streak-display:
+    value: false
+    range: null
+    unit: bool
+    confidence: medium
+    rationale: "Streaks punish rest and illness; show consistency as a rolling 4-week pattern instead (Controversies in daily-feedback-taxonomy.md)."
+    persona_overridable: true
+  unlogged-nudge:
+    value: {after_days: 1, channel: app-inbox, max_per_week: 3, tone: neutral, stop_if: [hard_stop_active, intent_registered]}
+    range: {after_days: [1, 3], max_per_week: [1, 5]}
+    unit: object
+    confidence: medium
+    rationale: "Absence is ambiguous — a nudge asks, it does not accuse."
+    persona_overridable: true
+  rpe_scale:
+    value: {legs: 5, mood: 5, pain: 0-10, rpe: 1-10}
+    range: null
+    unit: object
+    confidence: high
+    rationale: "Fixed scales forever; changing a scale destroys every stored baseline."
+    persona_overridable: false
+
+rules:
+  - id: save-never-blocked
+    when: "user submits with only required fields"
+    then: "persist(entry); comment(generate_from(factObject)); optional_fields_remain_offered_tomorrow"
+    severity: constraint
+    explain: "entry-save-always"
+
+  - id: remember-yesterday
+    when: "the entry screen opens"
+    then: "preselect(yesterday_same_field_where_unambiguous); label(preselection as 'same as yesterday', not as fact)"
+    severity: advise
+    explain: "entry-low-friction"
+
+  - id: no-comment-on-unlogged
+    when: "status == unlogged"
+    then: "comment(omit); nudge(per unlogged-nudge); never_invent_a_day"
+    severity: constraint
+    explain: "unlogged-silent"
+
+  - id: comment-numbers-are-facts
+    when: "any number appears in comment output"
+    then: "assert(number in factObject.allowedNumbers) else reject_and_use_template"
+    severity: constraint
+    explain: "narrator-grounding"
+
+  - id: safety-text-first
+    when: "safetyLayer.action in [hard_stop, constrain]"
+    then: "comment sentences[0] = instruction; suppress coaching content; suppress praise"
+    severity: constraint
+    explain: "safety-first-text"
+
+
+contract_aliases:
+  consecutive-reading-rule: {home: "noise.yaml#min_consecutive_observations", note: "no day-over-day verdict from a single entry; three confirming readings before a signal changes anything, and never a verdict about the runner's character from one bad day"}

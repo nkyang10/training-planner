@@ -1,0 +1,96 @@
+schema_version: 1
+id: individual-baselines
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/noise-and-individuality.md, knowledge/signals-and-metrics/hrv-and-rhr.md]
+  sources: [PHYS-S12, PHYS-S19, PHYS-S45]
+applies_to: [all]
+
+notes: >
+  Every signal in this product is compared to **the runner's own baseline**, never to a population table
+  ([../signals-and-metrics/noise-and-individuality.md](../signals-and-metrics/noise-and-individuality.md)).
+  Two consequences the engine must implement literally: a baseline needs *days of data before it can be
+  used* (cold-start), and a baseline that has drifted is not a bug but a training effect — so it must be
+  re-estimated on a window, not frozen at onboarding. Population percentiles exist only in the research
+  notes, never in a runner-facing sentence.
+
+knobs:
+  baseline_window_days:
+    value: 28
+    range: [14, 90]
+    unit: days
+    confidence: medium
+    rationale: "28 days matches the 28-day rolling load window in load-progression.yaml, so a 'change' in readiness and a 'change' in load are judged on the same span."
+    persona_overridable: true
+  baseline_min_valid_days:
+    value: 14
+    range: [7, 28]
+    unit: days
+    confidence: high
+    rationale: "Below this the 'baseline' is mostly one bad week. Signals stay display-only until it is met."
+    persona_overridable: false
+  statistic:
+    value: median
+    range: [median, trimmed_mean_20]
+    unit: enum
+    confidence: medium
+    rationale: "Heart-rate and wellness data are skewed by one party, one illness, one bad night. A median survives it."
+    persona_overridable: false
+  reestimate_every_days:
+    value: 7
+    range: [3, 14]
+    unit: days
+    confidence: medium
+    rationale: "Recompute weekly so adaptation moves the baseline instead of tripping a threshold forever."
+    persona_overridable: true
+  exclude_days:
+    value: [illness_flag, race_day, "rhr_z > 2", "pain ≥ 5", alcohol_or_travel_flag]
+    range: null
+    unit: list
+    confidence: medium
+    rationale: "Outliers must be excluded from the baseline *and* still count as signal on their own day. Excluding them from history entirely would hide the pattern we want to see."
+    persona_overridable: true
+  cold_start_behaviour:
+    value: "no thresholds, no verdicts; display values with 'collecting {n}/{min} days'; all interpretation off"
+    range: null
+    unit: behaviour
+    confidence: high
+    rationale: "The first two weeks must produce no verdicts at all. A system that guesses on day 2 loses the runner the moment it is wrong."
+    persona_overridable: false
+  drift_detection:
+    value: {compare_windows_days: 28, min_shift: "1 × within-person sd", confirm_days: 14}
+    range: {compare_windows_days: [21, 42], confirm_days: [7, 28]}
+    unit: object
+    confidence: low
+    rationale: "Distinguishing adaptation from measurement drift (strap change, new watch, wrist vs chest) is unsolved with consumer data; treat a detected drift as a review input, never an alert."
+    persona_overridable: true
+
+rules:
+  - id: own-baseline-only
+    when: "any signal is interpreted for a runner"
+    then: "compare to that user's baseline; population percentiles may not appear in user-facing text"
+    severity: constraint
+    explain: "baselines-individual"
+    note: "language-guardrails.yaml#no-population-shaming is the language half of this rule."
+
+  - id: no-verdict-before-minimum-data
+    when: "valid_days < baseline_min_valid_days"
+    then: "suppress_thresholds; suppress_verdicts; log_rate coaching only"
+    severity: constraint
+    explain: "baselines-cold-start"
+
+  - id: baseline-change-is-not-an-alert
+    when: "drift_detection fires"
+    then: "surface_in_review_only; ask about a device or method change before interpreting the shift"
+    severity: advise
+    explain: "baselines-drift-question"
+
+
+contract_aliases:
+  min_confirmations:
+    home: "noise.yaml#min_consecutive_observations"
+    value: 2
+    range: [1, 3]
+    note: "2 confirming days is enough for a wellness statement (wellness.yaml#min_confirmations); a device signal needs 3. individual-differences.md names the general requirement."

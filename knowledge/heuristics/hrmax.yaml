@@ -1,0 +1,92 @@
+schema_version: 1
+id: hrmax
+status: draft
+owner: phys-agent
+last_reviewed: 2026-11-03
+provenance:
+  docs: [knowledge/signals-and-metrics/hr-zone-models.md, knowledge/signals-and-metrics/measurement-and-testing.md]
+  sources: [PHYS-S1, PHYS-S2, PHYS-S3, PHYS-S4]
+applies_to: [all]
+
+notes: >
+  HRmax is one number that silently sets a whole zone model, which makes it the most dangerous place in
+  the system to be wrong — and it is *always* somewhat wrong. The measured spread on the best-known
+  equations is 9–11 bpm (PHYS-S2, PHYS-S4), and a single mixed-sex equation mis-sets part of the
+  population (PHYS-S3). So: prefer observation over prediction, sex the estimate with its uncertainty, and
+  never let a predicted HRmax drive a plan-mutating decision.
+
+knobs:
+  default_equation:
+    value: "208 − 0.7·age"
+    range: ["208 − 0.7·age", "206 − 0.88·age", "211 − 0.64·age", "220 − age"]
+    unit: formula
+    confidence: medium
+    rationale: "PHYS-S1 (grade A). Not '220 − age', which is not a fitted equation. Gulati's `206 − 0.88·age` (PHYS-S3, grade B, women during a graded test) is available as an explicit alternative, never auto-applied from a binary sex field."
+    persona_overridable: true
+  observed_max_window_weeks:
+    value: 52
+    range: [26, 104]
+    unit: weeks
+    confidence: medium
+    rationale: "The highest heart rate ever observed in a genuinely hard session beats any equation — until the runner is fitter or older than when it was recorded."
+    persona_overridable: true
+  observed_max_requires:
+    value: {session_rpe_min: 8, or_class: [race, interval, threshold], sustained_seconds_min: 10}
+    range: {session_rpe_min: [7, 10], sustained_seconds_min: [5, 30]}
+    unit: object
+    confidence: medium
+    rationale: "A spike on a downhill is not a maximum. The 10 s filter removes most artifact."
+    persona_overridable: false
+  uncertainty_band_bpm:
+    value: 10
+    range: [6, 15]
+    unit: bpm
+    confidence: high
+    rationale: "PHYS-S2 RMSE 9.1–10.5 bpm across 13 equations on 4,043 runners; PHYS-S4 SEE 10.8 bpm. Display this band whenever the value is predicted."
+    persona_overridable: false
+  never_used_for:
+    value: [session_hard_stop, threshold_derivation, pace_band, "±5 bpm decisions"]
+    range: null
+    unit: list
+    confidence: high
+    rationale: "A 10 bpm error is inside the noise of every derived boundary; medical red flags use absolute behaviour (safety-hard-stops.yaml), not a percentage of a predicted maximum."
+    persona_overridable: false
+  field_test_option:
+    value: "all-out finisher after a standardised warm-up, or a race finish; see field-tests.yaml"
+    range: null
+    unit: method
+    confidence: medium
+    rationale: "The only way a runner gets a number worth planning on without a lab; needs a warm-up protocol and a warning that it is hard."
+    persona_overridable: true
+
+rules:
+  - id: observation-over-prediction
+    when: "an observed maximum exists within observed_max_window_weeks"
+    then: "use_observed; label its date and session; keep the prediction visible as the provenance it replaced"
+    severity: constraint
+    explain: "hrmax-observed-first"
+
+  - id: predicted-hrmax-discloses-band
+    when: "hrmax source == predicted"
+    then: "display_value ± uncertainty_band_bpm; state the equation; zones.yaml#no-zone-decision-from-predicted-hrmax applies"
+    severity: constraint
+    explain: "hrmax-uncertainty-visible"
+
+  - id: no-medical-meaning
+    when: "any output mentions a maximum heart rate"
+    then: "no interpretation of whether a heart rate is 'safe', 'dangerous', or 'normal for your age'"
+    severity: hard-stop
+    explain: "hrmax-not-medical"
+    note: "AGENTS.md rule 6 — a heart-rate number is the fastest way for a runner to read a diagnosis into our text."
+
+
+contract_aliases:
+  prediction_default: {home: "#default_equation"}
+  session_max_observed_floor: {home: "#observed_max_requires", note: "sustained_seconds_min 10 with session_rpe_min 8 is the floor for treating a session as evidence of a true maximum"}
+  min_change_bpm:
+    value: 5
+    range: [3, 10]
+    unit: bpm
+    confidence: medium
+    rationale: "A re-band below 5 bpm is inside the uncertainty band and must not redraw any zone; individual-differences.md names this guard, uncertainty_band_bpm sizes it."
+    persona_overridable: false
