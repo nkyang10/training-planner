@@ -188,7 +188,7 @@ maintainer appears. Until then every `spine/* -> main` merge is an `--admin` mer
 
 | Gate | Failure it prevents |
 | --- | --- |
-| `tools/audit-links.ps1` prints zeros | a doc that cites a knob nobody declared; a source id that does not exist |
+| `tools/audit-links.ps1` prints zeros | a doc, contract or SQL comment that cites a knob nobody declared; a source id that does not exist. Since R5 it reads `knowledge/**/*.yaml`, `schemas/**/*.json` and `schemas/**/*.sql` as well as Markdown, and matches a citation with or without the `heuristics/` prefix (2026-11-04) |
 | YAML/JSON parse | the corpus is a build input; a stray quote breaks every consumer |
 | `tools/check-contracts.ps1` counters + the undocumented-property ratchet | a contract folder advertising a file nobody wrote (`PENDING CONTRACT FILES` reads the names out of `schemas/README.md` and looks for them on disk); a new field arriving with no description (ratchet 110/279, down-only) |
 | `tools/check-vocabulary.ps1` compares every declaration of the two shared vocabularies | two namespaces spelling one concept differently, which nothing noticed for weeks: the DDL's change-kind CHECK and the contract's `kind` enum shared **no** value names, and `hard_stop` stood in two CHECKs while 25 knowledge lines said `hard-stop`. It compares change kinds and tiers pairwise, exits 1 on a mismatch, and fails loudly if a constraint is renamed — and it was red on the real disagreement before it was green (2026-11-04) |
