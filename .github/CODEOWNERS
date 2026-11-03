@@ -14,6 +14,11 @@
 # holds every seat, a PR touching these paths lands only through an explicit `--admin` merge.
 # That is a recorded act, not a silent bypass -- and it is why a second pair of hands here is a
 # feature, not a nicety. See docs/engineering/branching-and-github.md.
+# (3) And a claim weaker than the flag implies: with one account, "code-owner review required" and
+# "one review required" are indistinguishable from outside. GitHub never asks the author to review,
+# and the author is the only owner here; PR #8 (2026-11-03) tried to observe the difference and could
+# not. So read this file as a list of seats waiting for people. It starts protecting the safety band
+# the day a second handle appears in it; until then the CI counters are the controls that actually run.
 
 # Safety band: subtract-only, referrals, contracts, irreversible decisions
 /knowledge/heuristics/safety-hard-stops.yaml   @nkyang10
