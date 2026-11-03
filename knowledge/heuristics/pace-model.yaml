@@ -54,7 +54,7 @@ knobs:
 rules:
   - id: refuse-rather-than-invent
     when: "conversion_input_priority would land on demographic_estimate for a pace band"
-    then: "refuse_and_request_test(field-tests.yaml#suggested)"
+    then: "refuse_and_request_test(field-tests.yaml#catalogue)"
     severity: constraint
     explain: "pace-model-refuses"
 
