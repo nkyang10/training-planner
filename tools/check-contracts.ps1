@@ -13,7 +13,9 @@
 #     consumed by TypeScript while SQL columns stay snake_case. The mapping is codegen's job, not
 #     each caller's, and a value copied from another namespace must declare itself as such;
 #   - every property is documented (a description, or a $ref that inherits one), up to a ratchet
-#     budget that may go down and must never go up.
+#     budget that may go down and must never go up. Properties named inside if/then/else are
+#     conditions on fields documented at their declaration, so they are casing-checked but not
+#     required to repeat a description that would only drift from the original.
 #
 # What it deliberately does not check: whether a description is *true*. That is a reviewer's job,
 # and a fake description that satisfies a script is the failure mode to watch for here.
@@ -22,9 +24,10 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $schemaDir = Join-Path $root 'schemas\json'
 
-# Ratchet. Undocumented properties inherited from the pre-gate contracts (116 of 212). Lower it as
-# they are documented; raising it is a deliberate act that should show up in a diff review. A new
-# field is expected to arrive documented, so the practical budget for new work is zero.
+# Ratchet: undocumented properties inherited from the pre-gate contracts (116 of 226 on 2026-11-03).
+# Lower it as they are documented; raising it is a deliberate act that should show up in a diff
+# review. New files are expected to arrive documented -- events.schema.json did -- so the practical
+# budget for new work is zero.
 $UndocumentedBudget = 116
 
 $CasePattern = '^[a-z][A-Za-z0-9]*$'
@@ -40,7 +43,7 @@ $script:PropCount = 0
 $filesChecked = 0
 
 function Walk-Node {
-    param($Node, [string]$Path, [string]$File)
+    param($Node, [string]$Path, [string]$File, [bool]$Predicate = $false)
 
     if ($Node -isnot [Management.Automation.PSCustomObject]) { return }
 
@@ -59,23 +62,29 @@ function Walk-Node {
         }
     }
 
-    # 1. properties: the map keys are real field names, so they are real contract surface.
+    # 1. properties: the map keys are real field names, so they are real contract surface. Inside an
+    #    if/then/else the same keys appear again as *conditions* on fields declared elsewhere; asking
+    #    for a second description there produces a paragraph that only drifts from the first. Casing is
+    #    still enforced, and additionalProperties: false at the root is what keeps this exemption from
+    #    becoming a hole through which an undocumented field could hide.
     $props = $Node.PSObject.Properties['properties']
     if ($null -ne $props -and $props.Value -is [Management.Automation.PSCustomObject]) {
         foreach ($child in $props.Value.PSObject.Properties) {
-            $script:PropCount++
             $childPath = "$Path/$($child.Name)"
             if ($child.Name -notmatch $CasePattern) {
                 $script:Cases += "$File  $childPath  (property names are camelCase; SQL keeps snake_case)"
             }
-            $documented = $false
-            if ($child.Value -is [Management.Automation.PSCustomObject]) {
-                $d = $child.Value.PSObject.Properties['description']
-                if ($null -ne $d -and "$($d.Value)".Trim().Length -gt 0) { $documented = $true }
-                if (-not $documented -and $null -ne $child.Value.PSObject.Properties['$ref']) { $documented = $true }
+            if (-not $Predicate) {
+                $script:PropCount++
+                $documented = $false
+                if ($child.Value -is [Management.Automation.PSCustomObject]) {
+                    $d = $child.Value.PSObject.Properties['description']
+                    if ($null -ne $d -and "$($d.Value)".Trim().Length -gt 0) { $documented = $true }
+                    if (-not $documented -and $null -ne $child.Value.PSObject.Properties['$ref']) { $documented = $true }
+                }
+                if (-not $documented) { $script:Undoc += "$File  $childPath" }
             }
-            if (-not $documented) { $script:Undoc += "$File  $childPath" }
-            Walk-Node -Node $child.Value -Path $childPath -File $File
+            Walk-Node -Node $child.Value -Path $childPath -File $File -Predicate $Predicate
         }
     }
 
@@ -92,15 +101,18 @@ function Walk-Node {
         }
     }
 
-    # 3. Subschema slots that hold one schema, or a tuple of schemas.
+    # 3. Subschema slots that hold one schema, or a tuple of schemas. if/then/else introduce the
+    #    predicate context described in section 1; everything below them inherits it.
     foreach ($kw in 'items', 'additionalItems', 'contains', 'if', 'then', 'else', 'not', 'propertyNames', 'additionalProperties') {
         $slot = $Node.PSObject.Properties[$kw]
         if ($null -eq $slot) { continue }
+        $pred = $Predicate
+        if ('if', 'then', 'else' -contains $kw) { $pred = $true }
         if ($slot.Value -is [Management.Automation.PSCustomObject]) {
-            Walk-Node -Node $slot.Value -Path "$Path/$kw" -File $File
+            Walk-Node -Node $slot.Value -Path "$Path/$kw" -File $File -Predicate $pred
         } elseif ($slot.Value -is [Object[]]) {
             for ($i = 0; $i -lt $slot.Value.Count; $i++) {
-                Walk-Node -Node $slot.Value[$i] -Path "$Path/$kw[$i]" -File $File
+                Walk-Node -Node $slot.Value[$i] -Path "$Path/$kw[$i]" -File $File -Predicate $pred
             }
         }
     }

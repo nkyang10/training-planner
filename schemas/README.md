@@ -58,9 +58,11 @@ marker moves from this list into the CI check that the set is complete (`PENDING
    It checks the draft, that `$id` matches the file's own path, that root metadata is present
    (`title`, `description`, `type: object`, `additionalProperties: false`), that keys are camelCase,
    and that enum values are kebab-case unless declared verbatim. It also prints an
-   undocumented-property count as a **ratchet**: 116 of 212 properties today, allowed to go down and
+   undocumented-property count as a **ratchet**: 116 of 226 properties today, allowed to go down and
    never up, so new fields arrive documented. The script cannot tell a true description from a
-   invented one; that half of rule 1 stays a human review.
+   invented one; that half of rule 1 stays a human review. A property named inside `if`/`then`/`else`
+   is a condition on a field documented at its declaration, so it is casing-checked but not made to
+   repeat a description that would only drift.
 
 ## Validation & codegen (intended)
 
