@@ -112,6 +112,31 @@ invented names, two of them asserted on this page as fact. A protection claim is
 read-back value of a named path, and the tool prints a table instead of a sentence, because a sentence
 cannot be audited.
 
+A fifth instance happened while verifying that fix, and it is the sneakiest: `GET
+/pulls/7/requested_reviewers` answers `{"users":[…],"teams":[…]}`, and the reading counted
+`.requested_reviewers` -- a property that endpoint does not have. It returned `$null`, and in PowerShell
+`@($null).Count` is **1**, so the report was "1 requested reviewer" from an empty list. Retracted within
+the same minute, which is only possible because the raw text was printed right after. For a one-line
+answer: read the raw text. An object model will happily answer a question you never asked.
+
+**Code-owner review is now stored; its effect is not yet observable.** Flipping the flag is not the same
+as having the gate, and PR #8 -- a `spike/*` that touched `/knowledge/`, an owned path, and was closed
+without merging -- is the evidence that the difference cannot be seen from a one-maintainer repository:
+
+| Read | PR #8, touches an owned path | PR #7, touches nothing owned |
+| --- | --- | --- |
+| `requested_reviewers` | `{"users":[],"teams":[]}` | `{"users":[],"teams":[]}` |
+| `reviewDecision` | `REVIEW_REQUIRED` | `REVIEW_REQUIRED` |
+| `gh pr merge --squash` | exit 1, *the base branch policy prohibits the merge* | the same |
+
+GitHub never requests a review from the author, and the author is the only owner, so the seat can never
+appear as a requested reviewer; and one required approval produces `REVIEW_REQUIRED` by itself. The test
+that *would* separate the two is an approval from someone who is not the code owner, and that needs a
+second account. So the claim this repository may make is "the setting is on and read back", not "a
+safety-band PR cannot land without a separate reviewer". That second sentence becomes true the day a
+second maintainer exists, and until then the controls actually enforcing the safety band are the CI
+counters -- which is what they were before, and what they remain.
+
 **`block_creations` is not set and is no longer asked for.** It was sent as `true`, answered 200, and
 stayed `false` through 30 seconds of polling: a field this API will not store here. The new verifier
 made that a permanent red — the correct reaction, and the reason the claim was deleted rather than
@@ -142,14 +167,17 @@ maintainer appears. Until then every `spine/* -> main` merge is an `--admin` mer
   `require_code_owner_reviews` read back `true`). The safety band --
   `knowledge/heuristics/safety-hard-stops.yaml`, `docs/engine/safety-layer.md`,
   `docs/engine/review-trigger-policy.md`, `schemas/**`, `docs/adr/**`,
-  `packages/planner-core/src/safety/**` -- cannot merge without the safety seat. Before that date the
-  settings holding that line were the CI counters, the SQL leak test and `tools/check-claims.sql`;
-  those are still the first controls I would cite, because they run whether or not anyone is watching.
+  `packages/planner-core/src/safety/**` -- is now *addressed* to the safety seat, and when that seat is
+  held by someone other than the author the PR cannot land without them. Today it is the same person, so
+  nothing about a safety PR looks different yet (PR #8 above). Before that date the settings holding that
+  line were the CI counters, the SQL leak test and `tools/check-claims.sql`; they are still the first
+  controls I would cite, because they run whether or not anyone is watching.
 - **The second review on the safety band is not something branch protection can express**: an
-  approval count is per branch, not per path. Enforceable today is the codeowner requirement above;
-  enforceable with one small CI step is counting approvals through the API on PRs that touch those
-  paths. Until that step exists the second review is a human rule, stated in the PR template, and we
-  call it that instead of pretending the setting does it.
+  approval count is per branch, not per path. Enforceable today is the codeowner requirement above --
+  which means "the right seat must approve" the moment a second person holds a seat; enforceable with one
+  small CI step is counting approvals through the API on PRs that touch those paths. Until that step
+  exists the second review is a human rule, stated in the PR template, and we call it that instead of
+  pretending the setting does it.
 - `enforce_admins` is **off** by choice and measured (table above): it removes the flag requirement for
   an admin, it does not let anyone merge quietly.
 - Accepted ADRs are **never edited** -- supersede with `docs/adr/NNNN-*.md`
@@ -168,6 +196,8 @@ maintainer appears. Until then every `spine/* -> main` merge is an `--admin` mer
 | Every link target is **committed**, with the right case | an unanchored `data/` in `.gitignore` hid `docs/data/` from git; seven documents cited it and the local audit still said zero (happened 2026-11-03) |
 | Every claim a setup tool makes is **read back by value, and polled** | five separate untruths in two days: 35 printed successes that created nothing (`@Args` splatted the empty automatic `$args`); a `PATCH` containing the invented field `rebase_merge`, answered 200 with no change; a single read that returned the pre-patch value because settings are eventually consistent; a verifier asking whether `enforce_admins` *existed* -- toggles arrive as `{enabled: …}`, so existence is always true, and it printed "on" for `false`; and `require_codeowner_reviews`, an invented name that left code-owner review off for a month while the tool reported protection "up to date" (all 2026-11-03) |
 | A setting the API will not store is **deleted from the claim, not polled harder** | `block_creations`: sent `true`, answered 200, still `false` after 30 s of polling. The per-field verifier turned that into a permanent red, which is the only honest outcome -- the repository either has the control or the page stops listing it (2026-11-03) |
+| A one-line API answer is read as **raw text**, not through a property chain | `GET /pulls/7/requested_reviewers` answers `{"users":[…],"teams":[…]}`; the code counted `.requested_reviewers`, which does not exist, got `$null`, and `@($null).Count` is 1 in PowerShell -- "1 requested reviewer" reported from an empty list. Wrong field plus truthy absence is the quietest way to invent a fact (2026-11-03) |
+| A control is claimed only as far as it is **distinguishable from no control** | `require_code_owner_reviews=true` and a plain 1-approval rule produce identical observable output when the only code owner is the author; PR #8 tried to see the difference and could not. The page therefore says "stored and read back", not "gated", until a second maintainer makes it mean something (2026-11-03) |
 | Every gate counter has been **forced to fail once**, by breaking the thing it measures | `tools/check-claims.sql` first shipped with its queries scoped to schemas that hold no tenant tables: it printed a clean bill of health for a database it had never looked at. `PENDING CONTRACT FILES` was exercised with a fake contract name in `schemas/README.md` before anyone believed its zero. A counter nobody can move is a counter nobody should trust (both 2026-11-03) |
 | `last_reviewed` age + `status` values | knowledge rotting invisibly while code ships |
 | Golden plans (`eval/golden-plans/`) | a "small tweak" that quietly rewrites 40 km of someone's week |
