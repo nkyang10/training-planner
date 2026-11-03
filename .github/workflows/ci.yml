@@ -72,6 +72,33 @@ jobs:
           }
           exit $fail
 
+      - name: Contract shape (casing, ids, documentation ratchet)
+        shell: pwsh
+        run: |
+          # The contracts are the only place a shape is written down, so a convention that lives only
+          # in prose quietly splits into two conventions. Two of five files had already done that.
+          $out = & ./tools/check-contracts.ps1 | Tee-Object -FilePath contracts.txt
+          $text = $out -join "`n"
+          $bad = @()
+          foreach ($k in 'PARSE FAILURES', 'MISSING METADATA', 'BAD ID PATHS', 'SNAKE_CASE PROPERTIES', 'SNAKE_CASE ENUM VALUES') {
+            if ($text -match "$k`:\s*(\d+)") {
+              if ([int]$Matches[1] -ne 0) { $bad += "$k = $($Matches[1])" }
+            } else { $bad += "$k not reported by the checker" }
+          }
+          $undoc = -1
+          $budget = -1
+          if ($text -match 'UNDOCUMENTED PROPERTIES:\s*(\d+)') { $undoc = [int]$Matches[1] }
+          if ($text -match 'UNDOCUMENTED BUDGET:\s*(\d+)') { $budget = [int]$Matches[1] }
+          if ($undoc -lt 0 -or $budget -lt 0) {
+            $bad += 'the documentation ratchet is not being reported'
+          } elseif ($undoc -gt $budget) {
+            $bad += "undocumented properties $undoc > budget $budget"
+          } elseif ($undoc -lt $budget) {
+            "::notice::undocumented properties down to $undoc; lower the budget in tools/check-contracts.ps1"
+          }
+          if ($bad) { $bad | ForEach-Object { "::error::$_" }; exit 1 }
+          'Contract shape gate clean.'
+
       - name: Heuristics are valid YAML with range + confidence + sources
         continue-on-error: false
         run: |
