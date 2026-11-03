@@ -527,15 +527,17 @@ create table plan_diff_changes (
   foreign key (user_id, diff_id) references plan_diffs(user_id, id) on delete cascade,
   -- AGENTS rule 3 as data: a safety-origin change is subtractive by definition. Why a
   -- CHECK and not a test: a test can be skipped on a Friday; this cannot.
-  -- KNOWN DISAGREEMENT, measured 2026-11-04: this list and the `kind` enum in
-  -- plan-diff.schema.json share no value names (dotted here, seven kebab verbs there), and the
-  -- sentence that used to sit here -- "exactly the subtractive half of change.kind in
-  -- plan-diff.schema.json" -- was false. The wire's coarser change-dose can describe *raising* a
-  -- distance, so a change marked is_safety could increase load and still satisfy this CHECK.
-  -- Decided: the finer dotted list is the single change-kind vocabulary, the subtractive subset is
-  -- declared once as x-subtractive-change-kinds in plan-diff.schema.json, and this list mirrors it.
-  -- Until that lands, the CHECK is the stricter side and nothing writes a wire value here.
-  -- (docs/engineering/contract-vocabulary.md items 7 and R2/R4.)
+  -- History, kept because the mistake is the lesson: until 2026-11-04 the sentence above this
+  -- block claimed the list was "exactly the subtractive half of change.kind in
+  -- plan-diff.schema.json". It was not -- the two lists shared no value names (dotted here, seven
+  -- kebab verbs there), so a wire change-dose could describe *raising* a distance and a row marked
+  -- is_safety could increase load while still satisfying this CHECK. Decided and now applied: these
+  -- 12 dotted values are the single change-kind vocabulary, plan-diff.schema.json's `kind` enum
+  -- holds exactly them, and the 6 subtractive values below are the same 6 the contract declares as
+  -- x-subtractive-change-kinds and repeats in its own if/then. Still true today: nothing in CI
+  -- compares the three lists, so their equality is prose until row R4 of the application table in
+  -- docs/engineering/contract-vocabulary.md adds a gate outside schemas/ that reads this CHECK
+  -- straight out of the catalog (a ruler kept outside the thing it measures).
   -- The two-change cap is deliberately NOT here: it lives on reviews.changes_count, one table
   -- away, where the count is known at write time. A CHECK cannot count sibling rows, so the
   -- honest statement is that the cap is enforced somewhere else, not that it is enforced here.

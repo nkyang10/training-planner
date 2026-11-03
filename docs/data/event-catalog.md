@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 ---
 
 # Event catalog
@@ -28,7 +28,7 @@ run belonged to.
 | Type | Notes | Consumers |
 |---|---|---|
 | `plan.generated` | `planVersionId`, `plannerVersion`, `knowledgeHash`, `inputsHash`, `horizon` | audit, UI |
-| `plan.activated` | `fromVersion`, `toVersion`, `effectiveFrom` | notifications |
+| `plan.activated` | `fromVersionId`, `toVersionId`, `effectiveFrom` | notifications |
 | `plan.superseded` | always paired with a `plan.diffStored` | audit |
 | `plan.diffStored` | `fromDay`, `diff` | review screen, weekly summary |
 | `plan.regenerated` | rolling refinement; `changedDays[]`, `budgetUsed` | weekly summary "what changed and why" |
