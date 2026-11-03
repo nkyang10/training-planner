@@ -29,8 +29,11 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
 }
 
 if (-not $Repo) {
-    $url = (git remote get-url origin 2>$null)
-    if (-not $url) { throw 'No origin remote. Run: git remote add origin git@github.com:<owner>/training-planner.git  (or pass -Repo owner/name)' }
+    $url = $null
+    try { $url = (& git remote get-url origin 2>&1 | Out-String).Trim() } catch { $url = $null }
+    if (-not $url -or $url -match 'No such remote') {
+        throw 'No origin remote yet. Either: gh repo create <owner>/training-planner --source . --remote origin --push --private   or pass -Repo <owner>/training-planner'
+    }
     if ($url -match '[:/]([^/]+)/([^/]+?)(\.git)?$') { $Repo = "$($Matches[1])/$($Matches[2])" }
     else { throw "Cannot parse remote url: $url" }
 }
@@ -43,7 +46,8 @@ if (Test-Path $cfgPath) {
     $raw = [System.IO.File]::ReadAllText($cfgPath)
     if ($raw -match 'github\.com/OWNER/') {
         $new = $raw -replace 'github\.com/OWNER/', "github.com/$owner/"
-        if ($DryRun) { "DRY  rewrite OWNER -> $owner in .github/ISSUE_TEMPLATE/config.yml" }
+        if ($owner -eq 'OWNER') { 'SKIP issue-template links -- pass the real -Repo <owner>/training-planner' }
+        elseif ($DryRun) { "DRY  rewrite OWNER -> $owner in .github/ISSUE_TEMPLATE/config.yml" }
         else {
             [System.IO.File]::WriteAllText($cfgPath, $new, (New-Object System.Text.UTF8Encoding($false)))
             'OK   issue-template links now point at the real owner'
@@ -81,7 +85,7 @@ $labels = [ordered]@{
     'finding/F10'             = '5319e7'
 }
 foreach ($name in $labels.Keys) {
-    Invoke-Gh @(['api'], '-X', 'POST', "repos/$Repo/labels", '-f', "name=$name", '-f', "color=$($labels[$name])") "label $name"
+    Invoke-Gh @('api','-X', 'POST', "repos/$Repo/labels", '-f', "name=$name", '-f', "color=$($labels[$name])") "label $name"
 }
 
 # --- Milestones (titles mirror docs/roadmap/milestones.md) -------------------
@@ -92,7 +96,7 @@ foreach ($m in 'M0 Skeleton and contracts',
                'M4 Evidence enrichment (import)',
                'M5 Autoregulation and calibration',
                'M6 Multi-tenant hardening and launch') {
-    Invoke-Gh @(['api'], '-X', 'POST', "repos/$Repo/milestones", '-f', "title=$m", '-f', 'state=open') "milestone $m"
+    Invoke-Gh @('api','-X', 'POST', "repos/$Repo/milestones", '-f', "title=$m", '-f', 'state=open') "milestone $m"
 }
 
 # --- Branch protection on main ---------------------------------------------
@@ -129,8 +133,9 @@ if ($DryRun) {
     } catch { "FAIL branch protection -- $($_.Exception.Message)" }
 }
 
-# Auto-merge on squash for dependabot-sized PRs (opt-in per PR on GitHub UI as well).
-Invoke-Gh @(['api'], '-X', 'PATCH', "repos/$Repo", '-F', 'squash_merge=true', '-F', 'merge_commit=true',
+# Which merge styles the repository allows: squash for leaves, merge commit for spine -> main,
+# no rebase (a rebased spine that is already reviewed elsewhere is a re-review).
+Invoke-Gh @('api','-X', 'PATCH', "repos/$Repo", '-F', 'squash_merge=true', '-F', 'merge_commit=true',
             '-F', 'rebase_merge=false', '-F', 'delete_branch_on_merge=true') 'repo merge settings'
 
 "`nNext: create the repository if it does not exist yet:"

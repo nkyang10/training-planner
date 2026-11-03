@@ -10,6 +10,9 @@ Effort: S (< 1 wk) · M (1–3 wk) · L (> 3 wk).
 
 ## Now (pre-M2)
 
+Rows 8--11 came out of [the end-user 5W1H self-review](../review/2026-11-03-enduser-5w1h-review.md)
+(F1--F10); F1 and F2 are launch blockers for the loop itself, not polish.
+
 | # | Item | Why | Effort | Risk if skipped |
 |---|---|---|---|---|
 | 1 | Encode the 6 golden-plan personas as fixtures with coach-annotated expectations | the planner's specification; every later rule change is measured against it | M | planner correctness becomes opinion |
@@ -19,6 +22,10 @@ Effort: S (< 1 wk) · M (1–3 wk) · L (> 3 wk).
 | 5 | Entry-form timing instrumented from day one of M2 | adherence is the business risk; we must see it in week 1 | S | guessing at the biggest risk |
 | 6 | Remaining contracts: `plan-version` and `events` JSON Schema, then `schemas/sql/schema.sql` | `plan-diff` and `review` are written; the DDL is where RLS becomes real | M | engine and UI inventing two different shapes |
 | 7 | `docs/engine/explanation-and-trust.md` + `docs/vision/personas-and-journeys.md` | the comment is half the product; explaining a plan is the trust surface | S | trust work deferred until it is a redesign |
+| 8 | Feedback-prompt policy: nudge hour from the runner's own behaviour, quiet hours, the 3-day/7-day silence ladder, one shared prompt budget (**F1**) | the rare event (a review) is exhaustively specified and the daily one is absent | S | the loop quietly stops and we read it as low motivation |
+| 9 | Say how long today takes and what the alternate dose gave up (**F2**, **F10**) | elapsed time is an input today and an output nowhere; race day has no card | S | the time-poor runner cannot plan the evening they actually have |
+| 10 | Sessions the runner does not control: club night, parkrun, pacing a friend (**F3**) | the group decides Tuesday; the plan has to survive that | S | every club runner's first week is fiction |
+| 11 | Surfaces for what is already posture: season view, heat/altitude cost, travel week shift, export and delete (**F4**–**F6**, **F9**) | a promise with no screen is not a promise | M | trust decays exactly where the runner is most exposed |
 
 ## Next (M3–M5)
 
@@ -30,7 +37,7 @@ Effort: S (< 1 wk) · M (1–3 wk) · L (> 3 wk).
 | `alternate` session branches used deliberately (plan B for a bad morning) | turns "I failed the session" into "I chose the other option" | M |
 | Pace-evidence provenance UI ("why these paces, and when they expire") | pace distrust kills plan trust | M |
 | GPX/CSV import + manual activity creation polish | manual-first must not mean manual-punishing | M |
-| Notification budget per user + local scheduling | spam kills the loop quietly | S |
+| Notification budget per user + local scheduling (promoted to `knowledge/engagement-policy`, **F1**) | spam kills the loop quietly | S |
 | Accessibility pass (keyboard calendar, colour-independent states, screen-reader labels) | a runner with low vision is a user | M |
 
 ## Later, deliberately
