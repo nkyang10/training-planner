@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 ---
 
 # Branching and GitHub workflow
@@ -20,6 +20,12 @@ Three layers, and only three:
 
 A **spine** exists only when a workstream cannot fit in three days. If it lingers past a milestone,
 it is unfinished, not important: cut it.
+
+Which milestone that is, and when it may be opened or closed, is not a judgement made here: each
+milestone is a phase with a machine-read contract in [phases/README.md](phases/README.md), and
+`tools/check-phases.py` fails a PR that opens a phase while a dependency is unfinished or closes one
+with an open criterion. A spine is cut for the active phase and deleted when that phase closes — so
+"spine lingers past a milestone" is a gate failure now, not a style note.
 
 Types: `feat` `fix` `test` `knowledge` `chore` `spike` `release`. Areas: `client` `api` `worker`
 `planner-core` `domain` `data` `knowledge` `eval` `infra` `docs`.
