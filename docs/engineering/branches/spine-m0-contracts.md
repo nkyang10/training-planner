@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 kind: branch-brief
 ---
 
@@ -51,7 +51,7 @@ fighting the other leaves over shared files.
 
 ## First pull requests, each one reviewable in an hour
 
-1. plan-version.schema.json: version, knowledgeBundleVersion, plannerVersion, inputsHash, sessions[], appliedRules[]
+1. plan-version.schema.json: version, knowledgeHash, plannerVersion, inputsHash, sessions[], appliedRules[]
 2. events.schema.json: append-only event envelope carrying user_id, tz and the 04:00 training-day boundary
 3. schema.sql: tables, RLS policies default-on, (user_id, occurred_at) indexes, plus a cross-user read test that must fail
 

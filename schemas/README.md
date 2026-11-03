@@ -58,9 +58,10 @@ the check, as this section promised it would.
    declare themselves with `x-verbatim-enum-values` so the exception is visible inside the contract
    rather than being silent drift.
     The rule fixes *how* to spell a name once a namespace is chosen; it cannot decide *which* namespace
-    a name belongs to, and on 2026-11-04 the four namespaces disagreed in seventeen measured places —
-    fourteen of naming, three of what a control actually enforces: the
-    safety tier spelling, the name of a diff's change kind, what a day's status means. Those
+    a name belongs to, and on 2026-11-04 the four namespaces disagreed in twenty measured places:
+    names that had drifted apart, three claims about what a control actually enforces (the safety tier
+    spelling, the name of a diff's change kind, what a day's status means), the gate's own field of
+    view, and the day-entry contract against the table it feeds. Those
     disagreements are recorded with their evidence and decided once in
     [contract-vocabulary.md](../docs/engineering/contract-vocabulary.md), which also lists what no gate
     checks yet. A new disagreement found while working is added there before it is patched locally.
@@ -72,7 +73,7 @@ the check, as this section promised it would.
    It checks the draft, that `$id` matches the file's own path, that root metadata is present
    (`title`, `description`, `type: object`, `additionalProperties: false`), that keys are camelCase,
    and that enum values are kebab-case unless declared verbatim. It also prints an
-   undocumented-property count as a **ratchet**: 113 of 279 properties today, allowed to go down and
+   undocumented-property count as a **ratchet**: 110 of 279 properties today, allowed to go down and
    never up, so new fields arrive documented. The script cannot tell a true description from a
    invented one; that half of rule 1 stays a human review. A property named inside `if`/`then`/`else`
    is a condition on a field documented at its declaration, so it is casing-checked but not made to

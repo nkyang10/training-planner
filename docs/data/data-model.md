@@ -18,7 +18,7 @@ CI proves it by applying it to a real Postgres 16 and reading the isolation clai
 users(id)`, an RLS policy, and `created_at timestamptz default now()`.
 
 **Read the tables below as the *reasons*, not as the definition.** They used to be a copy of the
-column lists, and they rotted within days of the DDL existing: seventeen such disagreements, each
+column lists, and they rotted within days of the DDL existing: twenty such disagreements, each
 measured and decided in
 [contract-vocabulary.md](../engineering/contract-vocabulary.md). Where a name here and a name in the DDL differ, the
 DDL is wrong *only if* that page says so — otherwise this page is wrong.

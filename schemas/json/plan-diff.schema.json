@@ -5,13 +5,13 @@
   "description": "The stored difference between two immutable plan versions (docs/adr/0004). A diff is the only way the UI explains a change, so every field a runner must see is required here rather than composed at render time. Produced by the engine, never by the LLM.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "diffId", "userId", "fromVersion", "toVersion", "createdAtDay", "changes", "changeCountWithinLimit"],
+  "required": ["schemaVersion", "diffId", "userId", "fromVersionId", "toVersionId", "createdAtDay", "changes", "changeCountWithinLimit", "knowledgeHash"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "diffId": { "type": "string", "format": "uuid" },
     "userId": { "type": "string", "format": "uuid", "description": "Every table and every document carries user_id (AGENTS rule 7); RLS is the enforcement, this is the check." },
-    "fromVersion": { "type": "string", "format": "uuid", "description": "The version the runner was already shown. Never mutated." },
-    "toVersion": { "type": "string", "format": "uuid" },
+    "fromVersionId": { "type": "string", "format": "uuid", "description": "The version the runner was already shown. Never mutated. Renamed from `fromVersion` on 2026-11-04: it holds an id, and the column is plan_diffs.from_version_id (docs/engineering/contract-vocabulary.md item 19)." },
+    "toVersionId": { "type": "string", "format": "uuid", "description": "The candidate the runner is being asked to accept; plan_diffs.to_version_id." },
     "createdAtDay": { "type": "string", "format": "date", "description": "Training day (04:00 local boundary) the diff was generated in, not a wall-clock instant, because the planner is pure (AGENTS rule 1)." },
     "firstTouchedDay": { "type": "string", "format": "date", "description": "Earliest day any change in this diff affects. Must be strictly later than the last completed day: a diff that touches the past is rejected at write time (AGENTS rule 4)." },
     "changes": {
@@ -26,27 +26,35 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 7,
-      "description": "Days inside the freeze window that a review deliberately did not touch (knowledge/heuristics/review-triggers.yaml#freeze_days)."
+      "description": "Days inside the freeze window that a review deliberately did not touch (knowledge/heuristics/review-triggers.yaml#freeze_window_days)."
     },
-    "knowledgeBundleVersion": { "type": "string", "description": "Which heuristics produced this diff. Required for explaining a plan months later." }
+    "knowledgeHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "Which heuristics produced this diff, as the digest of the knowledge bundle named by the plan version it applies to; the same field and the same pattern as plan-version.schema.json#knowledgeHash. Required, because a diff is how a plan is explained months later and an unattributed diff cannot be explained." }
   },
+  "x-subtractive-change-kinds": ["session.removed", "session.downgraded", "distance.reduced", "pace.band-widened", "pace.band-relaxed", "day.became-rest"],
+  "x-subtractive-change-kinds-note": "The subtract-only half of `kind`, declared once (docs/engineering/contract-vocabulary.md item 7). Three lists have to stay equal: this array, the `then` enum in $defs.change.allOf below, and the CHECK constraint changes_are_subtractive_or_not_safety in schemas/sql/schema.sql. Only the third is enforced today, by the database itself; nothing compares the three, so a gate kept outside schemas/ is row R4 of the application table in docs/engineering/contract-vocabulary.md. Until that row lands, the equality is a promise this file makes and no machine checks.",
   "$defs": {
     "change": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "day", "beforeSummary", "afterSummary", "reason", "trigger", "expectedCost", "knobsUsed"],
+      "required": ["kind", "day", "beforeSummary", "afterSummary", "reason", "signalId", "expectedCost", "knobsUsed"],
       "properties": {
-        "kind": { "enum": ["replace-session", "move-session", "drop-session", "change-dose", "swap-type", "change-rest-day", "reband-paces"], "description": "Structural verbs only. 'add-volume-to-make-up-missed-work' is absent on purpose (knowledge/heuristics/missed-session-rules.yaml)." },
+        "kind": { "enum": ["session.added", "session.removed", "distance.changed", "pace.band-changed", "day.became-rest", "day.swapped", "session.moved", "structure.changed", "session.downgraded", "distance.reduced", "pace.band-widened", "pace.band-relaxed"], "x-verbatim-enum-values": true, "description": "The one change-kind vocabulary: the 12 dotted values stored in plan_diff_changes.change_kind, spelled exactly as that CHECK constraint spells them (docs/engineering/contract-vocabulary.md item 7). The seven kebab verbs this enum used to hold are demoted to narrative labels: the UI groups these 12 kinds for a runner, and the label keys belong to the message catalogue (AGENTS rule 8), which does not exist yet. They cannot stay wire values because change-dose describes *raising* a distance as readily as cutting one, and the subtract-only rule needs the finer grain to be checkable. session.added is here so a review that reorganises around a fixed race slot can say so; adding volume to make up missed work is absent on purpose and no kind permits it (knowledge/heuristics/missed-session-rules.yaml)." },
         "day": { "type": "string", "format": "date" },
         "beforeSummary": { "type": "string", "maxLength": 240, "description": "Engine-authored plain text; the message catalogue, not the LLM." },
         "afterSummary": { "type": "string", "maxLength": 240 },
         "reason": { "type": "string", "maxLength": 400, "description": "The mechanism in one sentence, in the runner's own terms where possible." },
-        "trigger": { "type": "string", "description": "Id of the signal or feedback that opened this change (see review.schema.json#trigger)." },
+        "signalId": { "type": "string", "description": "Id of the signal or feedback that justifies this change (see review.schema.json#evidence). Named `signalId`, not `trigger`: the review-level field is an object of evidence and was renamed with it, the column here is plan_diff_changes.signal_id, and `trigger` is a database object in every reader's head (docs/engineering/contract-vocabulary.md item 3)." },
         "expectedCost": { "type": "string", "maxLength": 200, "description": "What the runner gives up. A change with no stated cost is a build error (docs/ux/review-flow.md)." },
         "expectedBenefit": { "type": "string", "maxLength": 200 },
         "knobsUsed": { "type": "array", "items": { "type": "string" }, "description": "heuristic ids that produced the numbers, so the UI can say 'this came from your plan rules, not from a model'." },
-        "safetyOrigin": { "type": "boolean", "description": "True when a safety rule caused this change. Safety changes may only subtract (AGENTS rule 3); a validator checks kind against the subtract-only verb set.", "default": false }
-      }
+        "isSafety": { "type": "boolean", "description": "True when a safety rule caused this change; mirrors plan_diff_changes.is_safety (renamed from `safetyOrigin`, item 19). Safety changes may only subtract (AGENTS rule 3), and that is checked in two places, not asserted here: the `allOf` below refuses a kind outside `x-subtractive-change-kinds` at the API boundary, and the column CHECK `changes_are_subtractive_or_not_safety` in schemas/sql/schema.sql refuses the same rows at insert even if the engine is bypassed.", "default": false }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "isSafety": { "const": true } }, "required": ["isSafety"] },
+          "then": { "properties": { "kind": { "enum": ["session.removed", "session.downgraded", "distance.reduced", "pace.band-widened", "pace.band-relaxed", "day.became-rest"] } } }
+        }
+      ]
     }
   }
 }

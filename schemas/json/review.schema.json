@@ -5,17 +5,18 @@
   "description": "One review of the future plan: the question the system asked, the options it offered, what the runner chose, and what happened after. A review is an option set with a 'keep as is' first option (docs/ux/review-flow.md), not a notification with a single accept button.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "reviewId", "userId", "openedAtDay", "trigger", "horizonDays", "options", "status"],
+  "required": ["schemaVersion", "reviewId", "userId", "openedAtDay", "evidence", "horizonDays", "options", "status"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "reviewId": { "type": "string", "format": "uuid" },
     "userId": { "type": "string", "format": "uuid" },
     "openedAtDay": { "type": "string", "format": "date", "description": "Training day the review opened. One review prompt per rolling week at most (review-triggers.yaml#dwell_days and #max_prompts_per_week)." },
     "openedBy": { "enum": ["system-signal", "user-request", "post-race", "post-layoff", "phase-boundary"], "description": "User-triggered reviews are first-class: the button exists so a runner can be the one who notices." },
-    "trigger": {
+    "evidence": {
       "type": "object",
       "additionalProperties": false,
       "required": ["signalIds", "ruleIds", "evidenceGradeMax"],
+      "description": "Why the system asked, as evidence rather than as a cause: the observations, the rules that fired, and how good the readings were. Renamed from `trigger` on 2026-11-04 - the same object is stored as reviews.rule_id plus reviews.evidence_snapshot and reviews.evidence_hash, and `trigger` names a database object in every reader's head (docs/engineering/contract-vocabulary.md item 3). `openedBy` stays the answer to who asked.",
       "properties": {
         "signalIds": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "Concrete observations, e.g. 'rhr_delta_sd:3' or 'feedback:motivation:low:streak4'. Never a device composite (metric-catalog.yaml#grade_gate)." },
         "ruleIds": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "heuristic rule ids that fired, kebab-case, so the UI can show which rule asked." },
@@ -44,11 +45,11 @@
         }
       }
     },
-    "status": { "enum": ["open", "accepted", "rejected", "expired", "superseded"] },
+    "status": { "enum": ["open", "accepted", "rejected", "deferred", "expired", "superseded"], "description": "One vocabulary for where a review stands, shared with the store (docs/engineering/contract-vocabulary.md item 4). accepted and rejected are final - the reviews_one_decision trigger refuses a second decision; deferred means the runner asked to be asked again later, expired means an option set aged out unanswered, superseded means a newer review replaced this one without the runner choosing. Measured gap: reviews.status still accepts the default 'suggested' and spells finality 'declined', and its CHECK has no 'superseded' value at all, so a review cannot be recorded as superseded today; closing that is row R4 of the application table on the vocabulary page, not this file." },
     "chosenOptionId": { "type": ["string", "null"] },
     "decidedAtDay": { "type": ["string", "null"], "format": "date" },
     "resultDiffId": { "type": ["string", "null"], "format": "uuid", "description": "Set only on accept. A rejection records no diff but does raise the trigger threshold for the next 30 days." },
-    "rejectedThresholdRaiseDays": { "type": "integer", "minimum": 0, "maximum": 90, "description": "After a rejection the same trigger waits longer before asking again (review-triggers.yaml#rejection_cooldown_days). The runner chose the current plan; the system does not ask twice in a week." },
+    "rejectedThresholdRaiseDays": { "type": "integer", "minimum": 0, "maximum": 90, "description": "After a rejection the same trigger waits longer before asking again. The runner chose the current plan; the system does not ask twice in a week. The number is not a knob: it comes from the rule knowledge/heuristics/review-triggers.yaml#rejected-review-is-data, whose then: says raise_that_trigger's_threshold_for_30d, and whose explain: key is review-rejection-respected. There is no rejection_cooldown_days knob in that file, and a citation naming one would be a dead link the Markdown auditor cannot see (item 18)." },
     "outcomeCheckDay": { "type": ["string", "null"], "format": "date", "description": "Day the review is scored against feedback, so 'did that help?' becomes an answer instead of a memory." },
     "narrative": {
       "type": ["object", "null"],
