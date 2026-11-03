@@ -1,0 +1,49 @@
+name: Knowledge change
+description: Add, correct or retire a rule or knob in knowledge/
+labels: ["area/knowledge"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Numbers live only in `knowledge/heuristics/*.yaml`. Prose carries reasoning, not figures.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of change
+      options: [new knob, change a value, change a range, retire a rule, correct a source, new prose doc]
+    validations: { required: true }
+  - type: input
+    id: home
+    attributes:
+      label: Home of the number
+      description: The one file and anchor that owns it, e.g. recovery.yaml#hard_day_gap_hours
+      placeholder: recovery.yaml#hard_day_gap_hours
+    validations: { required: true }
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Source ids from knowledge/sources/bibliography.md, with grade. Grade C may justify shape, never a measured number.
+      placeholder: PHYS-S9 (grade B, cohort) ...
+    validations: { required: true }
+  - type: textarea
+    id: range
+    attributes:
+      label: Proposed value, range, confidence
+      description: value / range (the clamp the engine uses) / confidence / persona_overridable, and what a typo would cost a runner if the range were missing.
+    validations: { required: true }
+  - type: textarea
+    id: who-feels-it
+    attributes:
+      label: Who feels this, and when
+      description: Persona plus the day it changes their week. If nothing in a runner's week changes, the knob is decoration.
+    validations: { required: true }
+  - type: checkboxes
+    attributes:
+      options:
+        - label: No second copy of the number exists anywhere (pointer or extends instead)
+          required: true
+        - label: Prose updated, last_reviewed bumped, tools/audit-links.ps1 prints four zeros
+          required: true
+        - label: Safety relevance assessed (subtract-only; persona_overridable false if safety depends on it)
+          required: true

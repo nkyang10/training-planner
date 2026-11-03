@@ -1,0 +1,51 @@
+name: Plan behaviour change
+description: The planner or the feedback/review loop should do something different
+labels: ["type/feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the runner's situation first, the mechanism second. Findings F1-F10 in
+        `docs/review/2026-11-03-enduser-5w1h-review.md` are a good model.
+  - type: textarea
+    id: life
+    attributes:
+      label: The week this happens in
+      description: Who, when, where, what they were doing, what the app said, what they needed instead.
+    validations: { required: true }
+  - type: textarea
+    id: today
+    attributes:
+      label: What the system does now
+      description: Quote the file and line. If nobody checked, write "not specified" - that is a real answer and this repository prefers it to a guess.
+    validations: { required: true }
+  - type: textarea
+    id: rule
+    attributes:
+      label: Rule that should apply instead
+      description: Deterministic wording the planner could actually follow, with the knob it reads.
+    validations: { required: true }
+  - type: dropdown
+    id: adds
+    attributes:
+      label: Does it add load or intensity?
+      options: [never, only subtracts, adds volume or intensity]
+    validations: { required: true }
+  - type: markdown
+    attributes:
+      value: |
+        If it adds load, say which non-safety rule owns that and why the evidence supports it. Safety
+        only subtracts (AGENTS.md rule 3); a good signal never buys extra work.
+  - type: textarea
+    id: fixture
+    attributes:
+      label: The fixture that would catch a regression
+      description: Name the golden-plan fixture and the assertion. "None" blocks the issue, not the PR.
+    validations: { required: true }
+  - type: checkboxes
+    attributes:
+      options:
+        - label: No diagnosis, no weight or calorie language, no guarantees, in either language
+          required: true
+        - label: Completed days are never rewritten; horizon stays future-only
+          required: true

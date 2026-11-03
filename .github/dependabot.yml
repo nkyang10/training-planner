@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: tuesday, time: "02:30", timezone: Asia/Taipei }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: chore(deps-actions) }
+    labels: [area/infra, type/chore]
+
+  # Guarded until the workspace exists; dependabot tolerates a missing lockfile.
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /apps/web
+      - /apps/api
+      - /apps/worker
+      - /packages/planner-core
+      - /packages/domain
+    schedule: { interval: weekly, day: tuesday, time: "02:45", timezone: Asia/Taipei }
+    open-pull-requests-limit: 8
+    commit-message: { prefix: chore(deps) }
+    labels: [area/infra, type/chore]
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]

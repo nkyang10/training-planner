@@ -1,0 +1,118 @@
+name: ci
+
+# Two jobs. `knowledge` is the hard gate that exists today (the corpus is a build input).
+# `app` is guarded: it skips until code exists, so a red-from-birth check never teaches anyone to
+# ignore CI. It becomes required in branch protection at M1, not before.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.check.outputs.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f package.json ] || ls apps/*/package.json >/dev/null 2>&1; then
+            echo 'app=true' >> "$GITHUB_OUTPUT"
+          else
+            echo '::notice::No application code yet (pre-M1): skipping app gates'
+            echo 'app=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  knowledge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Corpus integrity (anchors, yaml files, source ids, dead links)
+        shell: pwsh
+        run: |
+          $out = & ./tools/audit-links.ps1 | Tee-Object -FilePath audit.txt
+          $text = $out -join "`n"
+          $bad = @()
+          foreach ($k in 'MISSING ANCHORS', 'MISSING YAML FILES', 'BAD SOURCE IDS', 'DEAD LINKS') {
+            if ($text -match "$k`:\s*(\d+)") {
+              if ([int]$Matches[1] -ne 0) { $bad += "$k = $($Matches[1])" }
+            } else { $bad += "$k not reported by the audit" }
+          }
+          if ($bad) { $bad | ForEach-Object { "::error::$_" }; exit 1 }
+          'Corpus audit clean.'
+
+      - name: Contracts and fixtures parse
+        shell: pwsh
+        run: |
+          $strict = New-Object System.Text.UTF8Encoding($false, $true)
+          $fail = 0
+          Get-ChildItem -Recurse -Include *.json -File | Where-Object { $_.FullName -notmatch 'node_modules' } | ForEach-Object {
+            try {
+              $null = $strict.GetString([System.IO.File]::ReadAllBytes($_.FullName))
+              $_.FullName | Get-Content -Raw -Encoding utf8 | ConvertFrom-Json | Out-Null
+            } catch { "::error::${_}: $($_.Exception.Message)"; $fail = 1 }
+          }
+          exit $fail
+
+      - name: Heuristics are valid YAML with range + confidence + sources
+        continue-on-error: false
+        run: |
+          python3 - <<'PY'
+          import sys, pathlib
+          try:
+              import yaml
+          except Exception:
+              print('::notice::PyYAML unavailable, knob-shape check skipped'); sys.exit(0)
+          bad = 0
+          for p in sorted(pathlib.Path('knowledge/heuristics').glob('*.yaml')):
+              try:
+                  data = yaml.safe_load(p.read_text(encoding='utf-8'))
+              except Exception as e:
+                  print(f'::error file={p}::{e}'); bad = 1; continue
+              text = p.read_text(encoding='utf-8')
+              if 'confidence' not in text or 'provenance' not in text:
+                  print(f'::error file={p}::knob file lacks confidence or provenance'); bad = 1
+          sys.exit(bad)
+          PY
+
+      - name: Accepted ADRs are never edited
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          $files = git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- docs/adr/
+          $bad = 0
+          foreach ($f in $files) {
+            if (-not (Test-Path $f)) { continue }
+            $head = (Get-Content $f -Raw -Encoding utf8)
+            if ($head -match '(?m)^status:\s*(accepted|superseded)') { "::error::${f}: accepted ADR edited - supersede it with a new ADR"; $bad = 1 }
+          }
+          exit $bad
+
+  app:
+    needs: detect
+    if: needs.detect.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Golden plans
+        run: pnpm test:golden
+      - name: Catalogue parity en vs zh-Hant
+        run: node tools/check-i18n-parity.mjs
+      - name: Narrator never invents a number or crosses a banned topic
+        run: pnpm test -- narrator

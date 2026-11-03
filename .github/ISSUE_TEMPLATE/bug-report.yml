@@ -1,0 +1,40 @@
+---
+name: Bug report
+description: Something the system said or did that a runner should never see
+labels: ["type/bug"]
+body:
+  - type: textarea
+    id: seen
+    attributes:
+      label: What happened
+      description: The exact string or plan change, plus the day it appeared. Screenshots welcome.
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened
+      description: Which rule in knowledge/ owns this, if you can name it.
+    validations: { required: true }
+  - type: dropdown
+    id: class
+    attributes:
+      label: Class
+      options:
+        - Safety (a stop rule, a referral, an added intensity, a diagnosis, weight or calorie language)
+        - Honesty (a number nobody chose, a guarantee, an invented figure)
+        - Consent (a review without keep-as-is, no diff, no cost, past days touched)
+        - Data (cross-user leak, lost entry, wrong training day, missing tz)
+        - Language (zh-Hant fallback, tone, shame)
+        - Other
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Persona, profile, the feedback days, knowledge bundle version. Deterministic planner means this is reproducible exactly.
+    validations: { required: true }
+  - type: checkboxes
+    attributes:
+      options:
+        - label: Safety or honesty class - I expect this to block release until fixed
+          required: false

@@ -1,0 +1,26 @@
+# Owner review is required, not courtesy. Two approvals (one from @/safety) for the safety band.
+# Replace the teams below with real handles before the first merge; keep the paths accurate.
+
+# Safety band: subtract-only, referrals, contracts, irreversible decisions
+/knowledge/heuristics/safety-hard-stops.yaml   @/safety
+/knowledge/risk-and-safety/                    @/safety
+/docs/engine/safety-layer.md                   @/safety
+/docs/engine/review-trigger-policy.md          @/safety
+/schemas/                                      @/safety @/data
+/docs/adr/                                     @/safety @/architecture
+/packages/planner-core/src/safety/             @/safety
+
+# The knob layer: every number in the product
+/knowledge/heuristics/                         @/knowledge @/architecture
+
+# The planner and its expectations
+/packages/planner-core/                        @/architecture
+/eval/                                         @/architecture @/knowledge
+
+# Reasoning corpus
+/knowledge/                                    @/knowledge
+/research/                                     @/knowledge
+
+# Per-user isolation
+/schemas/sql/                                  @/data
+/apps/api/                                     @/data @/client
