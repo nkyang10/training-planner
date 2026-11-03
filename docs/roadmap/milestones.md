@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 ---
 
 # Milestones
@@ -9,6 +9,12 @@ Each milestone ends with something a real runner can use and something we can *m
 evidence required to open the next milestone. No milestone ships without its tests; the planner's
 golden plans are the specification, so M1 is where correctness is bought cheaply and M2 onward is
 where it is verified against humans.
+
+**This file is the narrative, not the control.** Which milestone is active, what has to be true to
+close it, and where the evidence lives is a machine-read contract in
+[../engineering/phases/README.md](../engineering/phases/README.md), one file per milestone, checked by
+`tools/check-phases.py` on every PR. Read the prose here to understand a milestone; read that folder to
+know whether it is done.
 
 Team assumption: 1–2 engineers + 1 coach-curated knowledge owner (part-time) + runners from one club
 (the Strava 10-athlete tier is literally this cohort — [ADR-0003](../adr/0003-manual-first-logging-with-import-as-enrichment.md)).

@@ -139,6 +139,23 @@ jobs:
           }
           'Contract instances clean.'
 
+      - name: Phase control (graph, states and done claims)
+        shell: pwsh
+        run: |
+          # The contract is docs/engineering/phases/*.md; this step is the ruler. It runs the gates a
+          # phase claims, so "done" is a claim this run can falsify rather than a word someone typed:
+          # exactly one active phase, dependencies ordered, no planned phase claiming a finished
+          # criterion, and no done criterion whose gate is red.
+          python -m pip install --quiet --disable-pip-version-check pyyaml
+          $out = & python tools/check-phases.py 2>&1 | Tee-Object -FilePath phase-control.txt
+          $text = $out -join "`n"
+          $text
+          if ($text -notmatch 'RESULT: OK') {
+            "::error::the phase graph and its claims do not hold"
+            exit 1
+          }
+          'Phase control clean.'
+
       - name: Heuristics are valid YAML with range + confidence + sources
         continue-on-error: false
         run: |
