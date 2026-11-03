@@ -50,7 +50,7 @@ jobs:
           $out = & ./tools/audit-links.ps1 | Tee-Object -FilePath audit.txt
           $text = $out -join "`n"
           $bad = @()
-          foreach ($k in 'MISSING ANCHORS', 'MISSING YAML FILES', 'BAD SOURCE IDS', 'DEAD LINKS') {
+          foreach ($k in 'MISSING ANCHORS', 'MISSING YAML FILES', 'BAD SOURCE IDS', 'DEAD LINKS', 'UNTRACKED TARGETS') {
             if ($text -match "$k`:\s*(\d+)") {
               if ([int]$Matches[1] -ne 0) { $bad += "$k = $($Matches[1])" }
             } else { $bad += "$k not reported by the audit" }

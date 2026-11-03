@@ -88,6 +88,7 @@ Applied by `tools/github-setup.ps1`, so the repository matches this page instead
 | `tools/audit-links.ps1` prints zeros | a doc that cites a knob nobody declared; a source id that does not exist |
 | YAML/JSON parse | the corpus is a build input; a stray quote breaks every consumer |
 | No personal absolute path in `tools/` | the audit that hardcoded the machine it was written on: green on a laptop, red on the runner (happened 2026-11-03) |
+| Every link target is **committed**, with the right case | an unanchored `data/` in `.gitignore` hid `docs/data/` from git; seven documents cited it and the local audit still said zero (happened 2026-11-03) |
 | `last_reviewed` age + `status` values | knowledge rotting invisibly while code ships |
 | Golden plans (`eval/golden-plans/`) | a "small tweak" that quietly rewrites 40 km of someone's week |
 | `en` vs `zh-Hant` key parity | half the users getting fallback strings in their system comment |

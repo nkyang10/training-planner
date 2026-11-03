@@ -14,7 +14,7 @@ is named, stacked, reviewed and merged.
 ## Before you open a PR
 
 ```pwsh
-& ./tools/audit-links.ps1        # must print four zeros and the backlink total
+& ./tools/audit-links.ps1        # must print five zeros and the backlink total
 ```
 
 Then, depending on what you touched:
