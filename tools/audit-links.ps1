@@ -1,6 +1,9 @@
 $ErrorActionPreference = 'Stop'
-$root = 'C:\Users\MY\Desktop\Development\training-planner'
-$heur = Join-Path $root 'knowledge\heuristics'
+# Repo root derived from where this script lives, never hardcoded: the audit has to run on a
+# Linux runner, in a clone, and in a CI checkout, not only on the machine that wrote it.
+$root = Split-Path -Parent $PSScriptRoot
+if (-not (Test-Path -LiteralPath (Join-Path $root 'knowledge'))) { throw "knowledge/ not found above $PSScriptRoot" }
+$heur = Join-Path $root 'knowledge/heuristics'
 
 # 1. Collect every backlink of the form heuristics/<file>.yaml#<anchor> in md files.
 $mdFiles = Get-ChildItem -Path (Join-Path $root 'knowledge'),(Join-Path $root 'docs') -Recurse -Filter *.md
@@ -29,7 +32,7 @@ foreach ($key in ($links.Keys | Sort-Object)) {
   if (-not $declared) { $missing += ($key + '  <- ' + (($links[$key] | Select-Object -First 2) -join ', ')) }}
 
 # 3. sources: ids must exist in bibliography.md
-$bib = Get-Content -Raw -LiteralPath (Join-Path $root 'knowledge\sources\bibliography.md')
+$bib = Get-Content -Raw -LiteralPath (Join-Path $root 'knowledge/sources/bibliography.md')
 $badSrc = @()
 foreach ($yp2 in (Get-ChildItem -Path $heur -Filter *.yaml)) {
   $t = Get-Content -Raw -LiteralPath $yp2.FullName
