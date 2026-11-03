@@ -293,7 +293,10 @@ function Test-ProtField {
 function Format-ProtValue {
     param($V)
     if ($null -eq $V) { return '<absent>' }
-    if ($V -is [array]) { return (@($V) -join ' + ') }
+    # Sorted, because GitHub does not promise an order for a list and an unsorted join made the
+    # read-back line flip between `knowledge + ddl` and `ddl + knowledge` on identical state: a
+    # value that changes when nothing changed is how a reader learns to skim past the table.
+    if ($V -is [array]) { return ((@($V) | Sort-Object) -join ' + ') }
     return "$V"
 }
 
@@ -326,11 +329,23 @@ if (-not $wikiOk)      { $Failures += 'wiki (read-back)' }
 "  merge settings:    squash=$($st.Flags.allow_squash_merge) merge=$($st.Flags.allow_merge_commit) rebase=$($st.Flags.allow_rebase_merge) deleteOnMerge=$($st.Flags.delete_branch_on_merge)$(if ($badMerge.Count) { '  <-- MISMATCH: ' + ($badMerge -join ', ') } else { '  (as intended)' })"
 # Printed as one line per field, with the value GitHub actually holds. A sentence like "protection is
 # up to date" is what hid the missing code-owner review; a table cannot hide it.
+# Fields sorted, and both columns sized from their own content: the old fixed widths put `want` in a
+# different column on every line, which is exactly how a mismatch stops being visible.
 "  branch protection:"
-foreach ($k in $wantProt.Keys) {
-    $gotV  = Get-ProtField $st.Prot $k
-    $flag  = if ($badProt -contains $k) { '   <-- NOT AS DOCUMENTED' } else { '' }
-    "    {0,-58} {1,-12} want {2}{3}" -f $k, (Format-ProtValue $gotV), (Format-ProtValue $wantProt[$k]), $flag
+$rows = @($wantProt.Keys | Sort-Object | ForEach-Object {
+    [pscustomobject]@{
+        Field = $_
+        Got   = Format-ProtValue (Get-ProtField $st.Prot $_)
+        Want  = Format-ProtValue $wantProt[$_]
+        Bad   = ($badProt -contains $_)
+    }
+})
+$wField = ($rows | ForEach-Object { $_.Field.Length } | Measure-Object -Maximum).Maximum
+$wGot   = ($rows | ForEach-Object { $_.Got.Length }   | Measure-Object -Maximum).Maximum
+foreach ($r in $rows) {
+    $line = ('    {0,-' + $wField + '}  {1,-' + $wGot + '}  want {2}') -f $r.Field, $r.Got, $r.Want
+    if ($r.Bad) { $line += '   <-- NOT AS DOCUMENTED' }
+    $line
 }
 "  topics:            $(if ($missTopics.Count) { 'missing ' + ($missTopics -join ', ') } else { $st.Topics -join ', ' })"
 "  wiki:              $(if ($wikiOk) { 'disabled' } else { 'still enabled' })"
