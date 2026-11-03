@@ -100,6 +100,22 @@ jobs:
           if ($bad) { $bad | ForEach-Object { "::error::$_" }; exit 1 }
           'Contract shape gate clean.'
 
+      - name: Vocabulary agreement (one list, every declaration)
+        shell: pwsh
+        run: |
+          # A vocabulary declared in four places is four chances to disagree, and the disagreement
+          # stays invisible until a CHECK rejects a row that a rule just fired. This compares the
+          # declarations pairwise - change kinds across the contract and the DDL, tiers across
+          # knowledge, both DDL CHECKs and the wire enum - and fails on a mismatch or on a renamed
+          # constraint (a checker that cannot tell "equal" from "not found" is not a checker).
+          $out = & ./tools/check-vocabulary.ps1 | Tee-Object -FilePath vocabulary.txt
+          $text = $out -join "`n"
+          if ($text -notmatch 'RESULT: OK') {
+            "::error::vocabulary declarations disagree, or the checker did not report a result"
+            exit 1
+          }
+          'Vocabulary gate clean.'
+
       - name: Heuristics are valid YAML with range + confidence + sources
         continue-on-error: false
         run: |

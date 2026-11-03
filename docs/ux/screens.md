@@ -33,8 +33,11 @@ Annotated specs for the four surfaces that decide whether the product works. Mic
   honest coarseness beats fake detail ([planner-engine §5](../engine/planner-engine.md)).
 - **Pull-down / "today" button** jumps to today; keyboard `←/→` move a day, `e` opens entry, `r`
   opens review. The calendar is genuinely usable from a keyboard on desktop.
-- **Review banner** sits above the grid when a review is `suggested` or `open`, with severity colour
-  and one sentence. `critical` renders as a modal on first open, then as a persistent banner.
+- **Review banner** sits above the grid when a review is `open`, with tier colour
+  (`advisory` / `constraint` / `hard-stop`) and one sentence. A `hard-stop` review renders as a modal
+  on first open, then as a persistent banner. There is no `suggested` state: a review row exists
+  because it opened, and the vocabulary is `open / accepted / rejected / deferred / expired /
+  superseded` ([contract-vocabulary.md](../engineering/contract-vocabulary.md) item 4).
 
 ### Mobile adaptations
 Month grid → swipeable week strip + a vertical "today card" (session, entry CTA, latest comment).

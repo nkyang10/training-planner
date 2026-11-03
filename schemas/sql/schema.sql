@@ -12,7 +12,13 @@
 -- -------------------------------------------------------------------------------------
 -- NAMING: two namespaces, two spellings, codegen owns the mapping
 -- -------------------------------------------------------------------------------------
---   SQL   : snake_case identifiers, snake_case enum values ('user_request', 'hard_stop')
+--   SQL   : snake_case identifiers. Enum values are not re-spelled by hand: a value keeps the
+--           spelling of the namespace that owns the word, so 'system-signal' is kebab and
+--           'session.added' is dotted here for the same reason the JSON spells them that way, while
+--           'in_app' is internal and stays snake_case. The three safety tiers are the one case where
+--           a single word is read in knowledge, in SQL, in JSON and in a comment, so it is kebab in
+--           all four ('advisory', 'constraint', 'hard-stop'; items 5 and 6 of
+--           docs/engineering/contract-vocabulary.md).
 --   JSON  : camelCase keys, kebab-case enum values ('user-request', 'hard-stop')
 -- A column that stores a JSON contract stores the JSON *inside* the column, so the wire
 -- spelling never leaks into SQL and nobody hand-maps field by field. Where a value must be
@@ -572,9 +578,9 @@ create table reviews (
   opened_by      text not null check (opened_by in
                    ('system-signal', 'user-request', 'post-race', 'post-layoff', 'phase-boundary')),
   rule_id        text,
-  severity       text not null check (severity in ('advisory', 'constraint', 'hard_stop')),
-  status         text not null default 'suggested' check (status in
-                   ('suggested', 'open', 'accepted', 'declined', 'deferred', 'expired')),
+  severity       text not null check (severity in ('advisory', 'constraint', 'hard-stop')),
+  status         text not null default 'open' check (status in
+                   ('open', 'accepted', 'rejected', 'deferred', 'expired', 'superseded')),
   evidence_snapshot jsonb not null,
   evidence_hash  text not null check (evidence_hash ~ '^sha256:[0-9a-f]{64}$'),
   options        jsonb not null default '[]',   -- review.schema.json options[]; "keep as is" first
@@ -597,15 +603,25 @@ create table reviews (
   constraint accepted_review_has_a_choice
     check ((status = 'accepted') = (chosen_option_id is not null))
 );
--- DECIDED 2026-11-04: the tier vocabulary is kebab -- advisory / constraint / hard-stop -- and the
--- two CHECKs in this file that spell it snake_case are the ones to change (next contracts DDL
--- change, item R4). The earlier note here justified snake_case by "rule 7 says SQL enum values are
--- snake_case"; rule 7 says no such thing -- it fixes *key* casing and makes kebab the default for
--- enum *values*. Measured before deciding: knowledge writes hard-stop on 20 lines across 15 files
--- and hard_stop on 5 lines in one file, so kebab is the minority of edits and needs no
--- x-verbatim-enum-values flag on the wire. `hard_stop(...)` as a verb inside a rule's `then:` stays
--- snake_case: a tier is a noun, an action is a verb, and only the tier crosses into this table
+-- DECIDED 2026-11-04 and applied in this commit: the tier vocabulary is kebab -- advisory /
+-- constraint / hard-stop -- in all four places that spell it: the knowledge `severity:` lines, the
+-- two CHECKs in this file, and the wire enum in plan-version.schema.json. The note that used to sit
+-- here justified snake_case by "rule 7 says SQL enum values are snake_case"; rule 7 says no such
+-- thing -- it fixes *key* casing and makes kebab the default for enum *values*. Measured before
+-- deciding: knowledge wrote hard-stop on 20 lines across 15 files and hard_stop on 5 lines in one
+-- file, so kebab was the minority of edits and needed no x-verbatim-enum-values flag on the wire.
+-- `hard_stop(...)` as a verb inside a rule's `then:` stays snake_case: a tier is a noun, an action
+-- is a verb, and only the tier crosses into this table
 -- (docs/engineering/contract-vocabulary.md items 5 and 6).
+-- The four declarations are compared by tools/check-vocabulary.ps1, which the `knowledge` CI job
+-- runs; it fails on a mismatch and fails loudly if either CHECK is renamed, so the equality is a
+-- check now and not a sentence. The same script compares the change-kind lists, which is item 7's
+-- gate (docs/engineering/contract-vocabulary.md row R4).
+-- The review status set is item 4's, and it is applied here too: a review row is created when it
+-- opens (so 'open' is the default, and 'suggested' is gone), the runner's refusal is spelled
+-- 'rejected' rather than 'declined', and 'superseded' exists so a newer review can replace an
+-- unanswered one without pretending the runner answered. reviews_one_decision refuses a second
+-- decision on 'accepted' or 'rejected' for the same reason it always did.
 -- opened_by holds the wire's `openedBy`, which already matched exactly. It is NOT the wire's
 -- `trigger`: that property is an object of evidence (signals, rules, grade, streak) and lands in
 -- rule_id + evidence_snapshot + evidence_hash. The name `trigger` also collides with a database
@@ -617,7 +633,7 @@ create table reviews (
 create function app.refuse_review_rewrite() returns trigger
   language plpgsql as
 $$ begin
-  if old.status in ('accepted', 'declined') then
+  if old.status in ('accepted', 'rejected') then
     raise exception 'refused: review % is already %; open a new review instead',
       old.id, old.status using errcode = 'TP405';
   end if;
@@ -631,7 +647,7 @@ create table safety_events (
   id          bigint generated always as identity,
   day         date not null,
   rule_id     text not null,
-  tier        text not null check (tier in ('advisory', 'constraint', 'hard_stop')),
+  tier        text not null check (tier in ('advisory', 'constraint', 'hard-stop')),
   scope       jsonb not null default '{}',
   acknowledged_at timestamptz,
   "override"  jsonb,          -- quoted: the column is a reserved word in every reader's head
