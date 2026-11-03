@@ -1,0 +1,12 @@
+{
+  "key": "load_srpe",
+  "userId": "3f2b6c1e-0000-4000-8000-000000000001",
+  "asOfDay": "2026-11-04",
+  "window": { "kind": "rolling", "days": 7 },
+  "value": 241.5,
+  "confidence": "medium",
+  "mayDrive": ["display"],
+  "computedAt": "2026-11-04T00:30:00.000Z",
+  "inputsHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "knowledgeHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}
