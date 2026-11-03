@@ -60,6 +60,16 @@ main
 ## Branch protection on `main`
 
 Applied by `tools/github-setup.ps1`, so the repository matches this page instead of drifting from it.
+The script finishes by reading the repository back and exits non-zero unless what GitHub *has*
+matches what the script asked for. An earlier version printed 35 `OK` lines and created nothing:
+`@Args` splatted the automatic (empty) `$args` rather than the parameter of the same name, so every
+"call" was a bare `gh` printing its own help and exiting 0. A setup script that reports intentions
+as results is worse than none, because it removes the reason to look. Claims are not evidence.
+
+**Status 2026-11-03:** labels (26) and milestones (7) are on the repository and verified by read-back.
+Branch protection and the merge-style settings are **not**: both need the token to hold
+`Administration: write`. Until they land, protection is a convention and the only hard guarantee is
+the `knowledge` CI gate.
 
 - Pull request required, 1 approving review, the `knowledge` check green and up to date, no force
   push, no delete, conversation resolved. Squash for leaves; merge commit allowed for

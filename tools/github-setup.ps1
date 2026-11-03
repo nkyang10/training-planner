@@ -13,15 +13,26 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$Failures = @()   # labels/milestones/protection that the API actually refused, counted at the end
 
 function Invoke-Gh {
-    param([string[]]$Args, [string]$Label)
+    # Splatted through $GhArgs, never $Args: `param([string[]]$Args)` binds fine as `$Args` but
+    # `@Args` splats the automatic (empty) $args, so every call became a bare `gh` that printed
+    # its own help and exited 0. The script then reported 26 labels and 7 milestones created,
+    # and none of them existed. A tool that prints OK while doing nothing is worse than one that
+    # fails: it convinced us the repository was configured. See Verify-Remote at the end.
+    param([string[]]$GhArgs, [string]$Label)
     if ($DryRun) { "DRY  $Label"; return }
     try {
-        $out = & gh @Args 2>&1
-        if ($LASTEXITCODE -ne 0) { "SKIP $Label -- $((($out | Out-String) -split "`n")[0])" }
-        else { "OK   $Label" }
-    } catch { "FAIL $Label -- $($_.Exception.Message)" }
+        $out = & gh @GhArgs 2>&1
+        if ($LASTEXITCODE -eq 0) { ('OK   ' + $Label) }
+        else {
+            $msg = (($out | Out-String) -split "`r?`n" | Where-Object { $_ } | Select-Object -First 1)
+            # An existing label or milestone is the expected outcome of a second run, not a failure.
+            if ($msg -match 'already (exists|been taken)|Validation Failed') { ('SKIP ' + $Label + ' -- ' + $msg) }
+            else { ('FAIL ' + $Label + ' -- ' + $msg); $script:Failures += $Label }
+        }
+    } catch { ('FAIL ' + $Label + ' -- ' + $_.Exception.Message); $script:Failures += $Label }
 }
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
@@ -89,13 +100,14 @@ foreach ($name in $labels.Keys) {
 }
 
 # --- Milestones (titles mirror docs/roadmap/milestones.md) -------------------
-foreach ($m in 'M0 Skeleton and contracts',
+$milestones = @('M0 Skeleton and contracts',
                'M1 Headless planner, correctness first',
                'M2 The daily loop, manual-first',
                'M3 Reviews that change the future',
                'M4 Evidence enrichment (import)',
                'M5 Autoregulation and calibration',
-               'M6 Multi-tenant hardening and launch') {
+               'M6 Multi-tenant hardening and launch')
+foreach ($m in $milestones) {
     Invoke-Gh @('api','-X', 'POST', "repos/$Repo/milestones", '-f', "title=$m", '-f', 'state=open') "milestone $m"
 }
 
@@ -129,10 +141,17 @@ if ($DryRun) {
     $json
 } else {
     try {
-        $json | & gh api -X PUT "repos/$Repo/branches/main/protection" --input -
+        $out = $json | & gh api -X PUT "repos/$Repo/branches/main/protection" --input - 2>&1
         if ($LASTEXITCODE -eq 0) { 'OK   branch protection main' }
-        else { 'SKIP branch protection -- gh api failed (needs admin on the repo)' }
-    } catch { "FAIL branch protection -- $($_.Exception.Message)" }
+        else {
+            'FAIL branch protection -- branch protection needs the token to hold Administration: write.'
+            '     Grant it at https://github.com/settings/personal-access-tokens (Repository permissions'
+            '     -> Administration -> Read and write), re-run this script, or set the same values under'
+            '     Settings -> Branches -> Add branch protection rule. Leaving this unset means a squashed'
+            '     leaf can be pushed straight to main, which is the one thing the branch model forbids.'
+            $Failures += 'branch protection main'
+        }
+    } catch { "FAIL branch protection -- $($_.Exception.Message)"; $Failures += 'branch protection main' }
 }
 
 # Which merge styles the repository allows: squash for leaves, merge commit for spine -> main,
@@ -140,6 +159,25 @@ if ($DryRun) {
 Invoke-Gh @('api','-X', 'PATCH', "repos/$Repo", '-F', 'squash_merge=true', '-F', 'merge_commit=true',
             '-F', 'rebase_merge=false', '-F', 'delete_branch_on_merge=true') 'repo merge settings'
 
-"`nNext: create the repository if it does not exist yet:"
-"  gh repo create <owner>/training-planner --private --source . --remote origin --push"
-"Then re-run this script without -DryRun."
+# --- Read the truth back ------------------------------------------------------
+# Everything above prints a claim made by the script. This section asks GitHub instead.
+# The first real run of this script printed 35 successes and created nothing, because the
+# splat in Invoke-Gh silently ran a bare `gh`; only a read-back can tell those two apart.
+if ($DryRun) { "`nDRY  verify -- nothing to read back"; return }
+Start-Sleep -Seconds 2
+$haveLabels = @(((gh api "repos/$Repo/labels?per_page=100" 2>&1 | Out-String) | ConvertFrom-Json | ForEach-Object { $_.name }))
+$haveMs = @(((gh api "repos/$Repo/milestones?state=all" 2>&1 | Out-String) | ConvertFrom-Json | ForEach-Object { $_.title }))
+$flags = ((gh api "repos/$Repo" 2>&1 | Out-String) | ConvertFrom-Json)
+$missLabels = @($labels.Keys | Where-Object { $haveLabels -notcontains $_ })
+$missMs = @($milestones | Where-Object { $haveMs -notcontains $_ })
+"`nRead back from ${Repo}:"
+"  labels missing:    $(@($missLabels).Count) of $($labels.Count) expected$(if ($missLabels) { ' -- ' + ($missLabels -join ', ') })"
+"  milestones missing: $(@($missMs).Count) of $($milestones.Count) expected$(if ($missMs) { ' -- ' + ($missMs -join ', ') })"
+"  merge settings:    squash=$($flags.allow_squash_merge) merge=$($flags.allow_merge_commit) rebase=$($flags.allow_rebase_merge) deleteOnMerge=$($flags.delete_branch_on_merge)"
+if ($Failures.Count -or $missLabels.Count -or $missMs.Count) {
+    "`nSETUP INCOMPLETE"
+    if ($Failures.Count) { "  refused: " + ($Failures -join '; ') }
+    "`nThe repository cannot be treated as configured until this prints SETUP VERIFIED."
+    exit 1
+}
+"`nSETUP VERIFIED against the live repository."
