@@ -34,9 +34,10 @@ the daily one. Detail and scales: `knowledge/feedback-and-autoregulation/daily-f
 
 | Field | Control | Why |
 |---|---|---|
-| `status` | `done / partial / skipped / rest-as-planned / did-something-else` | the only mandatory answer; drives everything |
+| `outcome` | `rest / completed / partial / skipped / missed` | the only mandatory answer; drives everything. `missed` is written by the system when a day closes with no entry |
+| `sessionTaken` | `as-prescribed / alternate / extra / none` | same tap as `outcome`, no extra cost: an alternate is a success for load but not for running ramp, and extra subtracts rather than earning credit |
 | `rpe` | 1–10 (Foster) | effort-vs-prescription gap is the single most useful daily signal |
-| `legs` | 0–5 soreness/heaviness | cheap proxy for recovery debt; trends better than sleep data |
+| `legs` | 1–5 (feathered → wrecked) | cheap proxy for recovery debt; trends better than sleep data |
 
 **Tier 2 — one optional row (collapsible, remembers last value):**
 `sleepHours`, `restingHr` (auto if a device is connected), `stress` 1–5 (life load), `mood/motivation`

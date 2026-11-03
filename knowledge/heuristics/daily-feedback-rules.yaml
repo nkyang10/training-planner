@@ -18,14 +18,14 @@ notes: >
 
 knobs:
   minimum-viable-entry:
-    value: {taps: 3, fields: [status, rpe-or-duration], must_always_save: true}
+    value: {taps: 3, fields: [outcome, rpe-or-duration], must_always_save: true}
     range: {taps: [2, 6]}
     unit: object
     confidence: high
     rationale: "daily-feedback-taxonomy.md#practice — never block a save on an optional field."
     persona_overridable: false
   pain-question-trigger:
-    value: {legs_gte: 4, rpe_gap_gte: 2, statusDetail: [pain, illness], first_time_injury_history: true}
+    value: {legs_gte: 4, rpe_gap_gte: 2, outcomeDetail: [pain, illness], first_time_injury_history: true}
     range: {legs_gte: [3, 5], rpe_gap_gte: [1, 3]}
     unit: object
     confidence: medium
@@ -81,7 +81,7 @@ rules:
     explain: "entry-low-friction"
 
   - id: no-comment-on-unlogged
-    when: "status == unlogged"
+    when: "outcome == missed"
     then: "comment(omit); nudge(per unlogged-nudge); never_invent_a_day"
     severity: constraint
     explain: "unlogged-silent"

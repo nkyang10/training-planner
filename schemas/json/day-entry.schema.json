@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://training-planner.local/schemas/json/day-entry.schema.json",
   "title": "DayEntry",
-  "description": "The runner's daily feedback — the input the whole product depends on. Design constraint: tier 1 (status, RPE, legs) is enough to generate a comment and a micro-adjustment, so the minimum viable save is 3 taps. Everything deeper is optional and progressively disclosed. Corrections never overwrite: they create a new revision with superseded_by (AGENTS.md rule 4).",
+  "description": "The runner's daily feedback — the input the whole product depends on. Design constraint: tier 1 (outcome, RPE, legs) is enough to generate a comment and a micro-adjustment, so the minimum viable save is 3 taps. Everything deeper is optional and progressively disclosed. Corrections never overwrite: they create a new revision with superseded_by (AGENTS.md rule 4). Two axes, named apart since 2026-11-04 (docs/engineering/contract-vocabulary.md item 20): `outcome` is what happened to the day, `sessionTaken` is what was actually done against the prescription. One field used to hold both, and it could not hold the runner's answers at all: five of its seven values were unstorable.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["day", "status", "revision", "tzAtEvent"],
+  "required": ["day", "outcome", "revision", "tzAtEvent"],
   "properties": {
     "entryId": { "type": "string", "format": "uuid" },
     "userId": { "type": "string", "format": "uuid", "description": "Server-assigned from session; ignored if sent by the client (RLS is the enforcement, not this field)." },
@@ -20,13 +20,17 @@
     "serverReceivedAt": { "type": ["string", "null"], "format": "date-time" },
     "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 128, "description": "Offline-safe resubmission; unique per (userId, day, revision)." },
 
-    "status": {
-      "enum": ["done", "partial", "skipped", "rest-as-planned", "alternate-taken", "extra-activity", "unlogged"],
-      "description": "'unlogged' is the system's absence marker, never submitted by a user. 'partial' means meaningful work was done but less than prescribed. 'alternate-taken' means the planned alternate was chosen — a success, not a failure."
+    "outcome": {
+      "enum": ["rest", "completed", "partial", "skipped", "missed"],
+      "description": "What happened to the day. The same five values the column stores (day_entries.outcome), because a runner's answer that no column can hold is not a feature. `rest` is a day accounted for, not a hole; `partial` is meaningful work below the prescription and is the input the next micro-adjust reads; `skipped` is the runner's own report; `missed` is the system's verdict on a day that closed with no entry, written at the day-start rollup and never submitted by a runner (formerly spelled `unlogged`). `completed` means the session was done in full - whether as prescribed, as the planned alternate, or beyond it is the next field's business."
     },
-    "statusDetail": {
+    "sessionTaken": {
+      "enum": ["as-prescribed", "alternate", "extra", "none", null],
+      "description": "What was actually done, relative to the prescription. `alternate` is a success - the planned alternate was chosen - and counts toward load but never toward running ramp maths; `extra` is more than prescribed and subtracts rather than earning credit (missed-session-rules.yaml#extra-activity-subtracts); `none` is nothing. Null when the runner did not say and the engine cannot infer it. Deliberately not folded into `outcome`: the same outcome can be a different session, and the rules need both facts separately."
+    },
+    "outcomeDetail": {
       "enum": ["illness", "travel", "work", "family", "sleep", "motivation", "pain", "weather", "equipment", "social", "just-didnt", "other", null],
-      "description": "One tap. Highest-value/lowest-cost field in the product: intent changes the decision more than the miss itself (missed-session-rules.yaml)."
+      "description": "One tap. Highest-value/lowest-cost field in the product: intent changes the decision more than the miss itself (missed-session-rules.yaml). Formerly `statusDetail`, which named a field that no longer exists. Stored in day_entries.outcome_detail, which is why the reasons are storable at all - before 2026-11-04 they had no column."
     },
     "completedKm": { "type": ["number", "null"], "minimum": 0, "maximum": 250, "description": "If omitted, the planner uses distanceKm from the linked activity, then prescribed distance with lower confidence." },
     "durationMin": { "type": ["number", "null"], "minimum": 0, "maximum": 1500 },
@@ -81,12 +85,20 @@
   },
   "allOf": [
     {
-      "if": { "properties": { "status": { "const": "skipped" } } },
-      "then": { "required": ["statusDetail"], "properties": { "statusDetail": { "type": "string" } } }
+      "if": { "properties": { "outcome": { "const": "skipped" } } },
+      "then": { "required": ["outcomeDetail"], "properties": { "outcomeDetail": { "type": "string" } } }
     },
     {
-      "if": { "properties": { "status": { "const": "partial" } } },
+      "if": { "properties": { "outcome": { "const": "partial" } } },
       "then": { "anyOf": [ { "required": ["completedKm"] }, { "required": ["durationMin"] } ] }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "completed" } }, "required": ["sessionTaken"] },
+      "then": { "properties": { "sessionTaken": { "enum": ["as-prescribed", "alternate", "extra"] } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "enum": ["rest", "skipped", "missed"] } }, "required": ["sessionTaken"] },
+      "then": { "properties": { "sessionTaken": { "const": "none" } } }
     }
   ]
 }

@@ -28,8 +28,9 @@ sources: [FB-S1, FB-S4, FB-S6, FB-S9]
 
 | # | Field | Scale | What it predicts / reveals | Cost to answer | Drives |
 |---|---|---|---|---|---|
-| 1 | Did it happen? `status` | done · partial · skipped · rest · alternate · extra | adherence, completion rate, whether the plan fits real life | 1 tap | `completion_rate`, missed-session rules |
-| 2 | `statusDetail` (why) | illness · travel · work · family · sleep · motivation · pain · weather · equipment · just-didn't | intent, risk trajectory, whether to escalate | 1 tap | `adherence_intent_mix`, review triggers |
+| 1 | Did it happen? `outcome` | rest · completed · partial · skipped · missed | adherence, completion rate, whether the plan fits real life | 1 tap | `completion_rate`, missed-session rules |
+| 1b | What was actually done? `sessionTaken` | as-prescribed · alternate · extra · none | an alternate is a success for load but not for running ramp; extra subtracts rather than earning credit | 0 extra taps (derived from the same tap as `outcome`) | missed-session rules |
+| 2 | `outcomeDetail` (why) | illness · travel · work · family · sleep · motivation · pain · weather · equipment · just-didn't | intent, risk trajectory, whether to escalate | 1 tap | `adherence_intent_mix`, review triggers |
 | 3 | `legs` | 1–5 (feathered → wrecked) | residual fatigue; the strongest single subjective predictor of a bad next session | 1 tap | micro-adjust of the next day |
 | 4 | `rpe` | 1–10 | true internal load (session-RPE load), the `rpe_gap` signal — prescription vs reality | 1 tap | `load_sRPE`, `rpe_gap`, zone calibration |
 | 5 | `pain` (site + intensity + next-morning + gait) | 0–10 + 3 booleans | injury trajectory; the only field that can trigger a **non-overridable** stop | ~10 s | safety layer, `pain_trend` |
@@ -59,8 +60,9 @@ numbers but cannot supply intent, and roughly half of amateur runners never prov
 
 ## Practice — how the form is presented
 
-1. **Three taps minimum, and it must be possible to stop there.** `status` → `rpe` → `legs`. The
-   system comment is generated from those three plus what happened.
+1. **Three taps minimum, and it must be possible to stop there.** `outcome` → `rpe` → `legs`. The
+   system comment is generated from those three plus what happened. `sessionTaken` rides along on
+   the same tap as `outcome` (a long-press offers alternate/extra) so it costs nothing.
 2. **Ask about pain only when there is something to ask.** A body map on every day trains runners to
    answer nothing; ask when a session was hard, a session was skipped for `pain`, or a pain exists in
    the last 14 days.

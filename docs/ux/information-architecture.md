@@ -50,7 +50,7 @@ One screen is the product. Everything else supports it.
 ## The day cell carries the whole argument
 
 A cell must answer, without a tap: **what was planned** (kind + one line), **what happened**
-(logged/partial/skipped/unlogged), **what the system said** (comment badge), **whether something is
+(rest/completed/partial/skipped/missed, plus whether an alternate or extra session was taken), **what the system said** (comment badge), **whether something is
 wrong** (safety chip / review dot), and **why it changed** (adjustment chip). That is five facts, so
 the cell is designed as a *stack of chips with one hero number*, not as text. Colour encodes session
 intensity class only; every non-colour state has a glyph and a word (colour-blind safety, and

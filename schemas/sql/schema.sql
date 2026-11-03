@@ -285,18 +285,34 @@ create table day_entries (
   user_id     uuid not null references users(id) on delete cascade,
   day         date not null,
   revision    smallint not null default 1 check (revision > 0),
-  status      text not null check (status in ('rest', 'completed', 'partial', 'skipped', 'missed')),
+  -- Two axes, named apart since 2026-11-04 (docs/engineering/contract-vocabulary.md item 20). One
+  -- column used to carry both and could not carry the runner's answers: the wire's seven values and
+  -- this CHECK's five shared two names, and the reason enum had no home at all.
+  --   outcome      what happened to the day
+  --   session_taken what was done against the prescription
+  outcome      text not null check (outcome in ('rest', 'completed', 'partial', 'skipped', 'missed')),
+  session_taken text check (session_taken in ('as-prescribed', 'alternate', 'extra', 'none')),
+  outcome_detail text check (outcome_detail in
+                   ('illness', 'travel', 'work', 'family', 'sleep', 'motivation', 'pain', 'weather',
+                    'equipment', 'social', 'just-didnt', 'other')),
   rpe         smallint check (rpe between 1 and 10),
-  legs        smallint check (legs between 1 and 10),
+  legs        smallint check (legs between 1 and 5),      -- the product's five-point scale, not ten
   sleep_h     numeric(4, 2) check (sleep_h between 0 and 24),
-  stress      smallint check (stress between 1 and 10),
-  mood        smallint check (mood between 1 and 10),
+  stress      smallint check (stress between 1 and 5),
+  mood        smallint check (mood between 1 and 5),
   note        text,                        -- runner-authored, health-sensitive, never copied to events
   source      text not null check (source in ('manual', 'voice', 'import')),
   superseded_by bigint,                    -- points at the row that replaced this revision
   submitted_at timestamptz not null,
   timezone    text not null,               -- the zone this day belonged to when it was written
-  primary key (user_id, day, revision)
+  primary key (user_id, day, revision),
+  -- The two axes cannot contradict each other: a day that happened as a session has a session,
+  -- and a day that did not says `none`. Written as a biconditional for the same reason
+  -- accepted_review_has_a_choice is one - it catches the case where one field was updated and the
+  -- other was not.
+  constraint outcome_and_session_agree check (
+    session_taken is null or ((outcome in ('rest', 'skipped', 'missed')) = (session_taken = 'none'))
+  )
 );
 -- The "latest" entry is a view over max(revision); an entry is never overwritten in place,
 -- so a corrected log keeps the original claim and the reason it changed.
@@ -1035,7 +1051,7 @@ begin
   set role app_user;
   perform set_config('app.user_id', a::text, true);
   insert into users (id, email, tz) values (a, 'a@example.test', 'Asia/Taipei');
-  insert into day_entries (user_id, day, status, source, submitted_at, timezone)
+  insert into day_entries (user_id, day, outcome, source, submitted_at, timezone)
     values (a, date '2026-11-03', 'completed', 'manual', now(), 'Asia/Taipei');
   -- One row in the log too, because step 4 needs a row to try to rewrite. An assertion that
   -- updates zero rows succeeds whether or not the guard exists, and passes for the wrong reason
@@ -1043,10 +1059,10 @@ begin
   insert into events (user_id, type, actor, occurred_at, training_day, timezone,
                       idempotency_key, payload)
     values (a, 'dayEntry.submitted', 'runner', now(), date '2026-11-03', 'Asia/Taipei',
-            'leak-test-seed', '{"day": "2026-11-03", "status": "completed"}');
+            'leak-test-seed', '{"day": "2026-11-03", "outcome": "completed"}');
   perform set_config('app.user_id', b::text, true);
   insert into users (id, email, tz) values (b, 'b@example.test', 'Asia/Taipei');
-  insert into day_entries (user_id, day, status, source, submitted_at, timezone)
+  insert into day_entries (user_id, day, outcome, source, submitted_at, timezone)
     values (b, date '2026-11-03', 'rest', 'manual', now(), 'Asia/Taipei');
 
   -- 2. A sees exactly their own row: a count of one, not an error. 404 not 403 (ADR-0002) --
@@ -1059,7 +1075,7 @@ begin
 
   -- 3. A cannot write B's row: the insert is refused by WITH CHECK.
   begin
-    insert into day_entries (user_id, day, status, source, submitted_at, timezone)
+    insert into day_entries (user_id, day, outcome, source, submitted_at, timezone)
       values (b, date '2026-11-03', 'completed', 'manual', now(), 'Asia/Taipei');
     raise exception 'leak test: cross-tenant insert should have been refused';
   exception when insufficient_privilege or check_violation then
@@ -1112,7 +1128,7 @@ begin
   set role app_user;
   perform set_config('app.user_id', c::text, true);
   insert into users (id, email, tz) values (c, 'c@example.test', 'Asia/Taipei');
-  insert into day_entries (user_id, day, status, source, submitted_at, timezone)
+  insert into day_entries (user_id, day, outcome, source, submitted_at, timezone)
     values (c, date '2026-11-03', 'rest', 'manual', now(), 'Asia/Taipei');
 
   --    6a. First, that a runner cannot delete their own past entry. Rule 4 protects the meaning
