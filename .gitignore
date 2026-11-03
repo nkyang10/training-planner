@@ -19,7 +19,10 @@ secrets/
 # local data: a real athlete's data never enters the repository, not even a dump
 *.sqlite
 *.db
-data/
+/data/
+# Anchored on purpose. An unanchored `data/` also matched `docs/data/`, and two design
+# documents that seven other files cite were silently never committed while every local
+# audit still said "0 dead links", because the files existed on the author's laptop.
 fixtures/**/real/**
 *.csv
 *.tcx

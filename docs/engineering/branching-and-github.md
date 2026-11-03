@@ -59,11 +59,47 @@ main
 
 ## Branch protection on `main`
 
-- Pull request required; `knowledge` and `app` checks pass; branch up to date; no force push, no
-  delete, linear history via squash.
-- **Two reviews, one from `@/safety`,** for: `knowledge/heuristics/safety-hard-stops.yaml`,
-  `docs/engine/safety-layer.md`, `schemas/json/**`, `docs/adr/**`, `packages/planner-core/src/safety/**`,
-  and any change adding a number to a file whose `provenance` cites a grade-C or grade-D source.
+Applied by `tools/github-setup.ps1`, so the repository matches this page instead of drifting from it.
+The script finishes by reading the repository back and exits non-zero unless what GitHub *has*
+matches what the script asked for. An earlier version printed 35 `OK` lines and created nothing:
+`@Args` splatted the automatic (empty) `$args` rather than the parameter of the same name, so every
+"call" was a bare `gh` printing its own help and exiting 0. A setup script that reports intentions
+as results is worse than none, because it removes the reason to look. Claims are not evidence.
+
+Two more untruths the read-back had to be taught to survive. `rebase_merge` is not a field of
+`PATCH /repos`: GitHub answered 200 and ignored it, while the real name is `allow_rebase_merge`. And
+repository settings are eventually consistent -- immediately after a successful PATCH the read still
+said `rebase=True`, and three seconds later it said `False`. So the verification polls until GitHub
+agrees or 60 seconds pass, and creation is preceded by a GET, because a duplicate `POST` reports
+only `Validation Failed (HTTP 422)` with the reason -- *already exists* -- buried in the body.
+A single read produces false alarms, and a tool that cries wolf gets ignored.
+
+**Status 2026-11-03, read back from the API:** labels (26), milestones (7), branch protection
+(`knowledge` required and strict, 1 approving review, stale reviews dismissed), merge styles
+(squash and merge commit on, rebase off, delete branch on merge), description, topics, wiki off.
+`tools/github-setup.ps1` prints `SETUP VERIFIED` for all of it; re-run it any time this page changes.
+
+`enforce_admins` is **off** (next section), so this constrains every actor except the repository
+owner's own token, which can still merge anything. The `knowledge` CI gate is therefore the guarantee
+that applies to the owner as well -- which is why it has been green and required since day one, and
+why no branch is treated as configured until the setup script says so.
+
+- Pull request required, 1 approving review, the `knowledge` check green and up to date, no force
+  push, no delete, conversation resolved. Squash for leaves; merge commit allowed for
+  `spine/* -> main`, so a milestone stays bisectable.
+- Codeowner review required (`.github/CODEOWNERS`). The safety band --
+  `knowledge/heuristics/safety-hard-stops.yaml`, `docs/engine/safety-layer.md`,
+  `docs/engine/review-trigger-policy.md`, `schemas/**`, `docs/adr/**`,
+  `packages/planner-core/src/safety/**` -- cannot merge without the safety seat.
+- **The second review on the safety band is not something branch protection can express**: an
+  approval count is per branch, not per path. Enforceable today is the codeowner requirement above;
+  enforceable with one small CI step is counting approvals through the API on PRs that touch those
+  paths. Until that step exists the second review is a human rule, stated in the PR template, and we
+  call it that instead of pretending the setting does it.
+- `enforce_admins` is **off** while one person holds every seat. With it on, a solo owner cannot
+  approve their own PR and begins bypassing protections by hand -- which is worse than the setting
+  never existing. Flip it on the day a second maintainer appears: that is when it stops being
+  theatre.
 - Accepted ADRs are **never edited** -- supersede with `docs/adr/NNNN-*.md`
   (`AGENTS.md` Conventions), and the CI step for `docs/adr/` fails on a modified non-draft ADR.
 - Merge commit is allowed only for `spine/* -> main`, so a milestone remains bisectable.
@@ -74,6 +110,9 @@ main
 | --- | --- |
 | `tools/audit-links.ps1` prints zeros | a doc that cites a knob nobody declared; a source id that does not exist |
 | YAML/JSON parse | the corpus is a build input; a stray quote breaks every consumer |
+| No personal absolute path in `tools/` | the audit that hardcoded the machine it was written on: green on a laptop, red on the runner (happened 2026-11-03) |
+| Every link target is **committed**, with the right case | an unanchored `data/` in `.gitignore` hid `docs/data/` from git; seven documents cited it and the local audit still said zero (happened 2026-11-03) |
+| Every claim a setup tool makes is **read back by value, and polled** | three separate lies in one afternoon: 35 printed successes that created nothing (`@Args` splatted the empty automatic `$args`); a `PATCH` containing the invented field `rebase_merge`, answered 200 with no change; and a single read that returned the pre-patch value because settings are eventually consistent (all 2026-11-03) |
 | `last_reviewed` age + `status` values | knowledge rotting invisibly while code ships |
 | Golden plans (`eval/golden-plans/`) | a "small tweak" that quietly rewrites 40 km of someone's week |
 | `en` vs `zh-Hant` key parity | half the users getting fallback strings in their system comment |
