@@ -31,7 +31,7 @@ A comment is a pure function of `FactObject` + `locale` + `persona` + `narrator`
 (template | LLM-styled). It must contain, in order:
 
 1. **Acknowledge** — the fact, without evaluation. "Four kilometres, felt easy." Never "only", never
-   "great job". The runner's own `statusDetail` is quoted back as context, not judged.
+   "great job". The runner's own `outcomeDetail` is quoted back as context, not judged.
 2. **Interpret** — the mechanism, at most one, always with the window and confidence:
    "two sessions in a row at RPE 7 when I prescribed 5 — your easy pace is probably too fast, or the
    week is hard." If evidence is insufficient, say so in the sentence: "I can't tell which yet."

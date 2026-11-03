@@ -69,49 +69,49 @@ knobs:
 
 rules:
   - id: never-make-up
-    when: "status in [skipped, partial, unlogged]"
+    when: "outcome in [skipped, partial, missed]"
     then: "no_session_may_be_added; future_days_load_unchanged_or_lower"
     severity: constraint
     explain: "no-compensatory-volume"
 
   - id: missed-easy-delete
-    when: "status == skipped and planned.class == easy"
+    when: "outcome == skipped and planned.class == easy"
     then: "delete(missed); keep_remaining_week_as_written"
     severity: advisory
     explain: "easy-miss-deleted"
 
   - id: missed-quality-swap-if-legal
-    when: "status == skipped and planned.class == quality and exists(slot where spacing_rules_hold and not adjacent_to_long_run)"
+    when: "outcome == skipped and planned.class == quality and exists(slot where spacing_rules_hold and not adjacent_to_long_run)"
     then: "swap(missed -> nearest_legal_slot); record(reason: missed-quality-swap)"
     severity: advisory
     explain: "quality-miss-swapped"
 
   - id: missed-quality-drop-if-illegal
-    when: "status == skipped and planned.class == quality and no legal slot exists"
+    when: "outcome == skipped and planned.class == quality and no legal slot exists"
     then: "delete(missed); keep_other_stimulus_in_week; flag_review_candidate_if(count(quality_misses, 7d) >= 2)"
     severity: advisory
     explain: "quality-miss-dropped"
 
   - id: alternate-counts-as-met
-    when: "status == alternate-taken"
+    when: "sessionTaken == alternate"
     then: "week_completion_counts_toward(met); exclude_from(running_load_series); no_extra_session"
     severity: advisory
     explain: "alternate-counts-met"
 
   - id: extra-activity-subtracts
-    when: "status == extra-activity and gap_to_next_quality_h <= extra_activity_stack_guard_h"
+    when: "sessionTaken == extra and gap_to_next_quality_h <= extra_activity_stack_guard_h"
     then: "downgrade(next_quality -> easy, effort_band); record(reason: unplanned-load)"
     severity: advisory
     explain: "extra-activity-protects-quality"
 
   - id: intent-rest-is-plan-evidence
-    when: "status == skipped and profile.intent.restRegistered == true"
+    when: "outcome == skipped and profile.intent.restRegistered == true"
     then: "no_pushback_language; flagReview('plan-too-big'); delete(missed)"
     severity: advisory
     explain: "rest-intent-honoured"
 
   - id: motivation-miss-shrinks-friction
-    when: "statusDetail in [just-didnt, motivation, sleep] and misses(14d) >= 2"
+    when: "outcomeDetail in [just-didnt, motivation, sleep] and misses(14d) >= 2"
     then: "reduce(next_session.duration_pct 80); move(next_session.slot -> profile.preferredSlot); no_volume_change"
     severity: advisory
     explain: "friction-reduced"
@@ -123,7 +123,7 @@ rules:
     explain: "streak-reanchor"
 
   - id: unlogged-is-not-zero
-    when: "status == unlogged"
+    when: "outcome == missed"
     then: "load_series_treat(missing); week_mark(incomplete); disable(load_derived_rules_when_days >= 3); comment(gathering)"
     severity: constraint
     explain: "unlogged-missing-not-zero"

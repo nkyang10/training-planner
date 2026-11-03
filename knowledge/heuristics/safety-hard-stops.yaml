@@ -45,7 +45,7 @@ rules:
     note: "First sentence of the comment is the instruction. No training content in the same comment."
 
   - id: fever-or-below-neck-illness
-    when: "wellness.illnessSymptoms in [fever, below-neck, chest, GI] and status != rest-as-planned"
+    when: "wellness.illnessSymptoms in [fever, below-neck, chest, GI] and outcome != rest"
     then: "hard_stop(today); downgrade(all_quality_within_next_3d); resume_rule('48h-symptom-free-easy-first')"
     severity: hard-stop
     non_overridable: true
