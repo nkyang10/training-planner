@@ -58,7 +58,8 @@ the check, as this section promised it would.
    declare themselves with `x-verbatim-enum-values` so the exception is visible inside the contract
    rather than being silent drift.
     The rule fixes *how* to spell a name once a namespace is chosen; it cannot decide *which* namespace
-    a name belongs to, and on 2026-11-04 the four namespaces disagreed in fourteen measured places: the
+    a name belongs to, and on 2026-11-04 the four namespaces disagreed in seventeen measured places —
+    fourteen of naming, three of what a control actually enforces: the
     safety tier spelling, the name of a diff's change kind, what a day's status means. Those
     disagreements are recorded with their evidence and decided once in
     [contract-vocabulary.md](../docs/engineering/contract-vocabulary.md), which also lists what no gate

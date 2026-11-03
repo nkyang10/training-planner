@@ -18,7 +18,7 @@ CI proves it by applying it to a real Postgres 16 and reading the isolation clai
 users(id)`, an RLS policy, and `created_at timestamptz default now()`.
 
 **Read the tables below as the *reasons*, not as the definition.** They used to be a copy of the
-column lists, and they rotted within days of the DDL existing: fourteen such disagreements, each
+column lists, and they rotted within days of the DDL existing: seventeen such disagreements, each
 measured and decided in
 [contract-vocabulary.md](../engineering/contract-vocabulary.md). Where a name here and a name in the DDL differ, the
 DDL is wrong *only if* that page says so — otherwise this page is wrong.
@@ -68,7 +68,7 @@ DDL is wrong *only if* that page says so — otherwise this page is wrong.
 
 | Constraint | Encodes |
 |---|---|
-| `events`, `day_entries` (supersede pattern), `plan_versions`, `system_comments` have no UPDATE/DELETE grants | "never change the past" (AGENTS rule 4) at the permission layer, not in code review |
+| `events`, `day_entries`, `system_comments` have **no `UPDATE`/`DELETE` policy** *and* a `refuse_mutation` trigger; `plan_versions` has update and delete policies and is held instead by `plan_versions_immutable` (`before update`, once the version is `active`) | "never change the past" (AGENTS rule 4). The three facts are append-only by permission — a draft plan version is still editable, an `active` one is not |
 | `day_entries (user_id, day, revision)` unique | append-only revisions per day |
 | `activities (user_id, provider, provider_activity_id, revision)` unique | idempotent sync |
 | `session_overrides` FK to a *future* `session_occurrences.day` (checked in a trigger) | micro-adjustments cannot reach back in time |
