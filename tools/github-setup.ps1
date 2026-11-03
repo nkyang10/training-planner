@@ -107,7 +107,9 @@ $protection = [ordered]@{
         strict = $true
         contexts = @('knowledge')
     }
-    enforce_admins = $true
+    # Off while one person holds every seat: with it on, a solo owner cannot approve their own PR
+    # and starts bypassing protections by hand. Flip to $true when a second maintainer appears.
+    enforce_admins = $false
     required_pull_request_reviews = @{
         required_approving_review_count = 1
         dismiss_stale_reviews = $true

@@ -59,11 +59,24 @@ main
 
 ## Branch protection on `main`
 
-- Pull request required; `knowledge` and `app` checks pass; branch up to date; no force push, no
-  delete, linear history via squash.
-- **Two reviews, one from `@/safety`,** for: `knowledge/heuristics/safety-hard-stops.yaml`,
-  `docs/engine/safety-layer.md`, `schemas/json/**`, `docs/adr/**`, `packages/planner-core/src/safety/**`,
-  and any change adding a number to a file whose `provenance` cites a grade-C or grade-D source.
+Applied by `tools/github-setup.ps1`, so the repository matches this page instead of drifting from it.
+
+- Pull request required, 1 approving review, the `knowledge` check green and up to date, no force
+  push, no delete, conversation resolved. Squash for leaves; merge commit allowed for
+  `spine/* -> main`, so a milestone stays bisectable.
+- Codeowner review required (`.github/CODEOWNERS`). The safety band --
+  `knowledge/heuristics/safety-hard-stops.yaml`, `docs/engine/safety-layer.md`,
+  `docs/engine/review-trigger-policy.md`, `schemas/**`, `docs/adr/**`,
+  `packages/planner-core/src/safety/**` -- cannot merge without the safety seat.
+- **The second review on the safety band is not something branch protection can express**: an
+  approval count is per branch, not per path. Enforceable today is the codeowner requirement above;
+  enforceable with one small CI step is counting approvals through the API on PRs that touch those
+  paths. Until that step exists the second review is a human rule, stated in the PR template, and we
+  call it that instead of pretending the setting does it.
+- `enforce_admins` is **off** while one person holds every seat. With it on, a solo owner cannot
+  approve their own PR and begins bypassing protections by hand -- which is worse than the setting
+  never existing. Flip it on the day a second maintainer appears: that is when it stops being
+  theatre.
 - Accepted ADRs are **never edited** -- supersede with `docs/adr/NNNN-*.md`
   (`AGENTS.md` Conventions), and the CI step for `docs/adr/` fails on a modified non-draft ADR.
 - Merge commit is allowed only for `spine/* -> main`, so a milestone remains bisectable.
