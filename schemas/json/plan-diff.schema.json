@@ -5,47 +5,47 @@
   "description": "The stored difference between two immutable plan versions (docs/adr/0004). A diff is the only way the UI explains a change, so every field a runner must see is required here rather than composed at render time. Produced by the engine, never by the LLM.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "diff_id", "user_id", "from_version", "to_version", "created_at_day", "changes", "change_count_within_limit"],
+  "required": ["schemaVersion", "diffId", "userId", "fromVersion", "toVersion", "createdAtDay", "changes", "changeCountWithinLimit"],
   "properties": {
-    "schema_version": { "const": 1 },
-    "diff_id": { "type": "string", "format": "uuid" },
-    "user_id": { "type": "string", "format": "uuid", "description": "Every table and every document carries user_id (AGENTS rule 7); RLS is the enforcement, this is the check." },
-    "from_version": { "type": "string", "format": "uuid", "description": "The version the runner was already shown. Never mutated." },
-    "to_version": { "type": "string", "format": "uuid" },
-    "created_at_day": { "type": "string", "format": "date", "description": "Training day (04:00 local boundary) the diff was generated in, not a wall-clock instant, because the planner is pure (AGENTS rule 1)." },
-    "first_touched_day": { "type": "string", "format": "date", "description": "Earliest day any change in this diff affects. Must be strictly later than the last completed day: a diff that touches the past is rejected at write time (AGENTS rule 4)." },
+    "schemaVersion": { "const": 1 },
+    "diffId": { "type": "string", "format": "uuid" },
+    "userId": { "type": "string", "format": "uuid", "description": "Every table and every document carries user_id (AGENTS rule 7); RLS is the enforcement, this is the check." },
+    "fromVersion": { "type": "string", "format": "uuid", "description": "The version the runner was already shown. Never mutated." },
+    "toVersion": { "type": "string", "format": "uuid" },
+    "createdAtDay": { "type": "string", "format": "date", "description": "Training day (04:00 local boundary) the diff was generated in, not a wall-clock instant, because the planner is pure (AGENTS rule 1)." },
+    "firstTouchedDay": { "type": "string", "format": "date", "description": "Earliest day any change in this diff affects. Must be strictly later than the last completed day: a diff that touches the past is rejected at write time (AGENTS rule 4)." },
     "changes": {
       "type": "array",
       "minItems": 0,
       "maxItems": 2,
-      "description": "Two changes per review, maximum; prefer one (AGENTS rule 5). maxItems is the hard clamp, change_count_within_limit is the same check asserted by the engine so a bad bundle cannot slip a third change through silently.",
+      "description": "Two changes per review, maximum; prefer one (AGENTS rule 5). maxItems is the hard clamp, changeCountWithinLimit is the same check asserted by the engine so a bad bundle cannot slip a third change through silently.",
       "items": { "$ref": "#/$defs/change" }
     },
-    "change_count_within_limit": { "const": true },
-    "frozen_days": {
+    "changeCountWithinLimit": { "const": true },
+    "frozenDays": {
       "type": "integer",
       "minimum": 0,
       "maximum": 7,
       "description": "Days inside the freeze window that a review deliberately did not touch (knowledge/heuristics/review-triggers.yaml#freeze_days)."
     },
-    "knowledge_bundle_version": { "type": "string", "description": "Which heuristics produced this diff. Required for explaining a plan months later." }
+    "knowledgeBundleVersion": { "type": "string", "description": "Which heuristics produced this diff. Required for explaining a plan months later." }
   },
   "$defs": {
     "change": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "day", "before_summary", "after_summary", "reason", "trigger", "expected_cost", "knobs_used"],
+      "required": ["kind", "day", "beforeSummary", "afterSummary", "reason", "trigger", "expectedCost", "knobsUsed"],
       "properties": {
-        "kind": { "enum": ["replace_session", "move_session", "drop_session", "change_dose", "swap_type", "change_rest_day", "reband_paces"], "description": "Structural verbs only. 'add_volume_to_make_up_missed_work' is absent on purpose (knowledge/heuristics/missed-session-rules.yaml)." },
+        "kind": { "enum": ["replace-session", "move-session", "drop-session", "change-dose", "swap-type", "change-rest-day", "reband-paces"], "description": "Structural verbs only. 'add-volume-to-make-up-missed-work' is absent on purpose (knowledge/heuristics/missed-session-rules.yaml)." },
         "day": { "type": "string", "format": "date" },
-        "before_summary": { "type": "string", "maxLength": 240, "description": "Engine-authored plain text; the message catalogue, not the LLM." },
-        "after_summary": { "type": "string", "maxLength": 240 },
+        "beforeSummary": { "type": "string", "maxLength": 240, "description": "Engine-authored plain text; the message catalogue, not the LLM." },
+        "afterSummary": { "type": "string", "maxLength": 240 },
         "reason": { "type": "string", "maxLength": 400, "description": "The mechanism in one sentence, in the runner's own terms where possible." },
         "trigger": { "type": "string", "description": "Id of the signal or feedback that opened this change (see review.schema.json#trigger)." },
-        "expected_cost": { "type": "string", "maxLength": 200, "description": "What the runner gives up. A change with no stated cost is a build error (docs/ux/review-flow.md)." },
-        "expected_benefit": { "type": "string", "maxLength": 200 },
-        "knobs_used": { "type": "array", "items": { "type": "string" }, "description": "heuristic ids that produced the numbers, so the UI can say 'this came from your plan rules, not from a model'." },
-        "safety_origin": { "type": "boolean", "description": "True when a safety rule caused this change. Safety changes may only subtract (AGENTS rule 3); a validator checks kind against the subtract-only verb set.", "default": false }
+        "expectedCost": { "type": "string", "maxLength": 200, "description": "What the runner gives up. A change with no stated cost is a build error (docs/ux/review-flow.md)." },
+        "expectedBenefit": { "type": "string", "maxLength": 200 },
+        "knobsUsed": { "type": "array", "items": { "type": "string" }, "description": "heuristic ids that produced the numbers, so the UI can say 'this came from your plan rules, not from a model'." },
+        "safetyOrigin": { "type": "boolean", "description": "True when a safety rule caused this change. Safety changes may only subtract (AGENTS rule 3); a validator checks kind against the subtract-only verb set.", "default": false }
       }
     }
   }

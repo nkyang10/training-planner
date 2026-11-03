@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://training-planner.local/schemas/athlete-profile.schema.json",
+  "$id": "https://training-planner.local/schemas/json/athlete-profile.schema.json",
   "title": "AthleteProfile",
   "description": "Who the runner is. Slowly changing and fully versioned: every edit becomes a profile_revision event, because plan generation must remain explainable months later. Paces and fitness are NOT stored here — they are derived evidence with their own confidence and expiry (pace_estimates, metric-definitions.md).",
   "type": "object",

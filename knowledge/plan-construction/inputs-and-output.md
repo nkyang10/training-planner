@@ -61,6 +61,16 @@ the plan schedules a test workout in week 2 rather than a quality session at inv
 
 ### Output contract
 
+> **Names below are domain names from the first draft and are stale as wire names.** JSON contracts are
+> camelCase and [plan-version.schema.json](../../schemas/json/plan-version.schema.json) is the
+> authority for what a stored plan version contains; SQL columns are snake_case; codegen owns the
+> mapping ([schemas/README.md](../../schemas/README.md) rule 7). Two structural questions are still
+> open and this sketch is *not* evidence for either answer: whether `phases[]` and `weeks[]` are stored
+> inside a version or are derived views over `sessions[]` (the table inventory keeps them as separate
+> tables, [data-model.md](../../docs/data/data-model.md)), and whether weekly targets are recorded in
+> metres or kilometres — the table says `volume_m`, the coaching literature and this file say km, and
+> a unit that only exists in a column name is how a 10× bug ships.
+
 ```
 Plan
   meta: {plan_id, generated_at, inputs_hash, knowledge_bundle_version, model, assumptions[], warnings[]}

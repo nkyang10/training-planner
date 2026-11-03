@@ -1,26 +1,32 @@
-# Owner review is required, not courtesy. Two approvals (one from @/safety) for the safety band.
-# Replace the teams below with real handles before the first merge; keep the paths accurate.
+# Owner review is required, not courtesy. The safety band needs a second, separate approval.
+#
+# These are SEATS, not people. Today one human holds every seat, so every line names
+# @nkyang10 and the review requirement is real but satisfiable. When a second person joins,
+# replace the handle on the affected band with a team and nothing else changes:
+#   @nkyang10        ->  @nkyang10/safety     (or @org/safety)
+# A band whose owner cannot be resolved is worse than no CODEOWNERS: GitHub silently stops
+# requiring it, and the safety layer looks protected when it is not.
 
 # Safety band: subtract-only, referrals, contracts, irreversible decisions
-/knowledge/heuristics/safety-hard-stops.yaml   @/safety
-/knowledge/risk-and-safety/                    @/safety
-/docs/engine/safety-layer.md                   @/safety
-/docs/engine/review-trigger-policy.md          @/safety
-/schemas/                                      @/safety @/data
-/docs/adr/                                     @/safety @/architecture
-/packages/planner-core/src/safety/             @/safety
+/knowledge/heuristics/safety-hard-stops.yaml   @nkyang10
+/knowledge/risk-and-safety/                    @nkyang10
+/docs/engine/safety-layer.md                   @nkyang10
+/docs/engine/review-trigger-policy.md          @nkyang10
+/schemas/                                      @nkyang10
+/docs/adr/                                     @nkyang10
+/packages/planner-core/src/safety/             @nkyang10
 
 # The knob layer: every number in the product
-/knowledge/heuristics/                         @/knowledge @/architecture
+/knowledge/heuristics/                         @nkyang10
 
 # The planner and its expectations
-/packages/planner-core/                        @/architecture
-/eval/                                         @/architecture @/knowledge
+/packages/planner-core/                        @nkyang10
+/eval/                                         @nkyang10
 
 # Reasoning corpus
-/knowledge/                                    @/knowledge
-/research/                                     @/knowledge
+/knowledge/                                    @nkyang10
+/research/                                     @nkyang10
 
 # Per-user isolation
-/schemas/sql/                                  @/data
-/apps/api/                                     @/data @/client
+/schemas/sql/                                  @nkyang10
+/apps/api/                                     @nkyang10
