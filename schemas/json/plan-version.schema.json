@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://training-planner.local/schemas/json/plan-version.schema.json",
+  "title": "PlanVersion",
+  "description": "One immutable generated plan version: every training day the engine prescribed for one runner between firstDay and lastDay, plus what it takes to re-explain that prescription months later - the planner build, the knowledge bundle, the input hash, the rules that fired, and the knob values the engine refused. Written once and never updated in place: completed days are append-only facts (AGENTS rule 4), and a version whose past could be edited could not be replayed, diffed, or defended in a bug report, so every later change is a new version that supersedes this one (ADR-0004). Lifecycle (draft, active, superseded, archived) lives on the SQL row, not in this payload, so nothing mutable is stored inside an immutable document.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "versionId", "planId", "userId", "supersedesVersionId", "generatedBy", "generatedAtDay", "firstDay", "lastDay", "plannerVersion", "knowledgeBundleVersion", "inputsHash", "sessions", "appliedRules", "clampedKnobs", "assumptions", "warnings"],
+  "properties": {
+    "schemaVersion": { "const": 1, "description": "Payload shape version. Additive changes only (schemas/README.md rule 2); a reader that does not know a field ignores it instead of guessing." },
+    "versionId": { "type": "string", "format": "uuid", "description": "Identity of this version. One row in plan_versions; referenced by plan_diffs, reviews, and day entries." },
+    "planId": { "type": "string", "format": "uuid", "description": "Identity of the version chain, shared by every version generated for one goal anchored on one priority race. A changed goal or a re-anchored race starts a new chain rather than superseding across chains, so 'the plan before the wedding' and 'the plan for spring' are never diffed as one history." },
+    "userId": { "type": "string", "format": "uuid", "description": "Server-assigned from session; ignored if sent by the client. Row-level security is the enforcement, not this field (AGENTS rule 7)." },
+    "supersedesVersionId": { "type": ["string", "null"], "format": "uuid", "description": "The version this one replaces, or null for the first version of a chain. Stored as plan_versions.parent_version_id (ADR-0004): the same edge seen from the child, which is the direction a reader of this document actually needs." },
+    "generatedBy": { "enum": ["initial-build", "rolling-refine", "micro-adjust", "review-accepted"], "description": "Why this version exists. initial-build = first plan after onboarding or a new chain; rolling-refine = the nightly or weekly job refined unexecuted detail inside the content horizon and must stay diff-visible in the weekly summary; review-accepted = the runner chose an option in a review (ADR-0005); micro-adjust = the rare tomorrow-change that had to become a version. Ordinary micro-adjustments and inside-the-freeze-window safety downgrades do NOT create a version: they are session_overrides rows layered on this one (ADR-0004), and a structural safety change goes through a review, arriving here as review-accepted." },
+    "generatedAtDay": { "type": "string", "format": "date", "description": "Training day the generation ran in, not a wall-clock instant: the planner is pure and takes `clock` as an argument, so replaying it means passing the same day (AGENTS rule 1). Also the line between fact and prescription - a day at or before this date may carry an executed status, a later day may not." },
+    "firstDay": { "type": "string", "format": "date", "description": "First training day covered. sessions[] is dense from here to lastDay; the UI never has to infer a gap." },
+    "lastDay": { "type": "string", "format": "date", "description": "Last training day covered, normally the day after the priority race or the end of the recovery block. Must be on or after firstDay; the engine rejects a version whose span is inverted rather than emitting an empty plan." },
+    "timeZone": { "type": "string", "minLength": 1, "maxLength": 64, "description": "IANA zone the days were laid out in, copied from the user at generation time. Sessions store bare dates, so a later device in another zone cannot move them (planner-engine.md sec. 6)." },
+    "dayStartHour": { "type": "integer", "minimum": 0, "maximum": 23, "description": "The 04:00-style boundary this version's days were cut at (users.day_start_hour). Stored per version because a boundary change re-buckets past sessions and would otherwise silently rewrite adherence." },
+    "plannerVersion": { "type": "string", "minLength": 1, "maxLength": 64, "description": "Version of packages/planner-core that produced this payload. Together with knowledgeBundleVersion and inputsHash it makes a bug report reproducible: same build, same bundle, same inputs, same plan." },
+    "knowledgeBundleVersion": { "type": "string", "minLength": 8, "maxLength": 128, "description": "The frozen knowledge bundle (heuristics, pace and zone tables, workout-library templates) this version was built with; stored as plan_versions.knowledge_hash. When a version names a bundle that no longer exists, the version stays readable - days, doses, and recorded reasons are still shown exactly as they were issued - but regenerating from it is refused and the UI says the knowledge is no longer available rather than quietly rebuilding it with today's rules." },
+    "inputsHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "sha256 of the canonical bytes of exactly the inputs the engine consumed, as sha256:<hex>. Canonical form, spelled out so two implementations agree byte for byte: object keys sorted by Unicode code point, recursively; no insignificant whitespace and no trailing comma; output encoded UTF-8 with no BOM; integers rendered unquoted with no fraction part; non-integers with exactly 2 fraction digits, fixed notation, no exponent, no locale separators, and negative zero as 0 (inputs are already rounded to 5 sec/km and 0.1 km by planner-engine.md sec. 6, so 2 digits loses nothing); NaN and Infinity are unencodable and are a generation error, not a value; arrays keep the order they arrived in and are never sorted, because the order of availability.days or fixedCalendar is itself part of the input; dates are ISO-8601 calendar dates and never an instant; clock and seed are hashed as the values supplied, never as the host's current time (AGENTS rule 1: same inputs, byte-identical plan)." },
+    "sessions": { "type": "array", "minItems": 1, "maxItems": 740, "items": { "$ref": "#/$defs/session" }, "description": "One entry per training day from firstDay to lastDay, inclusive, ascending by day, exactly one per day - rest days included, because rest is a prescription and an absent entry means something else entirely. A session the repair pass deletes leaves its day as prescribed rest, never as a hole in the grid (planner-engine.md Pass 7)." },
+    "appliedRules": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/appliedRule" }, "description": "Every rule that touched this plan, in evaluation order, so the whole version can be narrated without re-running the engine. An empty array is honest only for a trivially small plan; a full build always says what it did." },
+    "clampedKnobs": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/clampedKnob" }, "description": "Every knob value the engine refused to use as sent. This array exists so 'the engine quietly used a sane default' is distinguishable from 'the caller asked for a 40 km threshold session'; an empty array is a claim that nothing arrived out of range." },
+    "assumptions": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/note" }, "description": "What the engine assumed because an input was missing or thin - no race evidence, unknown sleep, an unverified self-report. Surfaced as a plan-level note (knowledge/plan-construction/inputs-and-output.md): a plan states its own assumptions instead of presenting a guess as a fact." },
+    "warnings": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/note" }, "description": "What the engine could not honour: an infeasible goal, a preference it had to override, a race date it is sacrificing. Never softened into silence and never worded as blame (docs/ux/feedback-microcopy.md)." }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "generatedBy": { "enum": ["rolling-refine", "micro-adjust", "review-accepted"] } }, "required": ["generatedBy"] },
+      "then": { "properties": { "supersedesVersionId": { "type": "string" } } }
+    },
+    {
+      "if": { "properties": { "generatedBy": { "const": "initial-build" } }, "required": ["generatedBy"] },
+      "then": { "properties": { "supersedesVersionId": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One prescribed training day. Rest is a session: it was placed on purpose, and the day cell has to be able to say 'rest' rather than 'nothing scheduled'.",
+      "required": ["day", "kind", "status", "restDay", "summaryText"],
+      "properties": {
+        "day": { "type": "string", "format": "date", "description": "Training day per calendar-and-time.md#1: the calendar date whose dayStartHour boundary contains the session, never a day derived from UTC." },
+        "kind": { "enum": ["rest", "recovery", "easy", "strides", "long", "hills", "tempo", "vo2max", "mp", "cross-training", "strength", "test", "race"], "description": "Session kind, kebab-case on the wire, taken from the engine's kind list (planner-engine.md sec. 2) with the workout-library file ids as the spelling authority: mp is marathon pace, cross-training is the engine's cross. This is NOT session-classes.yaml#classes: classes are load arithmetic the engine reasons with, kinds are what the runner sees. Closed set - a new value needs planner, UI, and both catalogues (schemas/README.md rule 3)." },
+        "status": { "enum": ["planned", "completed", "missed", "skipped"], "description": "State of this day as of generatedAtDay. Only planned is legal on a day after generatedAtDay: a version is a snapshot, so days already executed are carried forward as the facts they are (AGENTS rule 4). Completed covers an entry logged done or partial, skipped is the runner's explicit skip (day-entry.status skipped), missed is a day that closed with no entry at the next day-start rollup (calendar-and-time.md#5), which is a signal and never a rest day. A micro-adjusted or safety-downgraded day still reads planned here, because the change is a session_overrides row on top of this version and not a rewrite of it." },
+        "restDay": { "type": "boolean", "description": "True when rest was prescribed. Stated separately from kind so a UI cannot render an intentional rest day as a hole in the plan, and so rest is never confused with an unlogged day (feedback-loop.md: a missing entry is a signal, never a zero)." },
+        "summaryText": { "type": "string", "minLength": 1, "maxLength": 240, "description": "Engine-authored one-liner for the day cell: resolved catalogue text or fixed engine text, and any number in it is copied from the dose fields below. No narrator picks a distance, a pace, or a rest day (AGENTS rules 2, 8); the UI picks what a runner reads from catalogue keys, never by parsing this string." },
+        "distanceKm": { "type": ["number", "null"], "minimum": 0, "maximum": 250, "description": "Prescribed distance. null = not prescribed (a time-based or feel-based day); 0 = prescribed as zero distance, which only a rest day should carry. Never -1 for unknown (schemas/README.md rule 5)." },
+        "durationMin": { "type": ["number", "null"], "minimum": 0, "maximum": 1500, "description": "Prescribed wall time including warm-up and cool-down. null = not prescribed. Kept alongside distanceKm because a time-poor runner's constraint is minutes, not metres." },
+        "targetPaceMinSecPerKm": { "type": ["number", "null"], "minimum": 120, "maximum": 900, "multipleOf": 5, "description": "Lower edge of the prescribed pace band. A band, never a single number: pace prescriptions need a range, a feel cue, and the date they were anchored on (knowledge/plan-construction/inputs-and-output.md). null = no pace target, which is correct for easy, recovery, and finish-only runners." },
+        "targetPaceMaxSecPerKm": { "type": ["number", "null"], "minimum": 120, "maximum": 900, "multipleOf": 5, "description": "Upper edge of the pace band; null exactly when the min edge is null. Rounded to 5 sec/km so a cosmetic float difference is not a visible plan change." },
+        "targetHrMin": { "type": ["integer", "null"], "minimum": 40, "maximum": 230, "description": "Lower edge of the heart-rate band, null when no HR authority applies (no hrMax on file, or the day is RPE-led). A watch that disagrees with the band is data, not an order." },
+        "targetHrMax": { "type": ["integer", "null"], "minimum": 40, "maximum": 230, "description": "Upper edge of the heart-rate band; null exactly when targetHrMin is null." },
+        "targetRpe": { "type": ["integer", "null"], "minimum": 1, "maximum": 10, "description": "Prescribed effort on the 1-10 Foster scale (day-entry.schema.json rpe). The authority the runner can always answer, which is why easy days are RPE-led." },
+        "primaryTarget": { "enum": ["pace", "hr", "rpe", "feel"], "description": "Which authority wins when pace, HR, and RPE disagree (planner-engine.md sec. 2). Easy and recovery days are rpe or feel deliberately: pace-chasing on an easy day is the commonest self-inflicted error. feel is the branch for a plan with no valid evidence, where prescribing a pace would be inventing one." },
+        "feelCue": { "type": ["string", "null"], "maxLength": 160, "description": "The conversational cue that carries the intent when numbers are not the authority ('conversational, legs sinking under you'). null when a hard band governs the day." },
+        "paceAnchorDay": { "type": ["string", "null"], "format": "date", "description": "Date of the race or field test the band was derived from, so the UI can say how old the evidence is and expire it (pace-bands.yaml#evidence_max_age_weeks). null when no pace band exists." },
+        "granularity": { "enum": ["coarse", "detailed"], "description": "detailed = structure and dose are settled and inside the content horizon; coarse = the day is far enough out that only kind and slot are real. Pretending to know a set ten weeks away is theatre, and rendering a coarse day as a promise turns every later refinement into an apparent rewrite (planner-engine.md sec. 5)." },
+        "hardDay": { "type": "boolean", "description": "True when this day consumes a hard-day slot and starts the spacing clock (session-classes.yaml: hard is an accounting flag, not a difficulty adjective). Drives the 48 h and 72 h gap rules, so it must come from the engine, not from how the label reads." },
+        "nonNegotiable": { "type": "boolean", "description": "True for race-adjacent and key structural sessions the runner is asked to protect; at most 2 per week (planner-engine.md sec. 2). A plan that marks everything non-negotiable teaches the runner that nothing is." },
+        "ruleIds": { "type": "array", "maxItems": 20, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }, "description": "ruleId values from appliedRules that shaped this day, so a day cell can answer 'why is this here?' by reference instead of restating a reason and drifting from it. Empty means nothing decided this day beyond filling a template slot." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "restDay": { "const": true } }, "required": ["restDay"] },
+          "then": { "properties": { "kind": { "const": "rest" }, "hardDay": { "const": false }, "nonNegotiable": { "const": false } } }
+        },
+        {
+          "if": { "properties": { "primaryTarget": { "const": "pace" } }, "required": ["primaryTarget"] },
+          "then": { "properties": { "targetPaceMinSecPerKm": { "type": "number" }, "targetPaceMaxSecPerKm": { "type": "number" }, "paceAnchorDay": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["completed", "missed", "skipped"] } }, "required": ["status"] },
+          "then": { "properties": { "granularity": { "const": "detailed" } } }
+        }
+      ]
+    },
+    "appliedRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One rule the engine applied, and what it did. This is the audit trail behind every session and every comment: the narrator may phrase these, it may not invent them.",
+      "required": ["ruleId", "anchor", "effect"],
+      "properties": {
+        "ruleId": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "description": "Stable kebab-case id of the rule, e.g. hard-slot-accounting. The join key for sessions[].ruleIds, comment provenance, and loop metrics, so it must not be renamed casually." },
+        "anchor": { "type": "string", "minLength": 3, "maxLength": 200, "x-verbatim-enum-values": true, "description": "Where the rule and its numbers live, copied verbatim from the knowledge namespace: recovery.yaml#hard_day_gap_hours, safety-hard-stops.yaml#resume_after_illness, or a markdown heading. The underscore is the source's spelling, not a casing mistake (schemas/README.md rule 7)." },
+        "effect": { "enum": ["subtracted", "dosed", "clamped", "informed"], "description": "subtracted = removed, shortened, downgraded, relocated, or replaced with rest; dosed = chose the amount or the kind within what was allowed; clamped = capped a value at a knob range (also recorded in clampedKnobs); informed = read evidence that shaped a decision without changing any number." },
+        "safetyOrigin": { "type": "boolean", "default": false, "description": "True when the rule came from safety-hard-stops.yaml. Asserted below to allow only effect subtracted, which is what makes 'safety can only subtract' (AGENTS rule 3) checkable from a stored payload instead of from a code review." },
+        "severity": { "enum": ["constraint", "hard-stop", "advisory"], "description": "How much the rule insisted. advisory: a recommendation a human may decline. constraint: must be honoured, adjustable only with an acknowledgement. hard-stop: blocking, not dismissible by a single tap, and overridable only through an explicit recorded acknowledgement (AGENTS rule 3, safety-layer.md). The safety docs spell it hard_stop; kebab-case on the wire (schemas/README.md rule 7)." },
+        "daysAffected": { "type": "array", "maxItems": 400, "uniqueItems": true, "items": { "type": "string", "format": "date" }, "description": "Days this rule touched, so the calendar can explain or highlight a day without re-running the engine. Empty for a rule that only informed." },
+        "notes": { "type": "string", "maxLength": 400, "description": "One sentence for the audit trail and the 'why is this here?' panel: what the rule did and to what. Written for whoever reads the bug report, so it may name numbers; the runner-facing wording comes from the catalogue." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "safetyOrigin": { "const": true } }, "required": ["safetyOrigin"] },
+          "then": { "properties": { "effect": { "const": "subtracted" }, "severity": { "enum": ["hard-stop", "constraint"] } } }
+        }
+      ]
+    },
+    "clampedKnob": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A knob value that arrived outside its declared range and was refused rather than used. Every knob in knowledge/heuristics has a range precisely so a typo cannot generate a 40 km threshold session (AGENTS.md conventions); this is the record of that refusal. Only range-bounded numeric knobs can be clamped, so only they appear here; a non-numeric value the engine could not use is reported as a warnings entry instead.",
+      "required": ["anchor", "requestedValue", "allowedMin", "allowedMax", "appliedValue"],
+      "properties": {
+        "anchor": { "type": "string", "minLength": 3, "maxLength": 200, "x-verbatim-enum-values": true, "description": "Knob path in the knowledge namespace, verbatim, e.g. load-progression.yaml#weekly_increment_pct. Underscores here are the knob's own spelling (schemas/README.md rule 7)." },
+        "requestedValue": { "type": ["number", "string", "boolean", "null"], "description": "The value that arrived, kept as it arrived rather than normalised: from a persona override, an integration, an experiment, or a bundle edit. null means it was missing or unparseable, which is recorded instead of dropped so 'nobody sent anything' stays distinguishable from 'the engine picked a default'." },
+        "allowedMin": { "type": "number", "description": "Lower bound of the knob's declared range at build time. A knob with range null is never clamped and therefore never appears in this array." },
+        "allowedMax": { "type": "number", "description": "Upper bound of the knob's declared range at build time; always on or above allowedMin." },
+        "appliedValue": { "type": "number", "description": "The value the plan was actually built with, always inside the two bounds above. This is the number any user-visible dose came from." },
+        "unit": { "type": ["string", "null"], "maxLength": 40, "description": "Unit copied from the knob (hours, percent, sessions, minutes_at_threshold) so the four numbers can be read without opening the YAML. null only when the knob declares no unit. Never inferred downstream (schemas/README.md rule 4)." },
+        "requestedBy": { "type": ["string", "null"], "maxLength": 120, "description": "Who asked for it, when knowable: a persona id, an experiment id, a bundle file, or a review option. Null when the request came from a merged default with no single author." }
+      }
+    },
+    "note": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A machine-readable assumption or warning: an id the UI can translate, plus prose a human can read.",
+      "required": ["id", "detail"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "description": "Stable kebab-case id, e.g. no-evidence-exploratory or goal-above-predicted-band. The UI renders its own message from this id through the message catalogue and never parses detail to decide what to show (AGENTS rule 8)." },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 500, "description": "Plain sentence for logs, golden-plan diffs, and support tickets; it may contain numbers because nothing user-facing is allowed to depend on its wording. Not shown verbatim to a runner in the other language." },
+        "day": { "type": ["string", "null"], "format": "date", "description": "Training day the note is about, or null when it is about the plan as a whole (a goal, an evidence gap, a sacrificed race)." },
+        "blocksGeneration": { "type": "boolean", "default": false, "description": "True when the note is the reason the plan is exploratory or deliberately infeasible rather than quietly compromised: the engine reports what it could not honour instead of bending the goal (planner-engine.md Pass 8)." }
+      }
+    }
+  }
+}

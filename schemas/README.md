@@ -20,6 +20,13 @@ schemas/
   README.md
 ```
 
+Every name in that tree is a file, and `tools/check-contracts.ps1` prints `PENDING CONTRACT FILES`
+to keep it that way: the counter reads the names out of this page and fails the build when one of
+them is missing. Three of the lines above used to carry an "(in flight, M0)" marker, which is the
+exact failure the counter exists for — a directory advertising a contract nobody has written while a
+reader codes against the list. The set is complete now, so the marker has moved from this page into
+the check, as this section promised it would.
+
 ## Rules
 
 1. **Every field is documented with what it means, not just its type.** `primaryTarget: "rpe"` is a
@@ -36,7 +43,39 @@ schemas/
    schemas keep them distinct and never use sentinel values like `-1`.
 6. `sql/schema.sql` is a **design sketch** that the real Drizzle migrations are generated against and
    reviewed against; it is not run in production. Its job is to make the RLS and constraint decisions
-   reviewable in one file.
+   reviewable in one file — and reviewable here means *runnable*: the `ddl` CI job applies it to a real
+   Postgres 16 inside a transaction it then rolls back, applies it again for real, and reads the
+   isolation claims back out of the catalog with [check-claims.sql](../tools/check-claims.sql). A
+   sketch nobody can execute drifts quietly: this file has already carried two purge bugs that were
+   silent successes on paper and only showed up against a live server.
+7. **Three namespaces, three spellings, no hand-mapping.** JSON contract keys are `camelCase`
+   (`firstTouchedDay`), SQL columns are `snake_case` (`first_touched_day`), and knowledge knobs keep
+   the `snake_case` they are written in inside `knowledge/heuristics/*.yaml`. Codegen owns the
+   mapping between them; a caller never hand-writes the other namespace's spelling, because a
+   hand-made mapping is where the same field starts meaning two things. Enum *values* on the wire are
+   kebab-case (`move-session`), except identifiers copied verbatim from another namespace — a metric
+   key like `load_sRPE`, or a heuristic anchor like `review-triggers.yaml#freeze_days` — which must
+   declare themselves with `x-verbatim-enum-values` so the exception is visible inside the contract
+   rather than being silent drift.
+   Two of the five contracts had drifted into snake_case keys before this rule existed, and they are
+   the two whose names appear in UI code. They were renamed on 2026-11-03, when no stored payload
+   exists yet: this is a search-and-replace today and a migration with a replay fixture after the
+   first deploy. Saying so is the point — the cheap moment is now, not later.
+8. **`tools/check-contracts.ps1` enforces what can be enforced**, and runs in the `knowledge` CI job.
+   It checks the draft, that `$id` matches the file's own path, that root metadata is present
+   (`title`, `description`, `type: object`, `additionalProperties: false`), that keys are camelCase,
+   and that enum values are kebab-case unless declared verbatim. It also prints an
+   undocumented-property count as a **ratchet**: 113 of 279 properties today, allowed to go down and
+   never up, so new fields arrive documented. The script cannot tell a true description from a
+   invented one; that half of rule 1 stays a human review. A property named inside `if`/`then`/`else`
+   is a condition on a field documented at its declaration, so it is casing-checked but not made to
+   repeat a description that would only drift. The count fell from 116 while 53 properties were
+   added, because the two contracts written after this gate arrived documented instead of joining
+   the backlog -- the practical budget for new work is zero. The script also fails the build when a
+   contract named on this page is missing from disk, so the tree above cannot promise a file that
+   nobody has written. The DDL has its own job and its own checker (`tools/check-claims.sql`),
+   because "the schema loads" and "the schema isolates" are different claims, and only the second
+   one is worth a gate.
 
 ## Validation & codegen (intended)
 
