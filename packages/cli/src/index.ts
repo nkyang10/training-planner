@@ -10,13 +10,16 @@ import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { PLANNER_VERSION } from "@training-planner/planner-core";
 import { isLocale } from "@training-planner/i18n";
-import { diffFiles, explainLines, explainWeekLines, planFromFixture, readVersionFile } from "./commands";
+import { diffFiles, explainLines, explainWeekLines, knowledgeBundle, planFromFixture, readJson, readVersionFile, sweepLines } from "./commands";
+import { submitEntry } from "@training-planner/entries";
+import type { EntryDraft } from "@training-planner/entries";
 
 const USAGE = `planner ${PLANNER_VERSION}
 
   planner gen --fixture <path> [--out <path>] [--canonical]
   planner diff --from <path> --to <path> --created <YYYY-MM-DD> [--reason <text>]
   planner explain --version <path> [--day <YYYY-MM-DD>] [--weeks [--locale en|zh-Hant]]
+  planner sweep --fixture <path> --today <YYYY-MM-DD> [--entries <path>] [--closed <d1,d2>]
 
 Paths are relative to the working directory. Knowledge is always read from knowledge/heuristics and
 never from a flag: a plan that could name a knowledge version this repository does not have would be
@@ -40,6 +43,9 @@ const { values, positionals } = parseArgs({
     version: { type: "string" },
     day: { type: "string" },
     weeks: { type: "boolean", default: false },
+    today: { type: "string" },
+    entries: { type: "string" },
+    closed: { type: "string" },
     locale: { type: "string" },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -70,6 +76,38 @@ try {
     const diff = diffFiles(values.from, values.to, values.created, values.reason);
     console.log(JSON.stringify(diff, null, 2));
     console.error(`planner: ${diff.changes.length} change(s), within the two-change limit: ${diff.changeCountWithinLimit}`);
+  } else if (command === "sweep") {
+    if (typeof values.fixture !== "string") fail("sweep needs --fixture <path>");
+    if (typeof values.today !== "string") fail("sweep needs --today <YYYY-MM-DD>");
+    const bundle = knowledgeBundle();
+    const generated = planFromFixture(values.fixture, bundle);
+    const entries: EntryDraft[] = [];
+    if (typeof values.entries === "string") {
+      const parsed = readJson(values.entries);
+      if (!Array.isArray(parsed)) fail("--entries must point at a JSON array of entry drafts");
+      for (const draft of parsed) entries.push(draft as EntryDraft);
+    }
+    // Submit the drafts through the real pipeline, so the sweep reads the log the system would actually hold.
+    let log: import("@training-planner/domain").DayEntry[] = [];
+    let events: import("@training-planner/domain").TrainingEvent[] = [];
+    for (const draft of entries) {
+      const result = submitEntry(draft, { entries: log, events }, {
+        userId: generated.version.userId,
+        today: values.today,
+        occurredAt: `${values.today}T22:40:00.000Z`,
+        knowledge: bundle,
+      });
+      if (result.status === "accepted") {
+        log = [...log, result.entry];
+        events = [...events, result.event];
+      } else if (result.status === "rejected") {
+        console.error(`planner: draft for ${draft.day} rejected: ${result.code} - ${result.detail}`);
+      }
+    }
+    const closed = typeof values.closed === "string" ? values.closed.split(",").map((day) => day.trim()).filter((day) => day.length > 0) : [];
+    for (const line of sweepLines({ version: generated.version, entries: log, today: values.today, closed, knowledge: bundle })) {
+      console.log(line);
+    }
   } else if (command === "explain") {
     if (typeof values.version !== "string") fail("explain needs --version <path>");
     const version = readVersionFile(values.version);

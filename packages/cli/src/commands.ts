@@ -12,7 +12,9 @@ import type { KnowledgeBundle } from "@training-planner/knowledge";
 import { canonicalJson, hashOf } from "@training-planner/knowledge/canonical";
 import { checkInvariants, diffPlans, generatePlan } from "@training-planner/planner-core";
 import { renderPlanExplanation } from "@training-planner/narrator";
+import { runNightlySweep } from "@training-planner/worker";
 import type { Locale } from "@training-planner/i18n";
+import type { DayEntry } from "@training-planner/domain";
 import type { InvariantViolation, PlanDiff, PlanInput, PlanVersion } from "@training-planner/planner-core";
 import { fixtureSchema } from "../../../eval/golden-plans/fixture";
 
@@ -107,5 +109,42 @@ export function explainLines(version: PlanVersion, day?: string): string[] {
   }
   for (const assumption of version.assumptions) lines.push(`assumption: ${assumption.id} - ${assumption.detail}`);
   for (const warning of version.warnings) lines.push(`warning: ${warning.id} - ${warning.detail}`);
+  return lines;
+}
+
+/**
+ * The lines `planner sweep` prints: what the nightly sweep would close, what it would leave pending, and the
+ * cache key of the bundle it would snapshot. Read-only: the CLI never writes a rollup, and the sweep itself
+ * returns data rather than events (the catalogue has no day-close event type yet - backlog row 18).
+ */
+export function sweepLines(input: {
+  version: PlanVersion;
+  entries: readonly DayEntry[];
+  today: string;
+  closed?: readonly string[];
+  knowledge: KnowledgeBundle;
+}): string[] {
+  const result = runNightlySweep({
+    userId: input.version.userId,
+    today: input.today,
+    entries: input.entries,
+    plan: input.version,
+    knowledge: input.knowledge,
+    computedAt: `${input.today}T03:00:00.000Z`,
+    closedDays: input.closed ?? [],
+  });
+
+  const lines: string[] = [];
+  lines.push(`closed: ${result.newlyClosed.length === 0 ? "none" : result.newlyClosed.map((closed) => closed.day).join(", ")}`);
+  for (const closed of result.newlyClosed) {
+    lines.push(`  ${closed.day} ${closed.status} planned=${closed.plannedKm}km done=${closed.completedKm}km`);
+  }
+  lines.push(`pending: ${result.pending.length === 0 ? "none" : result.pending.join(", ")}`);
+  if (result.skipped.length > 0) lines.push(`skipped: ${result.skipped.join(", ")}`);
+  lines.push(
+    result.signalCache === null
+      ? "cache: none (the plan does not cover the sweep day)"
+      : `cache: asOfDay=${result.signalCache.asOfDay} signals=${result.signalCache.signals.length} inputsHash=${result.signalCache.inputsHash.slice(0, 16)}...`,
+  );
   return lines;
 }

@@ -11,7 +11,8 @@ import { GOLDEN_FIXTURE_COUNT } from "@training-planner/golden-fixtures";
 import { planVersionSchema } from "@training-planner/domain";
 import { canonicalJson } from "@training-planner/knowledge/canonical";
 import { checkInvariants } from "@training-planner/planner-core";
-import { diffFiles, explainLines, explainWeekLines, knowledgeBundle, planFromFixture, readVersionFile } from "../src/commands";
+import { diffFiles, explainLines, explainWeekLines, knowledgeBundle, planFromFixture, readVersionFile, sweepLines } from "../src/commands";
+import { makeEntry } from "../../policy/test/helpers";
 
 const directory = join(process.cwd(), "eval", "golden-plans");
 const scratch = mkdtempSync(join(tmpdir(), "tp-cli-"));
@@ -81,6 +82,35 @@ describe("planner explain --weeks", () => {
     const generated = planFromFixture(join(directory, "novice-5k.json"), bundle);
     const lines = explainWeekLines(generated.version, "zh-Hant").join(" ");
     expect(lines).toMatch(/[\\u4e00-\\u9fff]/);
+  });
+});
+
+describe("planner sweep", () => {
+  it("closes the days before the sweep day and names the gaps", () => {
+    const generated = planFromFixture(join(directory, "novice-5k.json"), bundle);
+    const firstDay = generated.version.firstDay;
+    const lines = sweepLines({
+      version: generated.version,
+      entries: [makeEntry({ day: firstDay, outcome: "completed" })],
+      today: generated.version.sessions[2]?.day ?? firstDay,
+      knowledge: bundle,
+    }).join("\n");
+    expect(lines).toContain("closed: ");
+    expect(lines).toContain(`${firstDay} logged`);
+    expect(lines).toContain("pending: ");
+    expect(lines).toMatch(/cache: asOfDay=\d{4}-\d{2}-\d{2} signals=\d+ inputsHash=sha256:/);
+  });
+
+  it("is idempotent: a sweep with the days already closed reports none", () => {
+    const generated = planFromFixture(join(directory, "novice-5k.json"), bundle);
+    const today = generated.version.sessions[2]?.day ?? generated.version.firstDay;
+    const first = sweepLines({ version: generated.version, entries: [], today, knowledge: bundle });
+    const closed = first
+      .filter((line) => /^\s{2}\d{4}-\d{2}-\d{2} /.test(line))
+      .map((line) => line.trim().split(" ")[0] as string);
+    const second = sweepLines({ version: generated.version, entries: [], today, closed, knowledge: bundle }).join("\n");
+    expect(second).toContain("closed: none");
+    expect(second).toContain("skipped: ");
   });
 });
 
