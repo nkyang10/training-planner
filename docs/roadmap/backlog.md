@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 ---
 
 # Backlog
@@ -8,10 +8,12 @@ last_reviewed: 2026-11-03
 Not a schedule — an ordered set of things we believe, with the evidence that would change our mind.
 Effort: S (< 1 wk) · M (1–3 wk) · L (> 3 wk).
 
-## Now (pre-M2)
+## Now (M2)
 
 Rows 8--11 came out of [the end-user 5W1H self-review](../review/2026-11-03-enduser-5w1h-review.md)
-(F1--F10); F1 and F2 are launch blockers for the loop itself, not polish.
+(F1--F10); F1 and F2 are launch blockers for the loop itself, not polish. Rows 12--16 came out of
+[the M1 coach sign-off](../review/2026-11-04-m1-coach-signoff.md) (F2--F6 there): coaching-quality
+findings that do not make a plan unsafe, which is why M1 closed with them recorded rather than fixed.
 
 | # | Item | Why | Effort | Risk if skipped |
 |---|---|---|---|---|
@@ -26,6 +28,11 @@ Rows 8--11 came out of [the end-user 5W1H self-review](../review/2026-11-03-endu
 | 9 | Say how long today takes and what the alternate dose gave up (**F2**, **F10**) | elapsed time is an input today and an output nowhere; race day has no card | S | the time-poor runner cannot plan the evening they actually have |
 | 10 | Sessions the runner does not control: club night, parkrun, pacing a friend (**F3**) | the group decides Tuesday; the plan has to survive that | S | every club runner's first week is fiction |
 | 11 | Surfaces for what is already posture: season view, heat/altitude cost, travel week shift, export and delete (**F4**–**F6**, **F9**) | a promise with no screen is not a promise | M | trust decays exactly where the runner is most exposed |
+| 12 | Distance-aware long-run band (M1 review F2: an 11.4 km longest run for a 50 km trail race) | one `long_run_share_pct` cannot serve a 5K and a 50K; the corpus needs a band keyed by race distance | M | ultra and marathon plans that cannot possibly prepare the runner |
+| 13 | State the 7-day-normalised rate wherever a week is partial (M1 review F3) | a Thursday start reads as +89% in raw kilometres while the plan is +8%; the plan is right and the presentation is not | S | the runner distrusts a plan that is correct |
+| 14 | Terrain-aware session kinds (M1 review F4: no hills in a trail ultra plan) | `hills` exists as a kind and is never selected from terrain | S | trail plans that train like road plans |
+| 15 | Neuromuscular-before-threshold sequencing rule for novices (M1 review F5) | the first 5K block opens with tempo and never with strides | S | a beginner's first quality session is the hardest kind |
+| 16 | A target-peak notion derived from race distance (M1 review F6: race blocks cannot exceed recent volume) | the curve is purely incremental, so a 7-week race block holds volume instead of building it, and the planner cannot tell "hold" from "fail to build" | L | marathon blocks that never build, with nothing in the plan saying so |
 
 ## Next (M3–M5)
 
