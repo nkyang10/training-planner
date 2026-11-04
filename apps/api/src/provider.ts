@@ -11,8 +11,10 @@
 import type { AdvisorCall, ModelPort } from "@training-planner/advisor";
 
 export interface ProviderConfig {
-  /** Full chat-completions URL, e.g. https://api.example.com/v1/chat/completions */
-  endpoint: string;
+  /** Full chat-completions URL, e.g. https://api.example.com/v1/chat/completions. Exactly one of endpoint/baseUrl. */
+  endpoint?: string;
+  /** An OpenAI-compatible base URL, e.g. http://host:8102/v1; the port appends /chat/completions. */
+  baseUrl?: string;
   apiKey: string;
   model: string;
   timeoutMs?: number;
@@ -45,11 +47,29 @@ export interface ProviderOptions {
   now?: () => number;
 }
 
-const SYSTEM_PROMPT =
-  "You are a training-review assistant. You answer with one JSON object that satisfies the advisor contract exactly. " +
-  "You never invent a number: every number you use must appear in the request. You may answer no-change.";
+const SYSTEM_PROMPT = [
+  "You are a training-review assistant. Answer with ONE JSON object and nothing else - no prose, no markdown, no extra keys.",
+  'The object has exactly these keys: "decision" (one of "no-change", "propose-change"), "reasonCode" (one of the request\'s allowedReasonCodes),',
+  '"facts" (array of {key, value} pairs, max 20; every number must appear in the request), "proposedChanges" (array, max 2; each item has exactly',
+  '"day", "kind", "fromKm", "toKm", "costKey", "costSlots"; fromKm must equal the plan\'s value and costKey must be in allowedCostKeys),',
+  '"confidence" ("low", "medium" or "high"), "needsHuman" (boolean).',
+  "If no change is needed, answer decision no-change with an empty proposedChanges array. You never invent a number, a day, a kind or a reason.",
+].join(" ");
+
+/**
+ * The chat-completions URL for a base URL. A provider that names its base (the common OpenAI-compatible shape) should
+ * not have to also name the path, and a base that already ends in /chat/completions is not doubled.
+ */
+export function chatCompletionsUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  return trimmed.endsWith("/chat/completions") ? trimmed : `${trimmed}/chat/completions`;
+}
 
 export function createHttpModelPort(config: ProviderConfig, options: ProviderOptions = {}): ProviderPort {
+  const endpoint = config.endpoint ?? (config.baseUrl === undefined ? undefined : chatCompletionsUrl(config.baseUrl));
+  if (endpoint === undefined || endpoint.length === 0) {
+    throw new ProviderError("missing-context", "the provider config needs an endpoint or a baseUrl");
+  }
   const fetchImpl = options.fetchImpl ?? fetch;
   const now = options.now ?? (() => Date.now());
   const timeoutMs = config.timeoutMs ?? 20_000;
@@ -88,7 +108,7 @@ export function createHttpModelPort(config: ProviderConfig, options: ProviderOpt
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const response = await fetchImpl(config.endpoint, {
+        const response = await fetchImpl(endpoint, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -148,14 +168,19 @@ export function modelPortFromEnv(
   options: ProviderOptions = {},
 ): ProviderPort | undefined {
   const endpoint = env["TRAINING_PLANNER_MODEL_ENDPOINT"];
+  const baseUrl = env["TRAINING_PLANNER_MODEL_BASE_URL"];
   const apiKey = env["TRAINING_PLANNER_MODEL_API_KEY"];
   const model = env["TRAINING_PLANNER_MODEL_NAME"];
-  if (endpoint === undefined || endpoint.length === 0 || apiKey === undefined || apiKey.length === 0 || model === undefined || model.length === 0) {
+  if (
+    (endpoint === undefined || endpoint.length === 0) &&
+    (baseUrl === undefined || baseUrl.length === 0)
+  ) {
     return undefined;
   }
+  if (apiKey === undefined || apiKey.length === 0 || model === undefined || model.length === 0) return undefined;
   return createHttpModelPort(
     {
-      endpoint,
+      ...(endpoint === undefined || endpoint.length === 0 ? { baseUrl } : { endpoint }),
       apiKey,
       model,
       ...(env["TRAINING_PLANNER_MODEL_TIMEOUT_MS"] === undefined ? {} : { timeoutMs: Number(env["TRAINING_PLANNER_MODEL_TIMEOUT_MS"]) }),
