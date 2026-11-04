@@ -240,6 +240,16 @@ export function createWeb(options: WebOptions): RequestListener {
           sheet({ locale: state.locale, review, firstEditableDay: first, message: undefined, error: `${result.code}: ${result.detail}` });
           return;
         }
+        // Accepting a change activates the version the review offered; keeping the plan activates nothing.
+        if (result.status === "accepted" && result.resultDiffId !== null) {
+          try {
+            repository.activatePlanVersionForDiff(userId, result.resultDiffId);
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            sheet({ locale: state.locale, review, firstEditableDay: first, message: undefined, error: detail });
+            return;
+          }
+        }
         repository.saveReview(result.review);
         sheet({
           locale: state.locale,

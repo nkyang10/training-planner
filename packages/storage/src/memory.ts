@@ -18,6 +18,9 @@ interface UserState {
   entries: DayEntry[];
   events: TrainingEvent[];
   plans: Map<string, PlanVersion>;
+  /** Proposed but not accepted: a review s options, staged. */
+  proposed: Map<string, PlanVersion>;
+  activeVersionId: string | null;
   diffs: Map<string, PlanDiff>;
   reviews: Map<string, Review>;
   comments: CommentRecord[];
@@ -28,6 +31,8 @@ const emptyUser = (): UserState => ({
   entries: [],
   events: [],
   plans: new Map(),
+  proposed: new Map(),
+  activeVersionId: null,
   diffs: new Map(),
   reviews: new Map(),
   comments: [],
@@ -92,6 +97,42 @@ export function createMemoryRepository(): Repository {
     savePlanVersion(version: PlanVersion): void {
       const state = stateOf(version.userId);
       state.plans.set(version.versionId, version);
+      // A saved plan is the plan in force; a review s proposal goes through saveProposedPlanVersion instead.
+      state.activeVersionId = version.versionId;
+    },
+
+    saveProposedPlanVersion(version: PlanVersion): void {
+      stateOf(version.userId).proposed.set(version.versionId, version);
+    },
+
+    getProposedPlanVersion(userId: string, versionId: string): PlanVersion | undefined {
+      return stateOf(userId).proposed.get(versionId);
+    },
+
+    getActivePlanVersion(userId: string): PlanVersion | undefined {
+      const state = stateOf(userId);
+      return state.activeVersionId === null ? undefined : state.plans.get(state.activeVersionId);
+    },
+
+    activatePlanVersion(userId: string, versionId: string): void {
+      const state = stateOf(userId);
+      const staged = state.proposed.get(versionId);
+      if (staged === undefined) throw new Error(`cannot activate ${versionId}: it was never proposed`);
+      state.plans.set(versionId, staged);
+      state.proposed.delete(versionId);
+      state.activeVersionId = versionId;
+    },
+
+    activatePlanVersionForDiff(userId: string, diffId: string): PlanVersion {
+      const state = stateOf(userId);
+      const diff = state.diffs.get(diffId);
+      if (diff === undefined) throw new Error(`cannot activate: no diff ${diffId} for this user`);
+      const staged = state.proposed.get(diff.toVersionId);
+      if (staged === undefined) throw new Error(`cannot activate: diff ${diffId} predicts ${diff.toVersionId}, which was never proposed`);
+      state.plans.set(staged.versionId, staged);
+      state.proposed.delete(staged.versionId);
+      state.activeVersionId = staged.versionId;
+      return staged;
     },
 
     getPlanVersion(userId: string, versionId: string): PlanVersion | undefined {
@@ -99,9 +140,12 @@ export function createMemoryRepository(): Repository {
     },
 
     latestPlanVersionFor(userId: string, day: string): PlanVersion | undefined {
-      const covering = [...stateOf(userId).plans.values()].filter(
-        (version) => version.firstDay <= day && day <= version.lastDay,
-      );
+      const state = stateOf(userId);
+      const active = state.activeVersionId === null ? undefined : state.plans.get(state.activeVersionId);
+      // The active plan wins when it covers the day: a review that was accepted must change what the runner sees,
+      // even if an older version happens to cover the same day.
+      if (active !== undefined && active.firstDay <= day && day <= active.lastDay) return active;
+      const covering = [...state.plans.values()].filter((version) => version.firstDay <= day && day <= version.lastDay);
       return covering.sort((a, b) => (a.generatedAtDay < b.generatedAtDay ? 1 : -1))[0];
     },
 

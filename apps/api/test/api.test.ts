@@ -8,6 +8,7 @@ import { createServer, type Server } from "node:http";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { dayEntrySchema, planVersionSchema, reviewSchema, signalSchema } from "@training-planner/domain";
+import type { PlanDiff } from "@training-planner/domain";
 import type { PlanVersion, Review } from "@training-planner/domain";
 import { fixtureSchema } from "@training-planner/golden-fixtures";
 import { messagesFor } from "@training-planner/i18n";
@@ -400,6 +401,30 @@ describe("a review decision is a state change, not an edit", () => {
       renderCost: (option) => option.costKey,
     });
     if (opened.status !== "opened") throw new Error("expected a review");
+
+    // The option diff and the version it predicts are staged at open time; acceptance activates the version.
+    const diffId = "11111111-1111-4111-8111-111111111111";
+    const childId = "aaaaaaaa-1111-4111-8111-111111111111";
+    const diff: PlanDiff = {
+      schemaVersion: 1,
+      diffId,
+      userId: USER_A,
+      fromVersionId: planVersion.versionId,
+      toVersionId: childId,
+      createdAtDay: TODAY,
+      changes: [],
+      changeCountWithinLimit: true,
+      knowledgeHash: knowledge.hash,
+    };
+    repository.savePlanDiff(diff);
+    repository.saveProposedPlanVersion({
+      ...planVersion,
+      versionId: childId,
+      parentVersionId: planVersion.versionId,
+      generatedBy: "review-accepted",
+      generatedAtDay: TODAY,
+    });
+
     repository.saveReview(opened.review);
     expect(reviewSchema.safeParse(opened.review).success).toBe(true);
 
@@ -408,8 +433,32 @@ describe("a review decision is a state change, not an edit", () => {
     expect(response.body["status"]).toBe("accepted");
     expect(response.body["applyFromDay"]).toBe("2026-11-07");
     expect(response.body["resultDiffId"]).toBe("11111111-1111-4111-8111-111111111111");
+    // Accepting a change materialises the plan version the review promised, and makes it the active plan.
+    expect(response.body["appliedVersionId"]).toBe("aaaaaaaa-1111-4111-8111-111111111111");
+    expect(repository.getActivePlanVersion(USER_A)?.versionId).toBe("aaaaaaaa-1111-4111-8111-111111111111");
     const stored: Review | undefined = repository.getReview(USER_A, opened.review.reviewId);
     expect(stored?.status).toBe("accepted");
+  });
+
+  it("refuses an acceptance whose proposed version was never staged", async () => {
+    const opened = openReview({
+      userId: USER_A,
+      today: TODAY,
+      candidate: { kind: "plan-too-big", ruleId: "plan-too-big", anchor: "review-triggers.yaml#plan-too-big", evidence: { signalIds: ["completion"], ruleIds: ["plan-too-big"], evidenceGradeMax: "B" }, presentation: "offer-at-next-open" },
+      knowledge,
+      options,
+      renderCost: (option) => option.costKey,
+    });
+    if (opened.status !== "opened") throw new Error("expected a review");
+    repository.saveReview(opened.review);
+
+    const response = await call(`/reviews/${opened.review.reviewId}/decision`, {
+      body: { decision: { kind: "accept", optionId: "reduce" } },
+    });
+    expect(response.status).toBe(409);
+    expect((response.body["error"] as { code: string }).code).toBe("missing-proposed-version");
+    // The review must not be recorded as accepted when its plan could not be materialised.
+    expect(repository.getReview(USER_A, opened.review.reviewId)?.status).toBe("open");
   });
 
   it("answers 404 for a review that is not this user's", async () => {

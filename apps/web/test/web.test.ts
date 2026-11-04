@@ -14,7 +14,7 @@ import { generatePlan } from "@training-planner/planner-core";
 import { loadKnowledge } from "@training-planner/knowledge";
 import { openReview } from "@training-planner/review";
 import type { ProposedOption } from "@training-planner/review";
-import type { Review } from "@training-planner/domain";
+import type { PlanDiff, Review } from "@training-planner/domain";
 import { createMemoryRepository, createMemorySessions } from "@training-planner/storage";
 import type { Repository } from "@training-planner/storage";
 import { createWeb } from "../src/server";
@@ -317,6 +317,37 @@ describe("the review sheet shows keep-the-plan first, with the cost, and records
       renderCost: (option) => option.costKey,
     });
     if (opened.status !== "opened") throw new Error("expected a review");
+    // Stage the diff and the child version the sheet accept will activate.
+    const base = planFor(USER_A);
+    const childId = "cccccccc-3333-4333-8333-333333333333";
+    const diff: PlanDiff = {
+      schemaVersion: 1,
+      diffId: "33333333-3333-4333-8333-333333333333",
+      userId: USER_A,
+      fromVersionId: base.versionId,
+      toVersionId: childId,
+      createdAtDay: TODAY,
+      changes: [],
+      changeCountWithinLimit: true,
+      knowledgeHash: knowledge.hash,
+    };
+    repository.savePlanDiff(diff);
+    // The child really changes something: the first hard session of this week becomes an easy one, so the
+    // calendar can be checked for the change after acceptance rather than trusting a status field.
+    const hardDay = base.sessions.find((session) => session.day >= TODAY && session.hardDay === true);
+    const sessions = base.sessions.map((session) =>
+      session.day === hardDay?.day
+        ? { ...session, kind: "easy" as const, hardDay: false, distanceKm: 1, summaryText: "easy 1 km", targetRpe: null }
+        : session,
+    );
+    repository.saveProposedPlanVersion({
+      ...base,
+      sessions,
+      versionId: childId,
+      parentVersionId: base.versionId,
+      generatedBy: "review-accepted",
+      generatedAtDay: TODAY,
+    });
     repository.saveReview(opened.review);
     return opened.review;
   };
@@ -342,6 +373,23 @@ describe("the review sheet shows keep-the-plan first, with the cost, and records
     expect(keepIndex).toBeLessThan(reduceIndex);
   });
 
+  it("applies an accepted change to the week the runner sees", async () => {
+    const review = openOne();
+    const before = await call("/", { cookie: "session=token-a" });
+    expect(before.html).toContain("tempo");
+    expect(before.html).not.toContain("easy, 1 km");
+
+    const accepted = await call(`/review/${review.reviewId}`, {
+      cookie: "session=token-a",
+      form: { decision: "accept", optionId: "reduce" },
+    });
+    expect(accepted.status).toBe(200);
+    expect(accepted.html).toContain("Accepted. The change starts on 2026-11-11.");
+
+    const after = await call("/", { cookie: "session=token-a" });
+    // The page renders the session from the active plan, so the accepted change is what the runner now sees.
+    expect(after.html).toContain("easy, 1 km");
+  });
   it("accepts a change and says when it starts", async () => {
     const review = openOne();
     const page = await call(`/review/${review.reviewId}`, {
@@ -353,6 +401,7 @@ describe("the review sheet shows keep-the-plan first, with the cost, and records
     expect(repository.getReview(USER_A, review.reviewId)?.status).toBe("accepted");
     expect(repository.getReview(USER_A, review.reviewId)?.resultDiffId).toBe("33333333-3333-4333-8333-333333333333");
   });
+
 
   it("records a decline as keeping the plan", async () => {
     const review = openOne();
