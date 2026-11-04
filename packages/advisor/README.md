@@ -10,6 +10,13 @@ ADR-0009 splits the review path in three: the operator's guidelines, the runner'
 | `advisorProposalSchema` / `ADVISOR_REASON_CODES` | the strict shape and the reason vocabulary; a new reason is a deliberate addition. |
 | `ModelPort` | the port the caller implements. P1 tests use a fake; P3 wires a provider behind consent, budget and a circuit breaker. |
 
+## The evaluation harness
+
+`eval/advisor-scenarios/scenarios.json` holds ten model answers a fluent model could plausibly produce, each with what
+the gates must say about it. `packages/advisor/test/scenarios.test.ts` measures both directions: a gate that accepts
+everything fails the rejected scenarios, and a gate that rejects everything fails the accepted ones. Removing one gate
+(the freeze window) makes four tests fail - the harness is measured, not assumed.
+
 ## What this package does not do
 
 - No clock, no network, no randomness: `today` is an argument and the model is a port.
