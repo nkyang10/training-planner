@@ -34,3 +34,4 @@ Revisit when: the concrete trigger that should reopen this
 | [0005](0005-micro-adjustment-and-review-as-separate-mechanisms.md) | Micro-adjustment and review as separate mechanisms | accepted |
 | [0006](0006-llm-processing-consent-and-data-boundary.md) | LLM processing: consent, data boundary, and residency | proposed |
 | [0007](0007-llm-language-only-with-template-fallback.md) | LLM language-only with a first-class template fallback | accepted |
+| [0008](0008-api-and-client-stack.md) | API behind a repository interface, server-rendered client | proposed |
