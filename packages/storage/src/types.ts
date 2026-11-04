@@ -12,7 +12,7 @@
  * - **idempotency is a uniqueness rule**: `appendEntryWithEventAndPointer` refuses a second row for an
  *   idempotency key that already exists. A middleware cannot give that guarantee; a unique index can.
  */
-import type { DayEntry, GuidelineContract, PainReport, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
+import type { AthleteProfile, DayEntry, GuidelineContract, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
 import type { Locale } from "@training-planner/i18n";
 
 export interface SupersededPointer {
@@ -93,6 +93,19 @@ export interface Repository {
 
   saveComment(comment: CommentRecord): void;
   listComments(userId: string, day?: string): CommentRecord[];
+  /** The runner's stored profile, or undefined when they have never saved one. */
+  getAthleteProfile(userId: string): AthleteProfile | undefined;
+  /**
+   * Store a profile and append the revision row in one call: a profile write without its history is the thing
+   * `profile_revisions` exists to prevent (ADR-0009). Returns the revision that was written.
+   */
+  saveAthleteProfile(
+    profile: AthleteProfile,
+    change: { changedBy: ProfileRevision["changedBy"]; source: ProfileRevision["source"]; diff: ProfileRevision["diff"]; occurredAt: string },
+  ): ProfileRevision;
+  /** Every profile revision for this user, oldest first. */
+  listProfileRevisions(userId: string): ProfileRevision[];
+
   /** Append one wizard answer. The caller computes the revision with packages/domain's nextWizardRevision. */
   saveWizardAnswer(userId: string, record: WizardAnswerRecord): void;
   /** Every wizard answer for this user, oldest first. */

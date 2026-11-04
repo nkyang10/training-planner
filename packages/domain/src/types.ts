@@ -161,6 +161,23 @@ export interface DiffChange {
   isSafety?: boolean;
 }
 
+/** One row of `profile_revisions` (ADR-0009): what changed, who changed it, and why. Append-only. */
+export interface ProfileRevision {
+  userId: string;
+  id: string;
+  changedBy: "runner" | "import" | "review" | "support";
+  source: "user" | "import" | "review";
+  diff: ProfileDiffEntry[];
+  occurredAt: string;
+}
+
+/** A leaf change in a profile, with JSON paths so a reader does not need the old object to understand the row. */
+export interface ProfileDiffEntry {
+  path: string;
+  from: unknown;
+  to: unknown;
+}
+
 export interface PlanDiff {
   schemaVersion: number;
   diffId: string;

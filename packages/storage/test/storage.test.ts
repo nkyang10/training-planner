@@ -4,7 +4,7 @@
  * against this adapter are testing the same discipline Postgres must keep.
  */
 import { describe, expect, it } from "vitest";
-import type { DayEntry, PlanDiff, PlanVersion, Review, TrainingEvent } from "@training-planner/domain";
+import type { AthleteProfile, DayEntry, PlanDiff, PlanVersion, Review, TrainingEvent } from "@training-planner/domain";
 import { createMemoryRepository, createMemorySessions, DuplicateIdempotencyError } from "../src/index";
 import type { Repository } from "../src/index";
 import { makeEntry, makeEvent } from "./helpers";
@@ -354,5 +354,54 @@ describe("sessions resolve a bearer token to a user, and nothing else", () => {
   it("refuses an unknown token and a missing header", () => {
     expect(sessions.resolve("Bearer nope")).toBeNull();
     expect(sessions.resolve(undefined)).toBeNull();
+  });
+});
+
+
+describe("a profile write always carries its revision row (ADR-0009)", () => {
+  const profile = (overrides: Partial<AthleteProfile> = {}): AthleteProfile => ({
+    userId: USER_A,
+    revision: 1,
+    age: 33,
+    availability: { days: ["Mon", "Wed"] },
+    goal: { type: "finish", event: null },
+    preferences: { units: "metric", locale: "en", timezone: "Asia/Taipei" },
+    health: {},
+    ...overrides,
+  });
+
+  it("stores the profile and appends one revision per save", () => {
+    const repository = createMemoryRepository();
+    expect(repository.getAthleteProfile(USER_A)).toBeUndefined();
+    repository.saveAthleteProfile(profile(), {
+      changedBy: "runner",
+      source: "user",
+      diff: [{ path: "goal.type", from: "finish", to: "time" }],
+      occurredAt: "2026-11-04T00:00:00.000Z",
+    });
+    repository.saveAthleteProfile(profile({ goal: { type: "time", event: null } }), {
+      changedBy: "runner",
+      source: "user",
+      diff: [{ path: "goal.type", from: "finish", to: "time" }],
+      occurredAt: "2026-11-04T00:00:01.000Z",
+    });
+    expect(repository.getAthleteProfile(USER_A)?.goal.type).toBe("time");
+    const revisions = repository.listProfileRevisions(USER_A);
+    expect(revisions).toHaveLength(2);
+    expect(revisions[0]?.id).toBe("1");
+    expect(revisions[1]?.id).toBe("2");
+    expect(revisions[1]?.occurredAt).toBe("2026-11-04T00:00:01.000Z");
+  });
+
+  it("keeps each user's profile separate", () => {
+    const repository = createMemoryRepository();
+    repository.saveAthleteProfile(profile(), {
+      changedBy: "runner",
+      source: "user",
+      diff: [],
+      occurredAt: "2026-11-04T00:00:00.000Z",
+    });
+    expect(repository.getAthleteProfile(USER_B)).toBeUndefined();
+    expect(repository.listProfileRevisions(USER_B)).toEqual([]);
   });
 });

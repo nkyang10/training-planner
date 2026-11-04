@@ -18,6 +18,7 @@ repository.appendEntryWithEventAndPointer({ entry, event, superseded? });
 
 | Call | Meaning |
 |---|---|
+| `getAthleteProfile(userId)` / `saveAthleteProfile(profile, change)` / `listProfileRevisions(userId)` | the stored profile is written **together with** its revision row (a profile write without history is what `profile_revisions` exists to prevent) |
 | `saveWizardAnswer(userId, record)` / `listWizardAnswers(userId)` | the onboarding wizard's rows, append-only (ADR-0009) |
 | `saveGuideline(guideline)` / `listGuidelines()` | the operator's guidelines: **global**, versioned, and a duplicate `(guidelineId, version)` is refused rather than overwritten |
 | `savePainReport(report)` / `listPainReports(userId)` | pain rows keyed by a derived id (a replay stores one row), ordered by day; included in the export |

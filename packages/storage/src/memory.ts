@@ -7,7 +7,7 @@
  * a check that can be forgotten, it is a lookup that cannot be expressed.
  */
 import { promptDeliverySchema } from "@training-planner/domain";
-import type { DayEntry, GuidelineContract, PainReport, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
+import type { AthleteProfile, DayEntry, GuidelineContract, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
 import {
   DuplicateIdempotencyError,
   type AppendEntryInput,
@@ -26,6 +26,8 @@ interface UserState {
   promptDeliveries: PromptDelivery[];
   painReports: Map<string, PainReport>;
   wizardAnswers: WizardAnswerRecord[];
+  profile: AthleteProfile | null;
+  profileRevisions: ProfileRevision[];
   reviews: Map<string, Review>;
   comments: CommentRecord[];
   idempotencyKeys: Set<string>;
@@ -41,6 +43,8 @@ const emptyUser = (): UserState => ({
   promptDeliveries: [],
   painReports: new Map(),
   wizardAnswers: [],
+  profile: null,
+  profileRevisions: [],
   reviews: new Map(),
   comments: [],
   idempotencyKeys: new Set(),
@@ -142,6 +146,32 @@ export function createMemoryRepository(): Repository {
       state.proposed.delete(staged.versionId);
       state.activeVersionId = staged.versionId;
       return staged;
+    },
+
+    getAthleteProfile(userId: string): AthleteProfile | undefined {
+      return stateOf(userId).profile ?? undefined;
+    },
+
+    saveAthleteProfile(
+      profile: AthleteProfile,
+      change: { changedBy: ProfileRevision["changedBy"]; source: ProfileRevision["source"]; diff: ProfileRevision["diff"]; occurredAt: string },
+    ): ProfileRevision {
+      const state = stateOf(profile.userId);
+      const revision: ProfileRevision = {
+        userId: profile.userId,
+        id: String(state.profileRevisions.length + 1),
+        changedBy: change.changedBy,
+        source: change.source,
+        diff: change.diff,
+        occurredAt: change.occurredAt,
+      };
+      state.profile = profile;
+      state.profileRevisions.push(revision);
+      return revision;
+    },
+
+    listProfileRevisions(userId: string): ProfileRevision[] {
+      return [...stateOf(userId).profileRevisions];
     },
 
     saveWizardAnswer(userId: string, record: WizardAnswerRecord): void {

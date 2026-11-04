@@ -26,6 +26,7 @@ import {
   latestWizardAnswers,
   nextWizardRevision,
   originalWizardAnswers,
+  profileDiffOf,
   profileFromWizard,
   validateWizardAnswer,
   wizardProgress,
@@ -627,6 +628,67 @@ export function createApi(options: ApiOptions): RequestListener {
         return;
       }
       return fail(response, 405, "method-not-allowed", "use GET or POST /wizard");
+    }
+
+    // POST /wizard/apply - store the folded profile and its revision row. The PLAN is not touched: a changed
+    // orientation becomes a plan through a review the runner decides (ADR-0009), not through this write.
+    if (segments.length === 2 && segments[0] === "wizard" && segments[1] === "apply") {
+      if (method !== "POST") return fail(response, 405, "method-not-allowed", "use POST /wizard/apply");
+      const body = await readBody(request);
+      if (!isObject(body)) return fail(response, 400, "invalid-body", "expected a JSON object");
+      const stored = repository.getAthleteProfile(userId);
+      let base = stored;
+      if (base === undefined && body["profile"] !== undefined) {
+        const parsed = athleteProfileSchema.safeParse(body["profile"]);
+        if (!parsed.success) {
+          return fail(response, 400, "invalid-profile", parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "));
+        }
+        base = parsed.data;
+      }
+      if (base === undefined) {
+        return fail(response, 400, "no-profile", "save a profile first, or send one in the body");
+      }
+      const folded = profileFromWizard(base, repository.listWizardAnswers(userId));
+      if (!folded.ok || folded.profile === undefined) {
+        return fail(response, 400, "invalid-profile", folded.detail ?? "the folded profile is not valid");
+      }
+      const diff = profileDiffOf(base, folded.profile);
+      if (diff.length === 0) {
+        sendJson(response, 200, {
+          status: "unchanged",
+          profile: base,
+          applied: folded.applied,
+          unapplied: folded.unapplied,
+          note: "the answers already match the stored profile",
+        });
+        return;
+      }
+      const revision = repository.saveAthleteProfile(folded.profile, {
+        changedBy: "runner",
+        source: "user",
+        diff,
+        occurredAt: at,
+      });
+      sendJson(response, 201, {
+        status: "saved",
+        profile: folded.profile,
+        revision,
+        applied: folded.applied,
+        unapplied: folded.unapplied,
+        note: "the profile is saved; the plan itself changes only through a review the runner decides",
+      });
+      return;
+    }
+
+    // GET /profile - the stored profile and its revision history.
+    if (segments.length === 1 && segments[0] === "profile" && method === "GET") {
+      const profile = repository.getAthleteProfile(userId);
+      if (profile === undefined) {
+        sendJson(response, 200, { status: "no-profile", profile: null, revisions: [] });
+        return;
+      }
+      sendJson(response, 200, { status: "ok", profile, revisions: repository.listProfileRevisions(userId) });
+      return;
     }
 
     // POST /wizard/profile - fold the recorded answers into the profile the planner would take. A preview: the
