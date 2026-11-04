@@ -78,9 +78,10 @@ const replanSources = packageSources.filter((file) => rel(file).startsWith("pack
 const workerSources = packageSources.filter((file) => rel(file).startsWith("packages/worker/src/"));
 const nudgeSources = packageSources.filter((file) => rel(file).startsWith("packages/nudges/src/"));
 const seasonSources = packageSources.filter((file) => rel(file).startsWith("packages/season/src/"));
+const advisorSources = packageSources.filter((file) => rel(file).startsWith("packages/advisor/src/"));
 
 scan(
-  [...plannerSources, ...policySources, ...narratorSources, ...entriesSources, ...reviewSources, ...offlineSources, ...signalsSources, ...triggersSources, ...replanSources, ...workerSources, ...nudgeSources, ...seasonSources],
+  [...plannerSources, ...policySources, ...narratorSources, ...entriesSources, ...reviewSources, ...offlineSources, ...signalsSources, ...triggersSources, ...replanSources, ...workerSources, ...nudgeSources, ...seasonSources, ...advisorSources],
   PURITY,
   "engine purity (AGENTS rule 1)",
 );
