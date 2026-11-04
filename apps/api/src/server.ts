@@ -31,6 +31,7 @@ import {
   WIZARD_STEPS,
 } from "@training-planner/domain";
 import type { WizardStepId } from "@training-planner/domain";
+import { guidelineSchema } from "@training-planner/domain";
 import { computeSignals } from "@training-planner/signals";
 import { evaluateTriggers } from "@training-planner/triggers";
 import { decideReview, openReview } from "@training-planner/review";
@@ -54,6 +55,11 @@ export interface ApiOptions {
    * never guessed per request, because a quiet-hours decision made in the wrong zone is a prompt at 03:00.
    */
   timezone?: string;
+  /**
+   * The single operator's token (ADR-0009). Absent means the admin routes are closed, not open: a deployment that
+   * forgot to configure an operator must not hand guideline-writing to every runner.
+   */
+  operatorToken?: string;
 }
 
 interface ApiError {
@@ -158,6 +164,37 @@ export function createApi(options: ApiOptions): RequestListener {
     const url = new URL(request.url ?? "/", "http://localhost");
     const segments = url.pathname.split("/").filter((segment) => segment.length > 0);
     const method = request.method ?? "GET";
+
+    // The operator's guideline console (ADR-0009). Deliberately before the runner session: an operator is not a
+    // runner, and a guideline write must not be reachable with a runner's token.
+    if (segments[0] === "admin" && segments[1] === "guidelines") {
+      const expected = options.operatorToken;
+      const presented = request.headers.authorization ?? "";
+      if (expected === undefined || expected.length === 0 || presented !== `Bearer ${expected}`) {
+        return fail(response, 403, "forbidden", "the operator token is required");
+      }
+      if (segments.length !== 2) return fail(response, 404, "not-found", "no such admin route");
+      if (method === "GET") {
+        sendJson(response, 200, { status: "ok", guidelines: repository.listGuidelines() });
+        return;
+      }
+      if (method === "POST") {
+        const parsed = guidelineSchema.safeParse(await readBody(request));
+        if (!parsed.success) {
+          return fail(response, 400, "invalid-body", parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "));
+        }
+        try {
+          repository.saveGuideline(parsed.data);
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          if (detail.includes("already exists")) return fail(response, 409, "duplicate-version", detail);
+          throw error;
+        }
+        sendJson(response, 201, { status: "ok", guideline: parsed.data });
+        return;
+      }
+      return fail(response, 405, "method-not-allowed", "use GET or POST /admin/guidelines");
+    }
 
     if (segments.length === 1 && segments[0] === "health" && method === "GET") {
       sendJson(response, 200, { ok: true, knowledge: knowledge.hash });

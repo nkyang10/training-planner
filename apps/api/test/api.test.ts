@@ -74,7 +74,7 @@ const draft = (overrides: Record<string, unknown> = {}): Record<string, unknown>
 let planVersion: PlanVersion;
 
 beforeAll(async () => {
-  server = createServer(createApi({ repository, sessions, knowledge, now: () => NOW }));
+  server = createServer(createApi({ repository, sessions, knowledge, now: () => NOW, operatorToken: "operator-token" }));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   const port = typeof address === "object" && address !== null ? address.port : 0;
@@ -714,5 +714,69 @@ describe("the onboarding wizard and the personal console (ADR-0009)", () => {
     expect(guidelines.map((guideline) => guideline.guidelineId)).toContain("progression-ceiling");
     expect(guidelines.map((guideline) => guideline.guidelineId)).not.toContain("night-pain-stop");
     expect(guidelines.every((guideline) => guideline.visibility === "public")).toBe(true);
+  });
+});
+
+
+describe("the operator guideline console (ADR-0009)", () => {
+  const guideline = (overrides: Record<string, unknown> = {}) => ({
+    guidelineId: "tone-warmth",
+    version: 1,
+    tier: "constraint",
+    scope: "tone",
+    visibility: "public",
+    text: "Warm, specific, never a scold.",
+    rationale: "The comment is the trust surface.",
+    effectiveFrom: "2026-11-01",
+    createdBy: "operator",
+    ...overrides,
+  });
+
+  it("refuses a runner token: an operator is not a runner", async () => {
+    const refused = await call("/admin/guidelines", { token: "token-a" });
+    expect(refused.status).toBe(403);
+    expect((refused.body.error as { code: string }).code).toBe("forbidden");
+  });
+
+  it("appends a version and returns every version, internal ones included", async () => {
+    const created = await call("/admin/guidelines", { method: "POST", token: null, headers: { authorization: "Bearer operator-token" }, body: guideline() });
+    expect(created.status).toBe(201);
+    expect(created.body.guideline).toMatchObject({ guidelineId: "tone-warmth", version: 1 });
+
+    const internal = await call("/admin/guidelines", {
+      method: "POST",
+      token: null,
+      headers: { authorization: "Bearer operator-token" },
+      body: guideline({ guidelineId: "night-pain-stop", version: 2, scope: "safety", tier: "non-negotiable", visibility: "internal" }),
+    });
+    expect(internal.status).toBe(201);
+
+    const listed = await call("/admin/guidelines", { token: null, headers: { authorization: "Bearer operator-token" } });
+    expect(listed.status).toBe(200);
+    const rows = listed.body.guidelines as Array<{ guidelineId: string; visibility: string }>;
+    expect(rows.map((row) => row.guidelineId)).toContain("night-pain-stop");
+    expect(rows.map((row) => row.guidelineId)).toContain("tone-warmth");
+  });
+
+  it("refuses a duplicate version instead of overwriting history", async () => {
+    const duplicate = await call("/admin/guidelines", {
+      method: "POST",
+      token: null,
+      headers: { authorization: "Bearer operator-token" },
+      body: guideline(),
+    });
+    expect(duplicate.status).toBe(409);
+    expect((duplicate.body.error as { code: string }).code).toBe("duplicate-version");
+  });
+
+  it("refuses a safety guideline made public", async () => {
+    const refused = await call("/admin/guidelines", {
+      method: "POST",
+      token: null,
+      headers: { authorization: "Bearer operator-token" },
+      body: guideline({ guidelineId: "safety-leak", scope: "safety", visibility: "public" }),
+    });
+    expect(refused.status).toBe(400);
+    expect((refused.body.error as { code: string }).code).toBe("invalid-body");
   });
 });
