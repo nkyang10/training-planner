@@ -21,6 +21,8 @@ export interface CalendarPageInput {
   intro: string | undefined;
   /** An open review, if there is one: the banner links to the sheet rather than asking for a decision here. */
   openReview: Review | undefined;
+  /** The daily prompt's sentence, when packages/nudges said one may arrive. */
+  prompt: string | undefined;
 }
 
 export interface DayPageInput {
@@ -99,11 +101,14 @@ export function renderCalendar(input: CalendarPageInput): string {
   });
 
   const intro = input.intro === undefined ? "" : `<p class="muted">${escapeHtml(input.intro)}</p>`;
+  const prompt =
+    input.prompt === undefined ? "" : `<p class="chip prompt" role="status">${escapeHtml(input.prompt)}</p>`;
   const banner =
     input.openReview === undefined
       ? ""
       : `<a class="card banner" href="/review/${escapeHtml(input.openReview.reviewId)}">${escapeHtml(messages.web["web.review-banner"])}</a>`;
   const body = `
+    ${prompt}
     ${banner}
     <section class="card">
       <h2>${escapeHtml(messages.web["web.calendar-title"])}</h2>

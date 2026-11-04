@@ -14,7 +14,7 @@ import { athleteProfileSchema, planVersionSchema } from "@training-planner/domai
 import type { DayEntry } from "@training-planner/domain";
 import { submitEntry } from "@training-planner/entries";
 import type { EntryDraft } from "@training-planner/entries";
-import { isLocale } from "@training-planner/i18n";
+import { format, isLocale, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
 import { loadKnowledge } from "@training-planner/knowledge";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
@@ -26,10 +26,12 @@ import { computeSignals } from "@training-planner/signals";
 import { evaluateTriggers } from "@training-planner/triggers";
 import { decideReview, openReview } from "@training-planner/review";
 import type { ProposedOption } from "@training-planner/review";
+import { decideNudge } from "@training-planner/nudges";
 import { proposePlanOptions } from "@training-planner/replan";
 import type { Decision } from "@training-planner/review";
 import { DuplicateIdempotencyError } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
+import { localClockOf } from "./local-clock";
 
 export interface ApiOptions {
   repository: Repository;
@@ -37,6 +39,11 @@ export interface ApiOptions {
   knowledge?: KnowledgeBundle;
   /** The clock is injected: the API is the composition root, and a test must be able to freeze the day. */
   now?: () => string;
+  /**
+   * The zone a prompt's local hour is computed in. The deployment's default until profile sync owns it (M4);
+   * never guessed per request, because a quiet-hours decision made in the wrong zone is a prompt at 03:00.
+   */
+  timezone?: string;
 }
 
 interface ApiError {
@@ -113,7 +120,7 @@ function trainingDayOf(request: IncomingMessage, now: string): string {
   return now.slice(0, 10);
 }
 
-function localeOf(request: IncomingMessage, body: Record<string, unknown>): Locale {
+function localeOf(request: IncomingMessage, body: Record<string, unknown> = {}): Locale {
   if (typeof body.locale === "string" && isLocale(body.locale)) return body.locale;
   const header = request.headers["accept-language"];
   const value = (Array.isArray(header) ? header[0] : header) ?? "en";
@@ -126,6 +133,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 export function createApi(options: ApiOptions): RequestListener {
   const knowledge = options.knowledge ?? loadKnowledge("knowledge/heuristics");
   const now = options.now ?? (() => new Date().toISOString());
+  const timezone = options.timezone ?? "Asia/Taipei";
   const repository = options.repository;
 
   return (request, response) => {
@@ -262,6 +270,57 @@ export function createApi(options: ApiOptions): RequestListener {
         ...(decision.flagReview === undefined ? {} : { review: decision.flagReview }),
         ...(decision.hardStop === undefined ? {} : { hardStop: decision.hardStop }),
         appliedRules: decision.appliedRules,
+      });
+      return;
+    }
+
+    // GET /prompts/next - the daily prompt policy, with delivery recorded when it says yes.
+    //
+    // The policy is pure (packages/nudges); this route supplies the clock, the local logging hours and the delivery
+    // log, and it records a delivery because a prompt the API handed out is a prompt the runner received.
+    if (segments.length === 2 && segments[0] === "prompts" && segments[1] === "next") {
+      if (method !== "GET") return fail(response, 405, "method-not-allowed", "use GET /prompts/next");
+      const plan = repository.latestPlanVersionFor(userId, today) ?? null;
+      const entries = repository.listEntries(userId);
+      const deliveries = repository.listPromptDeliveries(userId);
+      const clock = localClockOf(at, timezone);
+      const decision = decideNudge({
+        userId,
+        today,
+        nowMinute: clock.hour * 60 + clock.minute,
+        entries,
+        plan,
+        delivered: deliveries.map((delivery) => ({ kind: delivery.kind, day: delivery.day })),
+        loggingHours: entries.map((entry) => localClockOf(entry.clientSubmittedAt ?? at, timezone).hour),
+        knowledge,
+      });
+
+      if (decision.prompt === null) {
+        sendJson(response, 200, { status: "none", reason: decision.reason, evidence: decision.evidence, budget: decision.budget });
+        return;
+      }
+
+      repository.savePromptDelivery({
+        userId,
+        kind: "nudge",
+        day: today,
+        forDay: decision.prompt.forDay,
+        atMinute: decision.prompt.atMinute,
+      });
+      const locale = localeOf(request);
+      const messages = messagesFor(locale);
+      const template = decision.prompt.forDay === today ? "prompt.log-day" : "prompt.log-gap";
+      sendJson(response, 201, {
+        status: "prompt",
+        prompt: {
+          kind: "nudge",
+          text: format(messages.prompt[template], { weekday: weekdayName(locale, decision.prompt.forDay) }),
+          forDay: decision.prompt.forDay,
+          atMinute: decision.prompt.atMinute,
+        },
+        reason: decision.reason,
+        evidence: decision.evidence,
+        budget: decision.budget,
       });
       return;
     }

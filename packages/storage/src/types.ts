@@ -12,7 +12,7 @@
  * - **idempotency is a uniqueness rule**: `appendEntryWithEventAndPointer` refuses a second row for an
  *   idempotency key that already exists. A middleware cannot give that guarantee; a unique index can.
  */
-import type { DayEntry, PlanDiff, PlanVersion, Review, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent } from "@training-planner/domain";
 import type { Locale } from "@training-planner/i18n";
 
 export interface SupersededPointer {
@@ -81,6 +81,10 @@ export interface Repository {
   /** A proposed diff is evidence, stored when it is offered; a review points at it by id. */
   savePlanDiff(diff: PlanDiff): void;
   getPlanDiff(userId: string, diffId: string): PlanDiff | undefined;
+
+  /** A prompt that was delivered. The policy reads this log; nothing rewrites it. */
+  savePromptDelivery(delivery: PromptDelivery): void;
+  listPromptDeliveries(userId: string): PromptDelivery[];
 
   saveReview(review: Review): void;
   getReview(userId: string, reviewId: string): Review | undefined;

@@ -10,16 +10,18 @@ import { readFileSync } from "node:fs";
 import type { DayEntry, Session } from "@training-planner/domain";
 import { submitEntry } from "@training-planner/entries";
 import type { EntryDraft } from "@training-planner/entries";
-import { format, messagesFor } from "@training-planner/i18n";
+import { format, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
 import { loadKnowledge } from "@training-planner/knowledge";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
 import { renderComment, renderPlanExplanation } from "@training-planner/narrator";
+import { decideNudge } from "@training-planner/nudges";
 import { addDays, eachDay, uuidFrom, weekStart } from "@training-planner/planner-core";
 import { evaluatePolicy } from "@training-planner/policy";
 import { decideReview, firstEditableDay } from "@training-planner/review";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
+import { localClockOf } from "./local-clock";
 import { renderCalendar, renderDay, renderLogin, renderReview } from "./pages";
 import { STYLES } from "./styles";
 
@@ -189,6 +191,34 @@ export function createWeb(options: WebOptions): RequestListener {
       const plan = repository.latestPlanVersionFor(userId, today);
       const explanation = plan === undefined ? undefined : renderPlanExplanation(plan, { locale: state.locale });
       const openReview = repository.listReviews(userId).find((review) => review.status === "open");
+      // The daily prompt: packages/nudges decides whether one may arrive, and rendering it is the impression, so
+      // the delivery is recorded here - a page that showed the prompt and did not record it would show it forever.
+      const entries = repository.listEntries(userId);
+      const clock = localClockOf(state.now, timezone);
+      const nudge = decideNudge({
+        userId,
+        today,
+        nowMinute: clock.hour * 60 + clock.minute,
+        entries,
+        plan: plan ?? null,
+        delivered: repository.listPromptDeliveries(userId).map((delivery) => ({ kind: delivery.kind, day: delivery.day })),
+        loggingHours: entries.map((entry) => localClockOf(entry.clientSubmittedAt ?? state.now, timezone).hour),
+        knowledge,
+      });
+      let prompt: string | undefined;
+      if (nudge.prompt !== null) {
+        repository.savePromptDelivery({
+          userId,
+          kind: "nudge",
+          day: today,
+          forDay: nudge.prompt.forDay,
+          atMinute: nudge.prompt.atMinute,
+        });
+        const template = nudge.prompt.forDay === today ? "prompt.log-day" : "prompt.log-gap";
+        prompt = format(messagesFor(state.locale).prompt[template], {
+          weekday: weekdayName(state.locale, nudge.prompt.forDay),
+        });
+      }
       sendHtml(
         response,
         200,
@@ -201,6 +231,7 @@ export function createWeb(options: WebOptions): RequestListener {
           commentOf: (day) => repository.listComments(userId, day)[0],
           intro: explanation?.sentences[0],
           openReview,
+          prompt,
         }),
       );
       return;
