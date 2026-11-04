@@ -291,10 +291,17 @@ create table day_entries (
   --   outcome      what happened to the day
   --   session_taken what was done against the prescription
   outcome      text not null check (outcome in ('rest', 'completed', 'partial', 'skipped', 'missed')),
-  session_taken text check (session_taken in ('as-prescribed', 'alternate', 'extra', 'none')),
+  -- NULL is "the runner did not say": the wire spells that as an absent key, and the contract does not
+  -- accept null (day-entry.schema.json, row 21 of docs/roadmap/backlog.md).
+  session_taken text check (session_taken in ('as-prescribed', 'alternate', 'extra', 'partial', 'none')),
   outcome_detail text check (outcome_detail in
                    ('illness', 'travel', 'work', 'family', 'sleep', 'motivation', 'pain', 'weather',
                     'equipment', 'social', 'just-didnt', 'other')),
+  -- The amount a partial day reports. The wire requires completedKm or durationMin when outcome is
+  -- partial (day-entry.schema.json), so the table has to be able to store either one - otherwise a
+  -- runner's honest answer is unrepresentable, which is the same class of bug as item 20.
+  completed_km numeric(6, 2) check (completed_km between 0 and 250),
+  duration_min smallint check (duration_min between 0 and 1500),
   rpe         smallint check (rpe between 1 and 10),
   legs        smallint check (legs between 1 and 5),      -- the product's five-point scale, not ten
   sleep_h     numeric(4, 2) check (sleep_h between 0 and 24),
@@ -310,8 +317,19 @@ create table day_entries (
   -- and a day that did not says `none`. Written as a biconditional for the same reason
   -- accepted_review_has_a_choice is one - it catches the case where one field was updated and the
   -- other was not.
+  -- `partial` is a marker on both axes: a part of the prescription is only a fact on a day whose outcome is
+  -- partial, and a partial day cannot claim it did the prescription as written.
   constraint outcome_and_session_agree check (
-    session_taken is null or ((outcome in ('rest', 'skipped', 'missed')) = (session_taken = 'none'))
+    (session_taken is null)
+    or (session_taken = 'none' and outcome in ('rest', 'skipped', 'missed'))
+    or (session_taken = 'partial' and outcome = 'partial')
+    or (session_taken in ('as-prescribed', 'alternate', 'extra') and outcome = 'completed')
+  ),
+  -- A part with no amount is not a fact, so a partial day has to say how much.
+  constraint partial_day_has_an_amount check (
+    not (outcome = 'partial' or session_taken = 'partial')
+    or completed_km is not null
+    or duration_min is not null
   )
 );
 -- The "latest" entry is a view over max(revision); an entry is never overwritten in place,

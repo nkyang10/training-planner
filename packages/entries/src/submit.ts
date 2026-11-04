@@ -95,9 +95,9 @@ export function submitEntry(draft: EntryDraft, log: EntryLog, options: SubmitOpt
     correctedFromRevision: latest?.revision ?? null,
     supersededBy: null,
     tzAtEvent: draft.tzAtEvent,
-    // `sessionTaken: null` is not legal when the key is present (day-entry.schema.json allOf), and the
-    // contract is the authority on what a row may say, so an unstated session is an absent key.
-    ...(draft.sessionTaken === undefined || draft.sessionTaken === null ? {} : { sessionTaken: draft.sessionTaken }),
+    // The contract is the authority on what a row may say: an unstated session is an ABSENT key, because
+    // day-entry.schema.json does not accept null (row 21 fixed the description that used to claim it did).
+    ...(draft.sessionTaken === undefined ? {} : { sessionTaken: draft.sessionTaken }),
     outcomeDetail: draft.outcomeDetail ?? null,
     completedKm: draft.completedKm ?? null,
     durationMin: draft.durationMin ?? null,
@@ -125,6 +125,18 @@ export function submitEntry(draft: EntryDraft, log: EntryLog, options: SubmitOpt
   }
   if (draft.outcome === "completed" && draft.sessionTaken === "none") {
     coherence.push("sessionTaken none is not legal on a completed day");
+  }
+  // `partial` is a marker on both axes and the two have to agree: a part of the prescription is only a fact on a
+  // day whose outcome is partial, and a partial day may not claim it did the prescription as written.
+  if (draft.sessionTaken === "partial" && draft.outcome !== "partial") {
+    coherence.push("sessionTaken partial is only legal when outcome is partial");
+  }
+  if (
+    draft.outcome === "partial" &&
+    draft.sessionTaken !== undefined &&
+    draft.sessionTaken !== "partial"
+  ) {
+    coherence.push("sessionTaken must be partial when outcome is partial");
   }
   if (draft.outcome === "partial" && draft.completedKm != null && draft.completedKm > (draft.completedKm ?? 0) + 0) {
     coherence.push("completedKm must be a number");

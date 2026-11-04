@@ -1,0 +1,10 @@
+{
+  "day": "2026-11-07",
+  "outcome": "partial",
+  "revision": 1,
+  "tzAtEvent": "Asia/Taipei",
+  "sessionTaken": "partial",
+  "rpe": 5,
+  "legs": 2,
+  "idempotencyKey": "contract-partial-no-km-0001"
+}

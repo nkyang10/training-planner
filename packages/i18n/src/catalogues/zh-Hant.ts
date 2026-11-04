@@ -61,6 +61,7 @@ export const zhHant: Messages = {
     "web.outcome-skipped": "跳過",
     "web.outcome-rest": "休息日",
     "web.outcome-missed": "沒跑",
+    "web.completed-km": "實際距離（公里；如與計劃不同）",
     "web.rpe": "費力程度",
     "web.legs": "腿的狀態",
     "web.note": "有什麼想記下來的?",

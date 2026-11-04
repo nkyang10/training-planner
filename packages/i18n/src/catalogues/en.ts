@@ -60,6 +60,7 @@ export const en: Messages = {
     "web.outcome-skipped": "Skipped",
     "web.outcome-rest": "Rest day",
     "web.outcome-missed": "Missed",
+    "web.completed-km": "Distance run (km, if it was not as planned)",
     "web.rpe": "Effort",
     "web.legs": "Legs",
     "web.note": "Anything worth remembering?",

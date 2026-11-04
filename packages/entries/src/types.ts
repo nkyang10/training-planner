@@ -26,7 +26,7 @@ export interface EntryDraft {
   day: string;
   outcome: DayEntryOutcome;
   tzAtEvent: string;
-  sessionTaken?: SessionTaken | null;
+  sessionTaken?: SessionTaken;
   outcomeDetail?: OutcomeDetail | null;
   completedKm?: number | null;
   durationMin?: number | null;
