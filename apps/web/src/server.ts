@@ -93,6 +93,13 @@ async function readForm(request: IncomingMessage): Promise<URLSearchParams> {
 const oneOf = <T extends string>(values: readonly T[], candidate: string | null, fallback: T): T =>
   values.find((value) => value === candidate) ?? fallback;
 
+/** A number the runner typed, or undefined: the field is optional and "not said" stays absent. */
+const numberInRange = (candidate: string | null, min: number, max: number): number | undefined => {
+  if (candidate === null || candidate.trim().length === 0) return undefined;
+  const parsed = Number.parseFloat(candidate);
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? Math.round(parsed * 10) / 10 : undefined;
+};
+
 const intInRange = (candidate: string | null, min: number, max: number, fallback: number): number => {
   const parsed = candidate === null ? Number.NaN : Number.parseInt(candidate, 10);
   return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
@@ -301,12 +308,17 @@ export function createWeb(options: WebOptions): RequestListener {
         const reason = (form.get("detail") ?? "").trim();
         const outcomeDetail = SKIP_REASONS.find((candidate) => candidate === reason);
         const note = (form.get("note") ?? "").trim();
+        const km = numberInRange(form.get("completedKm"), 0.1, 250);
         const draft: EntryDraft = {
           day,
           outcome,
           tzAtEvent: timezone,
           ...(outcome === "completed" ? { sessionTaken: "as-prescribed" as const } : {}),
+          ...(outcome === "partial" ? { sessionTaken: "partial" as const } : {}),
           ...(outcome === "rest" || outcome === "missed" ? { sessionTaken: "none" as const } : {}),
+          // A partial day without an amount is not a fact, so the form asks for one and the pipeline refuses it
+          // otherwise. Completed days may carry the real distance too; the contract allows it.
+          ...(km === undefined ? {} : { completedKm: km }),
           ...(outcome === "skipped" && outcomeDetail !== undefined ? { outcomeDetail } : {}),
           rpe: intInRange(form.get("rpe"), 1, 10, 6),
           legs: intInRange(form.get("legs"), 1, 5, 2),

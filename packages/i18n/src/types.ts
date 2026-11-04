@@ -48,6 +48,7 @@ export type WebTemplate =
   | "web.outcome-skipped"
   | "web.outcome-rest"
   | "web.outcome-missed"
+  | "web.completed-km"
   | "web.rpe"
   | "web.legs"
   | "web.note"

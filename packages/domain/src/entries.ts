@@ -4,7 +4,7 @@
  * Split from types.ts only to keep each file readable; both are re-exported from ./index.
  */
 export type DayEntryOutcome = "rest" | "completed" | "partial" | "skipped" | "missed";
-export type SessionTaken = "as-prescribed" | "alternate" | "extra" | "none";
+export type SessionTaken = "as-prescribed" | "alternate" | "extra" | "partial" | "none";
 export type OutcomeDetail =
   | "illness" | "travel" | "work" | "family" | "sleep" | "motivation"
   | "pain" | "weather" | "equipment" | "social" | "just-didnt" | "other";
@@ -54,7 +54,8 @@ export interface DayEntry {
   correctedFromRevision?: number | null;
   /** Set by the writer when a later revision exists; the old row is never deleted (AGENTS rule 4). */
   supersededBy?: string | null;
-  sessionTaken?: SessionTaken | null;
+  /** Absent when the runner did not say: null is not a value day-entry.schema.json accepts. */
+  sessionTaken?: SessionTaken;
   outcomeDetail?: OutcomeDetail | null;
   completedKm?: number | null;
   durationMin?: number | null;

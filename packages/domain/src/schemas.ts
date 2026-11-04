@@ -114,7 +114,7 @@ export const athleteProfileSchema = z.object({
   }).strict().optional(),
   }).strict();
 
-export const dayEntrySchema = whenThen(whenThen(whenThen(whenThen(z.object({
+export const dayEntrySchema = whenThen(whenThen(whenThen(whenThen(whenThen(whenThen(z.object({
     "entryId": z.string().uuid().optional(),
     "userId": z.string().uuid().optional(),
     "day": z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -127,7 +127,7 @@ export const dayEntrySchema = whenThen(whenThen(whenThen(whenThen(z.object({
     "serverReceivedAt": z.string().datetime({ offset: true }).nullable().optional(),
     "idempotencyKey": z.string().min(8).max(128).optional(),
     "outcome": z.union([z.literal("rest"), z.literal("completed"), z.literal("partial"), z.literal("skipped"), z.literal("missed")]),
-    "sessionTaken": z.union([z.literal("as-prescribed"), z.literal("alternate"), z.literal("extra"), z.literal("none"), z.null()]).optional(),
+    "sessionTaken": z.union([z.literal("as-prescribed"), z.literal("alternate"), z.literal("extra"), z.literal("partial"), z.literal("none")]).optional(),
     "outcomeDetail": z.union([z.literal("illness"), z.literal("travel"), z.literal("work"), z.literal("family"), z.literal("sleep"), z.literal("motivation"), z.literal("pain"), z.literal("weather"), z.literal("equipment"), z.literal("social"), z.literal("just-didnt"), z.literal("other"), z.null()]).optional(),
     "completedKm": z.number().min(0).max(250).nullable().optional(),
     "durationMin": z.number().min(0).max(1500).nullable().optional(),
@@ -180,7 +180,18 @@ export const dayEntrySchema = whenThen(whenThen(whenThen(whenThen(z.object({
     "sessionTaken": requiredAny,
   }).passthrough(), z.object({
     "sessionTaken": z.literal("none").optional(),
-  }).passthrough(), "the object does not satisfy the contract's if/then rule");
+  }).passthrough(), "the object does not satisfy the contract's if/then rule"), z.object({
+    "outcome": z.literal("partial").optional(),
+    "sessionTaken": z.union([z.literal("as-prescribed"), z.literal("alternate"), z.literal("extra"), z.literal("none")]),
+  }).passthrough(), z.object({
+    "sessionTaken": z.literal("partial").optional(),
+  }).passthrough(), "the object does not satisfy the contract's if/then rule"), z.object({
+    "sessionTaken": z.literal("partial"),
+  }).passthrough(), z.union([z.object({
+    "completedKm": z.number().gt(0),
+  }).passthrough(), z.object({
+    "durationMin": z.number().gt(0),
+  }).passthrough()]), "the object does not satisfy the contract's if/then rule");
 
 const planVersionSession = whenThen(whenThen(whenThen(z.object({
     "day": z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

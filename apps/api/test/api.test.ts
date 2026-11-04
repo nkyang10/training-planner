@@ -208,7 +208,7 @@ describe("the daily loop closes: entry in, comment out", () => {
   });
 
   it("refuses an entry the contract rejects, naming the field", async () => {
-    const response = await call("/entries", { body: draft({ day: "2026-11-14", outcome: "skipped", sessionTaken: null }), day: "2026-11-14" });
+    const response = await call("/entries", { body: draft({ day: "2026-11-14", outcome: "skipped" }), day: "2026-11-14" });
     expect(response.status).toBe(400);
     const error = response.body["error"] as { code: string; detail: string };
     expect(error.code).toBe("invalid-entry");

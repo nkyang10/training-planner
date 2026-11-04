@@ -151,6 +151,7 @@ describe("the day drawer is a form that posts the same draft the API takes", () 
     for (const outcome of ["completed", "partial", "skipped", "rest", "missed"]) {
       expect(response.html).toContain(`value="${outcome}"`);
     }
+    expect(response.html).toContain('name="completedKm"');
     expect(response.html).toContain('name="rpe"');
     expect(response.html).toContain('name="legs"');
     expect(response.html).toContain('name="idempotencyKey"');
@@ -173,6 +174,22 @@ describe("the day drawer is a form that posts the same draft the API takes", () 
     expect(calendar.html).toContain("Logged");
   });
 
+  it("saves a partial day with its marker and its distance", async () => {
+    // Before this slice the form offered "Partly done" and had no distance field, so the pipeline refused it with
+    // "completedKm or durationMin is required when outcome is partial" - a dead end with a button on it.
+    const saved = await call("/day/2026-11-07", {
+      cookie: "session=token-a",
+      form: { outcome: "partial", completedKm: "3.5", rpe: "5", legs: "2", idempotencyKey: "form-key-partial-0001" },
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.html).toContain("Saved.");
+
+    const stored = repository.listEntriesForDay(USER_A, "2026-11-07").at(-1);
+    expect(stored?.outcome).toBe("partial");
+    expect(stored?.sessionTaken).toBe("partial");
+    expect(stored?.completedKm).toBe(3.5);
+  });
+
   it("does not write twice when the same form is submitted twice", async () => {
     const before = repository.listEntriesForDay(USER_A, "2026-11-08").length;
     const form = { outcome: "completed", rpe: "6", legs: "2", idempotencyKey: "form-key-0002" };
@@ -184,6 +201,7 @@ describe("the day drawer is a form that posts the same draft the API takes", () 
   });
 
   it("refuses a skipped day with no reason instead of inventing one", async () => {
+    const before = repository.listEntriesForDay(USER_A, "2026-11-07").length;
     const response = await call("/day/2026-11-07", {
       cookie: "session=token-a",
       form: { outcome: "skipped", detail: "", rpe: "6", legs: "2", idempotencyKey: "form-key-0003" },
@@ -191,7 +209,7 @@ describe("the day drawer is a form that posts the same draft the API takes", () 
     expect(response.status).toBe(400);
     expect(response.html).toContain("did not save");
     expect(response.html).toContain("outcomeDetail");
-    expect(repository.listEntriesForDay(USER_A, "2026-11-07")).toHaveLength(0);
+    expect(repository.listEntriesForDay(USER_A, "2026-11-07")).toHaveLength(before);
   });
 
   it("saves a skipped day that states its reason", async () => {

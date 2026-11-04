@@ -100,7 +100,8 @@ describe("the future is not writable and the contract is the authority", () => {
 
   it("refuses an entry the day-entry contract rejects", () => {
     // A skipped day must carry outcomeDetail; the contract says so and the pipeline must not store it anyway.
-    const result = submitEntry(draft({ day: TODAY, outcome: "skipped", sessionTaken: null }), emptyLog, options());
+    // The builder defaults sessionTaken to as-prescribed, so "not said" has to be stated as such.
+    const result = submitEntry(draft({ day: TODAY, outcome: "skipped", sessionTaken: undefined }), emptyLog, options());
     expect(result.status).toBe("rejected");
     if (result.status !== "rejected") throw new Error("unreachable");
     expect(result.code).toBe("invalid-entry");
@@ -108,9 +109,46 @@ describe("the future is not writable and the contract is the authority", () => {
   });
 
   it("accepts a rest day without inventing a session", () => {
-    const result = accepted(submitEntry(draft({ outcome: "rest", sessionTaken: null, rpe: null }), emptyLog, options()));
+    const result = accepted(submitEntry(draft({ outcome: "rest", rpe: null, sessionTaken: undefined }), emptyLog, options()));
     expect(dayEntrySchema.safeParse(result.entry).success).toBe(true);
     expect(result.entry.sessionTaken).toBeUndefined();
+  });
+});
+
+describe("a partial day says what part it did", () => {
+  it("stores the partial marker and the distance", () => {
+    const result = accepted(
+      submitEntry(draft({ outcome: "partial", sessionTaken: "partial", completedKm: 3.5 }), emptyLog, options()),
+    );
+    expect(result.entry.sessionTaken).toBe("partial");
+    expect(result.entry.completedKm).toBe(3.5);
+    expect(dayEntrySchema.safeParse(result.entry).success).toBe(true);
+  });
+
+  it("refuses the marker on a day whose outcome is not partial", () => {
+    const result = submitEntry(draft({ outcome: "completed", sessionTaken: "partial", completedKm: 5 }), emptyLog, options());
+    expect(result.status).toBe("rejected");
+    if (result.status !== "rejected") throw new Error("unreachable");
+    expect(result.code).toBe("invalid-entry");
+    expect(result.detail).toContain("partial");
+  });
+
+  it("refuses a partial day that claims it did the prescription as written", () => {
+    const result = submitEntry(
+      draft({ outcome: "partial", sessionTaken: "as-prescribed", completedKm: 3 }),
+      emptyLog,
+      options(),
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status !== "rejected") throw new Error("unreachable");
+    expect(result.detail).toContain("sessionTaken must be partial");
+  });
+
+  it("refuses a partial marker with no amount, because a part with no amount is not a fact", () => {
+    const result = submitEntry(draft({ outcome: "partial", sessionTaken: "partial" }), emptyLog, options());
+    expect(result.status).toBe("rejected");
+    if (result.status !== "rejected") throw new Error("unreachable");
+    expect(result.code).toBe("invalid-entry");
   });
 });
 

@@ -190,6 +190,8 @@ export function renderDay(input: DayPageInput): string {
         ${radios}
         ${reasonRow}
       </fieldset>
+      <label for="completedKm">${escapeHtml(messages.web["web.completed-km"])}</label>
+      <input id="completedKm" name="completedKm" type="number" min="0" max="250" step="0.1" inputmode="decimal" value="${input.current?.completedKm ?? ""}">
       <label for="rpe">${escapeHtml(messages.web["web.rpe"])}</label>
       <input id="rpe" name="rpe" type="range" min="1" max="10" step="1" value="${input.current?.rpe ?? 6}">
       <label for="legs">${escapeHtml(messages.web["web.legs"])}</label>

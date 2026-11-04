@@ -25,8 +25,8 @@
       "description": "What happened to the day. The same five values the column stores (day_entries.outcome), because a runner's answer that no column can hold is not a feature. `rest` is a day accounted for, not a hole; `partial` is meaningful work below the prescription and is the input the next micro-adjust reads; `skipped` is the runner's own report; `missed` is the system's verdict on a day that closed with no entry, written at the day-start rollup and never submitted by a runner (formerly spelled `unlogged`). `completed` means the session was done in full - whether as prescribed, as the planned alternate, or beyond it is the next field's business."
     },
     "sessionTaken": {
-      "enum": ["as-prescribed", "alternate", "extra", "none", null],
-      "description": "What was actually done, relative to the prescription. `alternate` is a success - the planned alternate was chosen - and counts toward load but never toward running ramp maths; `extra` is more than prescribed and subtracts rather than earning credit (missed-session-rules.yaml#extra-activity-subtracts); `none` is nothing. Null when the runner did not say and the engine cannot infer it. Deliberately not folded into `outcome`: the same outcome can be a different session, and the rules need both facts separately."
+      "enum": ["as-prescribed", "alternate", "extra", "partial", "none"],
+      "description": "What was actually done, relative to the prescription. `alternate` is a success - the planned alternate was chosen - and counts toward load but never toward running ramp maths; `extra` is more than prescribed and subtracts rather than earning credit (missed-session-rules.yaml#extra-activity-subtracts); `partial` is part of the prescription, and it requires the outcome `partial` plus a completedKm or durationMin, because a part with no amount is not a fact; `none` is nothing. When the runner did not say, the key is ABSENT - null is not a value this contract accepts, and the description used to say otherwise. Deliberately not folded into `outcome`: the same outcome can be a different session, and the rules need both facts separately."
     },
     "outcomeDetail": {
       "enum": ["illness", "travel", "work", "family", "sleep", "motivation", "pain", "weather", "equipment", "social", "just-didnt", "other", null],
@@ -99,6 +99,20 @@
     {
       "if": { "properties": { "outcome": { "enum": ["rest", "skipped", "missed"] } }, "required": ["sessionTaken"] },
       "then": { "properties": { "sessionTaken": { "const": "none" } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "partial" }, "sessionTaken": { "enum": ["as-prescribed", "alternate", "extra", "none"] } }, "required": ["sessionTaken"] },
+      "then": { "properties": { "sessionTaken": { "const": "partial" } } }
+    },
+    {
+      "if": { "properties": { "sessionTaken": { "const": "partial" } }, "required": ["sessionTaken"] },
+      "then": {
+        "properties": { "outcome": { "const": "partial" } },
+        "anyOf": [
+          { "properties": { "completedKm": { "type": "number", "exclusiveMinimum": 0 } }, "required": ["completedKm"] },
+          { "properties": { "durationMin": { "type": "number", "exclusiveMinimum": 0 } }, "required": ["durationMin"] }
+        ]
+      }
     }
   ]
 }
