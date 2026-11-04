@@ -14,6 +14,7 @@ wording including the escalation text: `docs/ux/feedback-microcopy.md`.
 
 | Route | What it is |
 |---|---|
+| database | the web process runs on the **memory** repository unless `TRAINING_PLANNER_DB` is `memory` (default) or `sqlite:<path>`; the SQLite adapter is closed on `SIGINT` / `SIGTERM` |
 | `GET /login`, `POST /login` | a token form that sets an `HttpOnly; SameSite=Lax` session cookie |
 | `GET /pain` | the pain history and its trajectory (from `packages/entries`' `painTrendOf`): the rows `packages/entries` projects from entries, with the flags that matter (night pain, gait change, known injury). It says what happened, not what it means - the triage still reads one entry's array (row 35) |
 | `GET /season` | the plan's weeks, planned against done, with the adherence rate and a way back to the week |

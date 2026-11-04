@@ -4,7 +4,8 @@
  * Nothing else lives here. The server is `createApi` in server.ts, which is a pure function of its dependencies,
  * so the process wrapper is the only untested-by-vitest part of the app - and it is four lines of wiring.
  */
-import { createMemoryRepository, createMemorySessions } from "@training-planner/storage";
+import { createMemorySessions, createRepositoryFromSpec } from "@training-planner/storage";
+import { modelPortFromEnv } from "./provider";
 import { startApi } from "./server";
 
 const port = Number(process.env["PORT"] ?? "8080");
@@ -16,5 +17,24 @@ if (tokens === undefined || tokens.length === 0) {
 }
 
 const sessions = createMemorySessions(JSON.parse(tokens) as Record<string, string>);
-const server = startApi({ repository: createMemoryRepository(), sessions, port });
-server.on("listening", () => console.log(`api: listening on :${port}`));
+const database = createRepositoryFromSpec(process.env["TRAINING_PLANNER_DB"]);
+const modelPort = modelPortFromEnv(process.env);
+const modelId = process.env["TRAINING_PLANNER_MODEL_NAME"];
+const server = startApi({
+  repository: database.repository,
+  sessions,
+  port,
+  ...(modelPort === undefined ? {} : { modelPort, ...(modelId === undefined ? {} : { modelId }) }),
+});
+server.on("listening", () =>
+  console.log(`api: listening on :${port} (database: ${database.kind}${modelPort === undefined ? ", no model port" : `, model: ${modelId ?? "configured"}`})`),
+);
+
+// The SQLite adapter holds the file open; releasing it on the way out is the difference between a clean stop and a
+// database file a Windows machine cannot remove.
+const shutdown = (): void => {
+  database.close();
+  server.close(() => process.exit(0));
+};
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

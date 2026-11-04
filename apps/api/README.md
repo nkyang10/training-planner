@@ -5,6 +5,12 @@ Thin by design — it validates, authenticates and persists; it does not plan.
 
 ```bash
 API_TOKENS='{"dev-token":"<user-uuid>"}' PORT=8080 npx tsx apps/api/src/index.ts
+
+The process runs on the **memory** repository unless `TRAINING_PLANNER_DB` says otherwise: `memory` (the default) or
+`sqlite:<path>` (e.g. `sqlite:./training-planner.sqlite`), which opens the SQLite adapter and closes it on `SIGINT` /
+`SIGTERM`. An unknown spec is a startup error, not a silent fallback. A real model port is configured the same way the
+route documents it (`TRAINING_PLANNER_MODEL_BASE_URL` / `..._API_KEY` / `..._NAME`); without it the process logs
+`no model port` and `POST /reviews/advisor` answers 503.
 ```
 
 ## The daily loop, in one request
