@@ -92,7 +92,19 @@ export function buildAdvisorRequest(input: AdvisorInput): AdvisorCall {
 
   const request: AdvisorRequest = {
     system: { guidelines, rules: [...REQUEST_RULES] },
-    runner: { answers, settings: input.settings, revisedSteps },
+    runner: {
+      answers,
+      settings: input.settings,
+      revisedSteps,
+      profile:
+        input.profile === undefined
+          ? null
+          : {
+              goalType: input.profile.goal.type,
+              riskAppetite: input.profile.goal.riskAppetite ?? null,
+              availabilityDays: [...input.profile.availability.days],
+            },
+    },
     context: {
       today: input.today,
       planVersionId: input.plan.versionId,

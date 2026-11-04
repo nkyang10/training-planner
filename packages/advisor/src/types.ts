@@ -8,7 +8,7 @@
  *
  * Nothing here reads a clock, a network or a file: `today` is an argument and the model is a port (see `ModelPort`).
  */
-import type { DayEntry, DayName, GuidelineContract, PlanVersion, SessionKind, Signal } from "@training-planner/domain";
+import type { AthleteProfile, DayEntry, DayName, GuidelineContract, PlanVersion, SessionKind, Signal } from "@training-planner/domain";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
 
 /** One recorded wizard answer, matching `wizard_answers` (ADR-0009). */
@@ -33,6 +33,8 @@ export interface AdvisorInput {
   signals?: readonly Signal[];
   wizardAnswers: readonly WizardAnswer[];
   settings: AdvisorSettings;
+  /** Optional: the profile the planner would use after the answers. The model sees it so it reasons about the same body. */
+  profile?: AthleteProfile;
   guidelines: readonly GuidelineContract[];
   /** The runner's training day, injected. */
   today: string;
@@ -63,6 +65,8 @@ export interface AdvisorRequest {
   runner: {
     answers: WizardAnswer[];
     settings: AdvisorSettings;
+    /** The profile the answers fold into (packages/domain's profileFromWizard), or null when it was not supplied. */
+    profile: { goalType: string; riskAppetite: string | null; availabilityDays: DayName[] } | null;
     /** Answers the runner has changed, so the model can see a preference that moved rather than guess one. */
     revisedSteps: string[];
   };

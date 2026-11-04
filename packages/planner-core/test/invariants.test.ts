@@ -225,3 +225,46 @@ describe("checkInvariants returns, it does not throw", () => {
     expect(() => checkInvariants(output, { knowledge })).not.toThrow();
   });
 });
+
+
+describe("a runner's preference cannot override the corpus's hard-day cap", () => {
+  const hardKinds = ["tempo", "vo2max", "hills", "mp", "test", "race"];
+  const busiestWeek = (version: PlanVersion): number => {
+    const perWeek = new Map<string, number>();
+    for (const session of version.sessions) {
+      if (session.hardDay === true || hardKinds.includes(session.kind)) {
+        perWeek.set(weekStart(session.day), (perWeek.get(weekStart(session.day)) ?? 0) + 1);
+      }
+    }
+    return Math.max(...perWeek.values());
+  };
+
+  it("caps hard days at the corpus's cap even when the runner offers seven days", () => {
+    const cap = knowledge.number("intensity-distribution.yaml#hard_days_cap");
+    const { version } = generatePlan(
+      makeInput({
+        profile: {
+          ...makeInput().profile,
+          availability: { days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] },
+        },
+      }),
+    );
+    const hard = version.sessions.filter((session) => session.hardDay === true || hardKinds.includes(session.kind));
+    expect(hard.length).toBeGreaterThan(0);
+    expect(busiestWeek(version)).toBeLessThanOrEqual(cap);
+  });
+
+  it("the aggressive appetite moves the band, not the cap", () => {
+    const cap = knowledge.number("intensity-distribution.yaml#hard_days_cap");
+    const aggressive = generatePlan(
+      makeInput({
+        profile: {
+          ...makeInput().profile,
+          availability: { days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] },
+          goal: { type: "finish", event: null, riskAppetite: "aggressive" },
+        },
+      }),
+    );
+    expect(busiestWeek(aggressive.version)).toBeLessThanOrEqual(cap);
+  });
+});
