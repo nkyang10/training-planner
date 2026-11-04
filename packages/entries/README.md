@@ -18,6 +18,7 @@ rewriting history (AGENTS rule 4).
 
 | Export | What it does |
 |---|---|
+| `painTrendOf({ reports, today, windowDays? })` | the trajectory over the rows: rising/falling/stable from first and last intensity in the window, `unknown` when there is one report or none, plus the two decisive flags (night pain, gait change). Seven-day window, shared with `pain_trend` in `packages/signals` |
 | `painReportsOf({ userId, entry })` | projects the entry's pain array into rows shaped like `pain_reports`, with ids derived from the entry's identity, so a replay or a re-derivation writes the same row |
 | Rule | Why it is worth a package |
 |---|---|

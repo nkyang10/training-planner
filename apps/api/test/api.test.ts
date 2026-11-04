@@ -413,6 +413,13 @@ describe("GET /pain returns the rows an entry wrote", () => {
     expect(reports[1]).toMatchObject({ side: null, nightPain: false, duration: null });
   });
 
+  it("serves the trajectory over the rows, not over one entry", async () => {
+    const response = await call("/pain", { token: "token-c" });
+    const trend = response.body["trend"] as { direction: string; days: number; peak: number | null; note: string };
+    // Two reports on one day is one point: the direction is unknown and the note says why.
+    expect(trend).toMatchObject({ direction: "unknown", days: 1, peak: 6, note: "one-report" });
+  });
+
   it("writes nothing twice for the same idempotency key", async () => {
     const before = (await call("/pain", { token: "token-c" })).body["reports"] as unknown[];
     const retry = await call("/entries", {

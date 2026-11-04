@@ -5,6 +5,8 @@
 export { submitEntry, entriesForDay, resolveCurrent, pendingDays } from "./submit";
 export { closeEventFor, DAY_CLOSED } from "./close";
 export { painReportsOf } from "./pain";
+export { painTrendOf, PAIN_TREND_WINDOW_DAYS } from "./pain-trend";
+export type { PainDirection, PainTrend, PainTrendInput } from "./pain-trend";
 export type { PainReportInput } from "./pain";
 export type { CloseEventInput } from "./close";
 export type {
