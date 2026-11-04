@@ -46,6 +46,18 @@ describe("the knowledge bundle", () => {
   });
 });
 
+describe("a bundle is a value", () => {
+  it("a copy with a replaced knobs map reads the copy, not the original", () => {
+    const anchor = "load-progression.yaml#weekly_increment_pct";
+    const knob = bundle.knob(anchor);
+    const knobs = new Map(bundle.knobs);
+    knobs.set(anchor, { ...knob, value: 11 });
+    const copy = { ...bundle, knobs, hash: hashOf({ from: bundle.hash, anchor, value: 11 }) };
+    expect(copy.number(anchor)).toBe(11);
+    expect(bundle.number(anchor)).toBe(8);
+    expect(copy.hash).not.toBe(bundle.hash);
+  });
+});
 describe("canonical JSON", () => {
   it("does not depend on object key order", () => {
     expect(canonicalJson({ b: 1, a: [2, { d: 4, c: 3 }] })).toBe(canonicalJson({ a: [2, { c: 3, d: 4 }], b: 1 }));

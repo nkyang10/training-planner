@@ -285,6 +285,27 @@ jobs:
       - run: pnpm test
       - name: Golden plans
         run: pnpm test:golden
+
+      # The phase gate runs the gates a phase claims. In the knowledge job it can check the corpus gates;
+      # here, where node_modules exists, it can also run the test suite and the golden suite that M1's
+      # criteria claim. A claim verified nowhere is a sentence, and a claim verified in two jobs is a claim.
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Phase control (graph, states and done claims)
+        shell: pwsh
+        run: |
+          # The gates this job can run need their own tools: pyyaml for the phase files, jsonschema for the
+          # contract instances. The first CI run of this step proved it - gate:instances exited 1 because
+          # jsonschema was missing, and the phase gate correctly refused to call that a pass.
+          python -m pip install --quiet --disable-pip-version-check pyyaml jsonschema
+          $out = & python tools/check-phases.py 2>&1 | Tee-Object -FilePath phase-control-app.txt
+          $text = $out -join "`n"
+          $text
+          if ($text -notmatch 'RESULT: OK') {
+            "::error::the phase graph and its claims do not hold"
+            exit 1
+          }
+          'Phase control clean.'
       # Catalogue parity and the narrator test moved to M2 with their subjects: there are no catalogues
       # and no narrator before the daily loop exists, and a step that cannot fail is not a gate. They are
       # written as criteria in docs/engineering/phases/M2.md, where a phase that claims them has to show
