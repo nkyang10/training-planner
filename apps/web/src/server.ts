@@ -8,6 +8,7 @@
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
 import type { DayEntry, Session, WizardStepId } from "@training-planner/domain";
+import { guidelineSchema } from "@training-planner/domain";
 import {
   latestWizardAnswers,
   nextWizardRevision,
@@ -32,7 +33,7 @@ import { exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
 import { localClockOf } from "./local-clock";
-import { renderCalendar, renderConsole, renderDay, renderLogin, renderPain, renderReview, renderSeason, renderWizard } from "./pages";
+import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderConsole, renderDay, renderLogin, renderPain, renderReview, renderSeason, renderWizard } from "./pages";
 import { STYLES } from "./styles";
 
 export interface WebOptions {
@@ -42,6 +43,11 @@ export interface WebOptions {
   now?: () => string;
   /** The dev default until the profile carries a timezone into the plan version. */
   timezone?: string;
+  /**
+   * The single operator's token (ADR-0009). Absent means the console is closed, not open: a deployment that forgot to
+   * configure an operator must not hand guideline-writing to every runner.
+   */
+  operatorToken?: string;
 }
 
 const MAX_BODY_BYTES = 200_000;
@@ -196,6 +202,107 @@ export function createWeb(options: WebOptions): RequestListener {
 
     if (method === "POST" && url.pathname === "/sign-out") {
       redirect(response, "/login", { "set-cookie": "session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0" });
+      return;
+    }
+
+    // The operator console (ADR-0009). It sits before the runner's session on purpose: an operator is not a
+    // runner, and a guideline write must not be reachable with a runner's cookie.
+    const operatorExpected = options.operatorToken;
+    const operatorCookie = (request.headers.cookie ?? "")
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith("operator="));
+    const presentedOperator = operatorCookie === undefined ? "" : decodeURIComponent(operatorCookie.slice("operator=".length));
+    const isOperator = operatorExpected !== undefined && operatorExpected.length > 0 && presentedOperator === operatorExpected;
+
+    if (url.pathname === "/admin/login") {
+      if (method === "GET") {
+        sendHtml(response, 200, renderAdminLogin(state.locale, undefined));
+        return;
+      }
+      if (method === "POST") {
+        const form = await readForm(request);
+        if (operatorExpected !== undefined && form.get("token") === operatorExpected) {
+          redirect(response, "/admin/guidelines", {
+            "set-cookie": `operator=${encodeURIComponent(operatorExpected)}; Path=/admin; HttpOnly; SameSite=Lax`,
+          });
+          return;
+        }
+        sendHtml(response, 200, renderAdminLogin(state.locale, messagesFor(state.locale).web["web.admin-forbidden"]));
+        return;
+      }
+    }
+
+    if (url.pathname === "/admin/sign-out" && method === "POST") {
+      redirect(response, "/admin/login", { "set-cookie": "operator=; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=0" });
+      return;
+    }
+
+    if (url.pathname === "/admin/guidelines") {
+      if (!isOperator) {
+        sendHtml(response, 200, renderAdminLogin(state.locale, messagesFor(state.locale).web["web.admin-forbidden"]));
+        return;
+      }
+      if (method === "GET") {
+        sendHtml(
+          response,
+          200,
+          renderAdminGuidelines({
+            locale: state.locale,
+            guidelines: repository.listGuidelines(),
+            saved: url.searchParams.get("saved") === "1",
+            error: undefined,
+          }),
+        );
+        return;
+      }
+      if (method === "POST") {
+        const form = await readForm(request);
+        const candidate = {
+          guidelineId: form.get("guidelineId") ?? "",
+          version: Number(form.get("version") ?? "0"),
+          tier: form.get("tier") ?? "",
+          scope: form.get("scope") ?? "",
+          visibility: form.get("visibility") ?? "",
+          text: form.get("text") ?? "",
+          rationale: form.get("rationale") ?? "",
+          effectiveFrom: form.get("effectiveFrom") ?? "",
+          createdBy: "operator",
+        };
+        const parsed = guidelineSchema.safeParse(candidate);
+        if (!parsed.success) {
+          sendHtml(
+            response,
+            200,
+            renderAdminGuidelines({
+              locale: state.locale,
+              guidelines: repository.listGuidelines(),
+              saved: false,
+              error: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "),
+            }),
+          );
+          return;
+        }
+        try {
+          repository.saveGuideline(parsed.data);
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          sendHtml(
+            response,
+            200,
+            renderAdminGuidelines({
+              locale: state.locale,
+              guidelines: repository.listGuidelines(),
+              saved: false,
+              error: detail.includes("already exists") ? messagesFor(state.locale).web["web.admin-duplicate"] : detail,
+            }),
+          );
+          return;
+        }
+        redirect(response, "/admin/guidelines?saved=1");
+        return;
+      }
+      sendHtml(response, 405, renderAdminLogin(state.locale, "use GET or POST"));
       return;
     }
 

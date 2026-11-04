@@ -579,3 +579,68 @@ export function renderConsole(input: ConsolePageInput): string {
       <p class="muted"><a href="/">${escapeHtml(web["web.console-back"])}</a></p></section>`;
   return layout({ locale: input.locale, title: web["web.console-title"], body, signedIn: true });
 }
+
+
+/** The operator's sign-in. One operator in P0 (ADR-0009); the token is the whole identity. */
+export function renderAdminLogin(locale: Locale, error: string | undefined): string {
+  const messages = messagesFor(locale);
+  const errorHtml =
+    error === undefined ? "" : `<p class="error" role="alert">${escapeHtml(format(messages.web["web.error"], { detail: error }))}</p>`;
+  const body = `<section class="card narrow"><h2>${escapeHtml(messages.web["web.admin-title"])}</h2>${errorHtml}
+      <form method="post" action="/admin/login" class="stack">
+        <p class="muted">${escapeHtml(messages.web["web.admin-login-hint"])}</p>
+        <input type="password" name="token" autocomplete="off">
+        <button type="submit">${escapeHtml(messages.web["web.admin-login-button"])}</button>
+      </form></section>`;
+  return layout({ locale, title: messages.web["web.admin-title"], body, signedIn: false });
+}
+
+export interface AdminGuidelinesPageInput {
+  locale: Locale;
+  /** Every version, internal ones included: the operator is the one person allowed to read them all. */
+  guidelines: readonly GuidelineContract[];
+  saved: boolean;
+  error: string | undefined;
+}
+
+const TIERS = ["non-negotiable", "constraint", "default"] as const;
+const SCOPES = ["safety", "medical", "progression", "tone", "review-cadence"] as const;
+const VISIBILITIES = ["internal", "public"] as const;
+
+const selectOf = (name: string, options: readonly string[]): string =>
+  `<select name="${escapeHtml(name)}">${options.map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join("")}</select>`;
+
+/** The operator console: append a guideline version. There is no edit form, because a version is not editable. */
+export function renderAdminGuidelines(input: AdminGuidelinesPageInput): string {
+  const messages = messagesFor(input.locale);
+  const web = messages.web;
+  const saved = input.saved ? `<p class="chip done">${escapeHtml(web["web.admin-saved"])}</p>` : "";
+  const errorHtml =
+    input.error === undefined ? "" : `<p class="error" role="alert">${escapeHtml(format(web["web.error"], { detail: input.error }))}</p>`;
+  const rows = input.guidelines.map(
+    (guideline) =>
+      `<li class="row"><span class="day">${escapeHtml(guideline.guidelineId)}@${formatNumber(guideline.version)}</span>` +
+      `<span class="session">${escapeHtml(guideline.tier)} / ${escapeHtml(guideline.scope)} / ${escapeHtml(guideline.visibility)}</span>` +
+      `<span class="muted">${escapeHtml(guideline.text)}</span></li>`,
+  );
+  const list =
+    input.guidelines.length === 0
+      ? `<p class="muted">${escapeHtml(web["web.admin-guidelines-empty"])}</p>`
+      : `<ul class="week">${rows.join("\n")}</ul>`;
+  const body = `<section class="card"><h2>${escapeHtml(web["web.admin-title"])}</h2>${saved}${errorHtml}
+      <h2>${escapeHtml(web["web.admin-guidelines-title"])}</h2>${list}
+      <form method="post" action="/admin/guidelines" class="stack">
+        <label class="field">${escapeHtml(web["web.admin-guideline-id"])} <input name="guidelineId" required pattern="[a-z0-9]+(-[a-z0-9]+)*"></label>
+        <label class="field">${escapeHtml(web["web.admin-version"])} <input type="number" name="version" min="1" value="1" required></label>
+        <label class="field">${escapeHtml(web["web.admin-tier"])} ${selectOf("tier", TIERS)}</label>
+        <label class="field">${escapeHtml(web["web.admin-scope"])} ${selectOf("scope", SCOPES)}</label>
+        <label class="field">${escapeHtml(web["web.admin-visibility"])} ${selectOf("visibility", VISIBILITIES)}</label>
+        <label class="field">${escapeHtml(web["web.admin-text"])} <textarea name="text" required></textarea></label>
+        <label class="field">${escapeHtml(web["web.admin-rationale"])} <textarea name="rationale" required></textarea></label>
+        <label class="field">${escapeHtml(web["web.admin-effective-from"])} <input type="date" name="effectiveFrom" required></label>
+        <button type="submit">${escapeHtml(web["web.admin-create"])}</button>
+      </form>
+      <form method="post" action="/admin/sign-out"><button type="submit" class="quiet">${escapeHtml(web["web.admin-logout"])}</button></form>
+    </section>`;
+  return layout({ locale: input.locale, title: web["web.admin-title"], body, signedIn: false });
+}

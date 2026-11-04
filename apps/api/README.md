@@ -27,6 +27,8 @@ comment in the runner's language. The client never re-derives a number.
 | `POST /entries` | the daily loop |
 | `GET /pain` | the runner's pain reports as rows, oldest day first, plus `trend` from `painTrendOf` (direction, days, peak, night-pain and gait-change flags). An accepted or corrected entry writes one row per report it carries, with ids derived from the entry so a replay is not a second report |
 | `GET /season` | the plan's weeks with planned and done kilometres, sessions, hard days, logged days and one adherence rate - computed by `packages/season`, so the page and the JSON cannot disagree |
+| `GET /admin/guidelines` | **operator only** (`Bearer <operatorToken>`); every version, internal ones included. Without a configured operator token the route is closed (403), not open |
+| `POST /admin/guidelines` | **operator only**; validates the `guideline` contract, appends a version, and answers `409 duplicate-version` rather than overwriting history |
 | `GET /wizard` | the onboarding steps plus `answers`, `current` (latest per step), `original` (first per step) and `progress` |
 | `POST /wizard` | `{ stepId, answer, source? }`; validates the answer against the step, appends a revision, returns the record and the new `current`/`original` |
 | `GET /console` | the runner's answers, original next to current, and the **public** guidelines only (an internal safety guideline never leaves the server) |

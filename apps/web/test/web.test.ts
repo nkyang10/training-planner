@@ -86,7 +86,7 @@ const planFor = (userId: string): PlanVersion =>
 beforeAll(async () => {
   repository.savePlanVersion(planFor(USER_A));
   repository.savePlanVersion(planWithPace(USER_C));
-  server = createServer(createWeb({ repository, sessions, knowledge, now: () => NOW }));
+  server = createServer(createWeb({ repository, sessions, knowledge, now: () => NOW, operatorToken: "operator-token" }));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   const port = typeof address === "object" && address !== null ? address.port : 0;
@@ -673,5 +673,61 @@ describe("the wizard and the personal console (ADR-0009)", () => {
     expect(response.html).toContain("Public guidelines");
     expect(response.html).toContain("Weekly volume rises by at most 10 percent.");
     expect(response.html).not.toContain("Night pain stops training.");
+  });
+});
+
+
+describe("the operator console (ADR-0009)", () => {
+  it("asks for the operator token and refuses a runner cookie", async () => {
+    const page = await call("/admin/guidelines", { cookie: "session=token-a", locale: "en" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Operator console");
+    expect(page.html).toContain("The operator token is required.");
+    expect(page.html).not.toContain("Add a version");
+  });
+
+  it("signs the operator in and appends a version from the form", async () => {
+    const login = await call("/admin/login", { form: { token: "operator-token" } });
+    expect(login.status).toBe(303);
+    expect(login.headers.get("set-cookie")).toContain("operator=");
+
+    const created = await call("/admin/guidelines", {
+      cookie: "operator=operator-token",
+      form: {
+        guidelineId: "progression-ceiling",
+        version: "3",
+        tier: "constraint",
+        scope: "progression",
+        visibility: "public",
+        text: "Weekly volume rises by at most 10 percent.",
+        rationale: "Stated once, kept once.",
+        effectiveFrom: "2026-11-01",
+      },
+    });
+    expect(created.status).toBe(303);
+    expect(created.headers.get("location")).toBe("/admin/guidelines?saved=1");
+
+    const listed = await call("/admin/guidelines", { cookie: "operator=operator-token", locale: "en" });
+    expect(listed.html).toContain("progression-ceiling@3");
+    expect(listed.html).toContain("Weekly volume rises by at most 10 percent.");
+  });
+
+  it("shows the duplicate-version sentence instead of overwriting", async () => {
+    const duplicate = await call("/admin/guidelines", {
+      cookie: "operator=operator-token",
+      locale: "en",
+      form: {
+        guidelineId: "progression-ceiling",
+        version: "3",
+        tier: "constraint",
+        scope: "progression",
+        visibility: "public",
+        text: "Different text, same version.",
+        rationale: "Attempted overwrite.",
+        effectiveFrom: "2026-11-01",
+      },
+    });
+    expect(duplicate.status).toBe(200);
+    expect(duplicate.html).toContain("That version already exists.");
   });
 });
