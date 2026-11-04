@@ -21,7 +21,9 @@
       "@training-planner/knowledge/canonical": ["packages/knowledge/src/canonical.ts"],
       "@training-planner/golden-fixtures": ["eval/golden-plans/fixture.ts"],
       "@training-planner/planner-core": ["packages/planner-core/src/index.ts"],
-      "@training-planner/policy": ["packages/policy/src/index.ts"]
+      "@training-planner/policy": ["packages/policy/src/index.ts"],
+      "@training-planner/i18n": ["packages/i18n/src/index.ts"],
+      "@training-planner/narrator": ["packages/narrator/src/index.ts"]
     }
   },
   "include": [

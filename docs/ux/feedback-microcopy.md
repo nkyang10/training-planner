@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 ---
 
 # Feedback microcopy & coaching tone
@@ -103,6 +103,14 @@ own note back at them in a judgmental frame, and any comparison to other users (
    and never machine-translate an English idiom ("listen to your body" → 身體的訊號).
 7. Units and formats are locale-aware: `5:45/km` vs `5:45 配速`, km/mi, 週一-first weeks, ISO dates in
    exports, and CJK punctuation (「」, ——, no full-width space before a Latin number).
+
+Implemented in `packages/narrator` (`src/guardrails.ts`): grounding against
+`commentFacts.allowedNumbers`, the banned categories as data with the promise each one protects, the
+exclamation limits per locale, the script check, and slot completeness. Rules 6 and 7 are copy-authoring
+rules and live in the catalogues (`packages/i18n`) with the glossary at
+[`apps/web/messages/glossary.md`](../../apps/web/messages/glossary.md). Each guardrail has a failing case in
+`packages/narrator/test/narrator.test.ts` — a guardrail that has never been red is a comment with a boolean
+in front of it.
 
 ## Voice for the two other writers
 

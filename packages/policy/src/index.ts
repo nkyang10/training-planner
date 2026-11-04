@@ -9,3 +9,4 @@ export type { CheckOptions } from "./check";
 export { RULES, NOT_IMPLEMENTED, PRECEDENCE, ruleOf, precedenceOf } from "./rules";
 export type { RuleSpec, RuleGroup, RuleTier, RuleAction } from "./rules";
 export * from "./types";
+export { FACT_TEMPLATES, ADJUST_REASON_KEYS, ADJUST_COST_KEYS, STOP_INSTRUCTION_KEYS, TEMPLATE_LIST_IS_COMPLETE } from "./templates";

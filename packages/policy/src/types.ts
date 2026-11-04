@@ -6,7 +6,7 @@
  * is AGENTS rule 2 made structural - a number in the comment can only come from `allowedNumbers`, because
  * the narrator receives no other numbers.
  */
-import type { DayEntry, PlanVersion } from "@training-planner/domain";
+import type { DayEntry, PlanVersion, SessionKind } from "@training-planner/domain";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
 
 /**
@@ -53,13 +53,10 @@ export type FactTemplate =
   | "interpret.effort-gap"
   | "interpret.legs-heavy"
   | "interpret.sleep-short"
-  | "interpret.illness"
-  | "interpret.missed-not-zero"
   | "interpret.extra-subtracts"
   | "interpret.pain-reported"
   | "redirect.tomorrow-kept"
   | "redirect.tomorrow-downgraded"
-  | "redirect.tomorrow-rest"
   | "redirect.tomorrow-swapped"
   | "redirect.safety-instruction"
   | "redirect.review-offered"
@@ -104,20 +101,32 @@ export interface CommentFacts {
 
 export type AdjustKind = "keep" | "downgrade" | "insert-rest" | "shorten" | "swap" | "shift" | "reduce-dose";
 
+/** Why a change happened, as a message key. The narrator owns the sentence; the engine owns the reason. */
+export type AdjustReasonKey =
+  | "missed-quality-moved"
+  | "extra-activity-guard"
+  | "readiness-downgrade"
+  | "illness-hold"
+  | "pain-hold";
+
+/** What the runner gives up, as a message key. A change with no stated cost is not consent. */
+export type AdjustCostKey = "easy-day-becomes-quality" | "quality-becomes-easy" | "no-intensity-this-week";
+
 export interface MicroAdjustment {
   /** The future day that changes. Never today, never a past day, never at or before the plan's generation day. */
   day: string;
   kind: AdjustKind;
-  beforeSummary: string;
-  afterSummary: string;
-  /** Why, in the runner's language; the rule id and anchor carry the audit trail. */
-  reason: string;
+  /** The prescription before and after, as data. The chip is rendered from these, never from prose. */
+  before: { kind: SessionKind; km: number };
+  after: { kind: SessionKind; km: number };
+  reasonKey: AdjustReasonKey;
+  reasonSlots: Record<string, string | number>;
+  costKey: AdjustCostKey;
+  costSlots: Record<string, string | number>;
   ruleId: string;
   anchor: string;
-  /** What the runner gives up. A change with no stated cost is not consent (review-trigger-policy.md). */
-  expectedCost: string;
   isSafety: boolean;
-  /** Load before and after, so "subtracts only" is a comparison rather than an adjective. */
+  /** Weekly load before and after, so "subtracts only" is a comparison rather than an adjective. */
   beforeKm?: number;
   afterKm?: number;
 }
@@ -140,13 +149,16 @@ export interface ReviewFlag {
   proposals: string[];
 }
 
+/** The canonical stop sentence, chosen by key. language-guardrails.yaml#escalation-copy-is-fixed: no variants. */
+export type StopInstructionKey = "chest-urgent" | "illness-hold" | "bone-referral" | "pain-hold";
+
 export interface HardStop {
   ruleId: string;
   anchor: string;
   /** What the stop covers, e.g. "today", "all-future-sessions-in-phase". */
   scope: string;
-  /** The one sentence the comment must open with (daily-feedback-rules.yaml#safety-text-first). */
-  instruction: string;
+  /** Which fixed instruction the narrator must open with; the copy itself lives in the catalogues. */
+  instructionKey: StopInstructionKey;
   referral: "urgent" | "routine-urgent" | "clinician-with-sports-medicine" | null;
   suppressCoaching: boolean;
 }

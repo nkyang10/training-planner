@@ -62,8 +62,11 @@ const plannerSources = packageSources.filter((file) => rel(file).startsWith("pac
 // has to be reproducible from the entry, the plan and the knowledge hash, and a clock read inside the
 // evaluator would make every stored decision unexplainable.
 const policySources = packageSources.filter((file) => rel(file).startsWith("packages/policy/src/"));
+// The narrator must be deterministic for the same reason: the same fact object has to produce the same
+// comment on the server, in a test and in a replay six months later.
+const narratorSources = packageSources.filter((file) => rel(file).startsWith("packages/narrator/src/"));
 
-scan([...plannerSources, ...policySources], PURITY, "engine purity (AGENTS rule 1)");
+scan([...plannerSources, ...policySources, ...narratorSources], PURITY, "engine purity (AGENTS rule 1)");
 
 const anyRule = [[/\b:\s*any\b/, "`: any`"], [/\bas\s+any\b/, "`as any`"], [/<any>/, "`<any>`"]];
 scan(packageSources, anyRule, "no any in package sources");
