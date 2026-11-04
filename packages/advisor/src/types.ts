@@ -104,7 +104,11 @@ export interface AdvisorCall {
   hashes: AdvisorHashes;
 }
 
-/** The model is a port: P1 tests use a fake, P3 wires a provider behind consent and a budget. */
+/** The model is a port: tests use a fake, a deployment wires a provider behind consent and a budget. */
 export interface ModelPort {
-  complete(call: AdvisorCall): Promise<unknown>;
+  /**
+   * `context.userId` is optional for a fake and required by the HTTP port, which enforces the per-runner daily budget.
+   * A port that needs it refuses without it rather than guessing.
+   */
+  complete(call: AdvisorCall, context?: { userId: string }): Promise<unknown>;
 }
