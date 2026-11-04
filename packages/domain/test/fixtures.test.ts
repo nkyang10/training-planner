@@ -20,6 +20,7 @@ import {
   dayEntrySchema,
   eventSchema,
   promptDeliverySchema,
+  guidelineSchema,
   planDiffSchema,
   planVersionSchema,
   reviewSchema,
@@ -48,6 +49,7 @@ const contracts: Record<string, z.ZodTypeAny> = {
   signal: signalSchema,
   events: eventSchema,
   "prompt-delivery": promptDeliverySchema,
+  guideline: guidelineSchema,
 };
 
 const readJson = (path: string): unknown => JSON.parse(readFileSync(path, "utf8"));

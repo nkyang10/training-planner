@@ -440,6 +440,23 @@ export const promptDeliverySchema = z.object({
     "atMinute": z.number().int().min(0).max(1439),
   }).strict();
 
+export const guidelineSchema = whenThen(z.object({
+    "guidelineId": z.string().regex(new RegExp("^[a-z0-9]+(-[a-z0-9]+)*$")),
+    "version": z.number().int().min(1),
+    "tier": z.union([z.literal("non-negotiable"), z.literal("constraint"), z.literal("default")]),
+    "scope": z.union([z.literal("safety"), z.literal("medical"), z.literal("progression"), z.literal("tone"), z.literal("review-cadence")]),
+    "visibility": z.union([z.literal("internal"), z.literal("public")]),
+    "text": z.string().min(1).max(2000),
+    "rationale": z.string().min(1).max(2000),
+    "effectiveFrom": z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    "createdBy": z.string().min(1).max(120),
+    "supersedesVersion": z.number().int().min(1).optional(),
+  }).strict(), z.object({
+    "scope": z.union([z.literal("safety"), z.literal("medical")]),
+  }).passthrough(), z.object({
+    "visibility": z.literal("internal").optional(),
+  }).passthrough(), "the object does not satisfy the contract's if/then rule");
+
 export type AthleteProfileContract = z.infer<typeof athleteProfileSchema>;
 export type DayEntryContract = z.infer<typeof dayEntrySchema>;
 export type PlanVersionContract = z.infer<typeof planVersionSchema>;
@@ -448,3 +465,4 @@ export type ReviewContract = z.infer<typeof reviewSchema>;
 export type SignalContract = z.infer<typeof signalSchema>;
 export type EventContract = z.infer<typeof eventSchema>;
 export type PromptDeliveryContract = z.infer<typeof promptDeliverySchema>;
+export type GuidelineContract = z.infer<typeof guidelineSchema>;

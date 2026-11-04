@@ -1,0 +1,11 @@
+{
+  "guidelineId": "tone-warmth",
+  "version": 1,
+  "tier": "hard-stop",
+  "scope": "tone",
+  "visibility": "public",
+  "text": "Warm, specific, never a scold.",
+  "rationale": "The comment is the trust surface.",
+  "effectiveFrom": "2026-11-04",
+  "createdBy": "operator"
+}

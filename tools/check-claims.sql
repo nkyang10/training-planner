@@ -43,7 +43,7 @@ begin
 
   -- 3. No application role may bypass row security. This is the sentence ADR-0002 rests on.
   select count(*) into bad from pg_roles
-   where rolname in ('app_user', 'worker', 'analytics_reader', 'purger') and (rolbypassrls or rolsuper);
+   where rolname in ('app_user', 'worker', 'analytics_reader', 'purger', 'operator') and (rolbypassrls or rolsuper);
   if bad <> 0 then
     raise exception 'application roles holding BYPASSRLS or superuser: %', bad;
   end if;
@@ -76,7 +76,7 @@ begin
   --     stops the one that holds a grant. The trigger half is invisible to a load test unless
   --     somebody counts it.
   select count(*) into bad
-    from (values ('events'), ('day_entries'), ('system_comments'), ('prompt_deliveries'), ('pain_reports')) as want(tbl)
+    from (values ('events'), ('day_entries'), ('system_comments'), ('prompt_deliveries'), ('pain_reports'), ('wizard_answers'), ('ai_review_proposals'), ('guidelines')) as want(tbl)
    where not exists (
        select 1 from pg_trigger t
          join pg_class c on c.oid = t.tgrelid
