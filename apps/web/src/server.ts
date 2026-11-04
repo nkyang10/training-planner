@@ -7,7 +7,15 @@
  */
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
-import type { DayEntry, Session } from "@training-planner/domain";
+import type { DayEntry, Session, WizardStepId } from "@training-planner/domain";
+import {
+  latestWizardAnswers,
+  nextWizardRevision,
+  originalWizardAnswers,
+  validateWizardAnswer,
+  wizardProgress,
+  WIZARD_STEPS,
+} from "@training-planner/domain";
 import { PAIN_TREND_WINDOW_DAYS, painReportsOf, painTrendOf, submitEntry } from "@training-planner/entries";
 import type { EntryDraft } from "@training-planner/entries";
 import { format, messagesFor, weekdayName } from "@training-planner/i18n";
@@ -24,7 +32,7 @@ import { exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
 import { localClockOf } from "./local-clock";
-import { renderCalendar, renderDay, renderLogin, renderPain, renderReview, renderSeason } from "./pages";
+import { renderCalendar, renderConsole, renderDay, renderLogin, renderPain, renderReview, renderSeason, renderWizard } from "./pages";
 import { STYLES } from "./styles";
 
 export interface WebOptions {
@@ -266,6 +274,92 @@ export function createWeb(options: WebOptions): RequestListener {
           ? undefined
           : seasonSummary({ plan, entries: repository.listEntries(userId), today: state.now.slice(0, 10) });
       sendHtml(response, 200, renderSeason({ locale: state.locale, summary }));
+      return;
+    }
+
+    // The onboarding wizard: one step at a time, and every answer is a row (ADR-0009).
+    if (method === "GET" && url.pathname === "/wizard") {
+      const answers = repository.listWizardAnswers(userId);
+      const progress = wizardProgress(answers);
+      const requested = url.searchParams.get("step");
+      const step =
+        (requested === null ? undefined : WIZARD_STEPS.find((candidate) => candidate.id === requested)) ??
+        (progress.next === null ? undefined : WIZARD_STEPS.find((candidate) => candidate.id === progress.next));
+      sendHtml(
+        response,
+        200,
+        renderWizard({
+          locale: state.locale,
+          step,
+          progress,
+          current: latestWizardAnswers(answers),
+          original: originalWizardAnswers(answers),
+          error: url.searchParams.get("error") ?? undefined,
+        }),
+      );
+      return;
+    }
+
+    if (method === "POST" && url.pathname === "/wizard") {
+      const form = await readForm(request);
+      const stepId = form.get("stepId") ?? "";
+      const step = WIZARD_STEPS.find((candidate) => candidate.id === stepId);
+      if (step === undefined) {
+        redirect(response, "/wizard");
+        return;
+      }
+      const raw =
+        step.kind === "multi"
+          ? { values: form.getAll("values") }
+          : { value: step.kind === "number" ? Number(form.get("value")) : form.get("value") };
+      const validation = validateWizardAnswer(stepId, raw);
+      if (!validation.ok || validation.answer === undefined) {
+        const answers = repository.listWizardAnswers(userId);
+        sendHtml(
+          response,
+          200,
+          renderWizard({
+            locale: state.locale,
+            step,
+            progress: wizardProgress(answers),
+            current: latestWizardAnswers(answers),
+            original: originalWizardAnswers(answers),
+            error: validation.detail ?? "invalid answer",
+          }),
+        );
+        return;
+      }
+      const answers = repository.listWizardAnswers(userId);
+      repository.saveWizardAnswer(userId, {
+        stepId: stepId as WizardStepId,
+        answer: validation.answer,
+        revision: nextWizardRevision(answers, stepId as WizardStepId),
+        source: "wizard",
+      });
+      redirect(response, "/wizard?saved=1");
+      return;
+    }
+
+    // The personal console: the runner's own answers, original next to current, and the public guidelines only.
+    if (method === "GET" && url.pathname === "/console") {
+      const answers = repository.listWizardAnswers(userId);
+      const guidelines = repository
+        .listGuidelines()
+        .filter((guideline) => guideline.visibility === "public")
+        .sort((left, right) =>
+          left.guidelineId < right.guidelineId ? -1 : left.guidelineId > right.guidelineId ? 1 : left.version - right.version,
+        );
+      sendHtml(
+        response,
+        200,
+        renderConsole({
+          locale: state.locale,
+          steps: WIZARD_STEPS,
+          current: latestWizardAnswers(answers),
+          original: originalWizardAnswers(answers),
+          guidelines,
+        }),
+      );
       return;
     }
 

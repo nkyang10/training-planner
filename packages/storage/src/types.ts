@@ -12,7 +12,7 @@
  * - **idempotency is a uniqueness rule**: `appendEntryWithEventAndPointer` refuses a second row for an
  *   idempotency key that already exists. A middleware cannot give that guarantee; a unique index can.
  */
-import type { DayEntry, PainReport, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, GuidelineContract, PainReport, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
 import type { Locale } from "@training-planner/i18n";
 
 export interface SupersededPointer {
@@ -93,6 +93,13 @@ export interface Repository {
 
   saveComment(comment: CommentRecord): void;
   listComments(userId: string, day?: string): CommentRecord[];
+  /** Append one wizard answer. The caller computes the revision with packages/domain's nextWizardRevision. */
+  saveWizardAnswer(userId: string, record: WizardAnswerRecord): void;
+  /** Every wizard answer for this user, oldest first. */
+  listWizardAnswers(userId: string): WizardAnswerRecord[];
+  /** Every guideline version, global and not tenant-scoped (ADR-0009). */
+  saveGuideline(guideline: GuidelineContract): void;
+  listGuidelines(): GuidelineContract[];
   /** Pain reports as rows, oldest day first. The id is derived from the entry, so a replay stores one row. */
   savePainReport(report: PainReport): void;
   listPainReports(userId: string): PainReport[];

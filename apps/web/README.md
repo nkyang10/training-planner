@@ -17,6 +17,9 @@ wording including the escalation text: `docs/ux/feedback-microcopy.md`.
 | `GET /login`, `POST /login` | a token form that sets an `HttpOnly; SameSite=Lax` session cookie |
 | `GET /pain` | the pain history and its trajectory (from `packages/entries`' `painTrendOf`): the rows `packages/entries` projects from entries, with the flags that matter (night pain, gait change, known injury). It says what happened, not what it means - the triage still reads one entry's array (row 35) |
 | `GET /season` | the plan's weeks, planned against done, with the adherence rate and a way back to the week |
+| `GET /wizard` | the onboarding wizard, one step at a time; the form posts to `POST /wizard` and redirects to the next step |
+| `POST /wizard` | validates and records one answer (`source: wizard`), then redirects; an invalid answer re-renders the step with the catalogue's error sentence |
+| `GET /console` | the personal console: each answer with its original beside it when it changed, and the public guidelines |
 | `GET /export` | the same document `GET /export` on the API returns, offered as a download (`content-disposition: attachment`) - one definition, two doors |
 | `GET /` | the week, the explanation and the daily prompt chip. Rendering a prompt **records the delivery** (`prompt_deliveries`), so a reload does not repeat it; the policy is `packages/nudges` |
 | the current Monday–Sunday week: session kind and distance per day, a logged/not-logged chip, the plan's first explanation sentence, and a banner when a review is open |

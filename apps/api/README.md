@@ -27,6 +27,9 @@ comment in the runner's language. The client never re-derives a number.
 | `POST /entries` | the daily loop |
 | `GET /pain` | the runner's pain reports as rows, oldest day first, plus `trend` from `painTrendOf` (direction, days, peak, night-pain and gait-change flags). An accepted or corrected entry writes one row per report it carries, with ids derived from the entry so a replay is not a second report |
 | `GET /season` | the plan's weeks with planned and done kilometres, sessions, hard days, logged days and one adherence rate - computed by `packages/season`, so the page and the JSON cannot disagree |
+| `GET /wizard` | the onboarding steps plus `answers`, `current` (latest per step), `original` (first per step) and `progress` |
+| `POST /wizard` | `{ stepId, answer, source? }`; validates the answer against the step, appends a revision, returns the record and the new `current`/`original` |
+| `GET /console` | the runner's answers, original next to current, and the **public** guidelines only (an internal safety guideline never leaves the server) |
 | `GET /export` | the runner's data in one document: plan versions, entries, events, reviews, comments, prompt deliveries, and counts that let a client check the file it received |
 | `GET /prompts/next` | the daily prompt policy (`packages/nudges`): returns the sentence when a prompt may arrive, **records the delivery**, and answers `none` with the reason and budget otherwise |
 | `GET /signals` | what the system currently believes about this runner (`packages/signals`), plus the signals it cannot compute and why |

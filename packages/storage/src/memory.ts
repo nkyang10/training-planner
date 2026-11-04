@@ -7,7 +7,7 @@
  * a check that can be forgotten, it is a lookup that cannot be expressed.
  */
 import { promptDeliverySchema } from "@training-planner/domain";
-import type { DayEntry, PainReport, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, GuidelineContract, PainReport, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
 import {
   DuplicateIdempotencyError,
   type AppendEntryInput,
@@ -25,6 +25,7 @@ interface UserState {
   diffs: Map<string, PlanDiff>;
   promptDeliveries: PromptDelivery[];
   painReports: Map<string, PainReport>;
+  wizardAnswers: WizardAnswerRecord[];
   reviews: Map<string, Review>;
   comments: CommentRecord[];
   idempotencyKeys: Set<string>;
@@ -39,6 +40,7 @@ const emptyUser = (): UserState => ({
   diffs: new Map(),
   promptDeliveries: [],
   painReports: new Map(),
+  wizardAnswers: [],
   reviews: new Map(),
   comments: [],
   idempotencyKeys: new Set(),
@@ -46,6 +48,8 @@ const emptyUser = (): UserState => ({
 
 export function createMemoryRepository(): Repository {
   const users = new Map<string, UserState>();
+  // Global, not tenant-scoped: ADR-0009's guidelines are the operator's layer for every runner.
+  const guidelines: GuidelineContract[] = [];
   const stateOf = (userId: string): UserState => {
     const existing = users.get(userId);
     if (existing !== undefined) return existing;
@@ -138,6 +142,28 @@ export function createMemoryRepository(): Repository {
       state.proposed.delete(staged.versionId);
       state.activeVersionId = staged.versionId;
       return staged;
+    },
+
+    saveWizardAnswer(userId: string, record: WizardAnswerRecord): void {
+      stateOf(userId).wizardAnswers.push(record);
+    },
+
+    listWizardAnswers(userId: string): WizardAnswerRecord[] {
+      return [...stateOf(userId).wizardAnswers];
+    },
+
+    saveGuideline(guideline: GuidelineContract): void {
+      // Guidelines are global, so they live outside the per-user state. A duplicate (id, version) is an error:
+      // versions are append-only, and silently overwriting one would rewrite history.
+      const exists = guidelines.some(
+        (candidate) => candidate.guidelineId === guideline.guidelineId && candidate.version === guideline.version,
+      );
+      if (exists) throw new Error(`guideline ${guideline.guidelineId}@${guideline.version} already exists; write a new version`);
+      guidelines.push(guideline);
+    },
+
+    listGuidelines(): GuidelineContract[] {
+      return [...guidelines];
     },
 
     savePainReport(report: PainReport): void {

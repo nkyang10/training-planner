@@ -621,3 +621,57 @@ describe("the review sheet shows keep-the-plan first, with the cost, and records
     expect(page.html).toContain("No review is open.");
   });
 });
+
+describe("the wizard and the personal console (ADR-0009)", () => {
+  it("walks the runner through the steps and shows the question in their language", async () => {
+    const first = await call("/wizard", { cookie: "session=token-c", locale: "en" });
+    expect(first.status).toBe(200);
+    expect(first.html).toContain("Set your orientation");
+    expect(first.html).toContain("What is your goal right now?");
+    expect(first.html).toContain('name="stepId" value="goal"');
+  });
+
+  it("records a step, redirects, and keeps the original visible after a change", async () => {
+    const saved = await call("/wizard", { cookie: "session=token-c", form: { stepId: "goal", value: "finish" } });
+    expect(saved.status).toBe(303);
+    expect(saved.headers.get("location")).toBe("/wizard?saved=1");
+
+    const changed = await call("/wizard", { cookie: "session=token-c", form: { stepId: "goal", value: "time" } });
+    expect(changed.status).toBe(303);
+
+    const consolePage = await call("/console", { cookie: "session=token-c", locale: "en" });
+    expect(consolePage.status).toBe(200);
+    expect(consolePage.html).toContain("Run a time");
+    expect(consolePage.html).toContain("Originally chosen");
+    expect(consolePage.html).toContain("Finish a race");
+  });
+
+  it("shows public guidelines and never an internal one", async () => {
+    repository.saveGuideline({
+      guidelineId: "progression-ceiling",
+      version: 1,
+      tier: "constraint",
+      scope: "progression",
+      visibility: "public",
+      text: "Weekly volume rises by at most 10 percent.",
+      rationale: "Stated once.",
+      effectiveFrom: "2026-11-01",
+      createdBy: "operator",
+    });
+    repository.saveGuideline({
+      guidelineId: "night-pain-stop",
+      version: 1,
+      tier: "non-negotiable",
+      scope: "safety",
+      visibility: "internal",
+      text: "Night pain stops training.",
+      rationale: "Triage decisive.",
+      effectiveFrom: "2026-11-01",
+      createdBy: "operator",
+    });
+    const response = await call("/console", { cookie: "session=token-c", locale: "en" });
+    expect(response.html).toContain("Public guidelines");
+    expect(response.html).toContain("Weekly volume rises by at most 10 percent.");
+    expect(response.html).not.toContain("Night pain stops training.");
+  });
+});
