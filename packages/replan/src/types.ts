@@ -24,6 +24,10 @@ export interface ReplanRequest {
 
 export interface ProposedPlan {
   optionId: string;
+  /** ADR-0010: absent means edit. A replan carries a staged plan version and its honest size instead of a diff. */
+  kind?: "edit" | "replan";
+  planVersionId?: string | null;
+  changeSummary?: import("@training-planner/domain").ReviewOptionChangeSummary | null;
   /** A message key, never a sentence: the narrator owns the words. */
   labelKey: string;
   keepAsIs: boolean;

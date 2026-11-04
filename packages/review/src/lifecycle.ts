@@ -126,7 +126,19 @@ export function assembleOptions(input: AssembleOptionsInput): AssembleResult {
   const safetyCritical = review.evidence.ruleIds.some((ruleId) => ruleId.includes("safety")) || review.openedBy === "system-signal";
   for (const option of options) {
     if (option.keepAsIs) continue;
-    if (option.diffId === null) return refuse("missing-diff", `${option.optionId} proposes a change with no diff`);
+    if (option.kind === "replan") {
+      // ADR-0010: a re-plan is a new plan version, not a diff. It must carry that version and its honest size,
+      // and it must not also pretend to be an edit.
+      if (option.planVersionId === undefined || option.planVersionId === null || option.planVersionId.length === 0) {
+        return refuse("missing-plan-version", `${option.optionId} is a replan with no staged plan version`);
+      }
+      if (option.changeSummary === undefined || option.changeSummary === null) {
+        return refuse("missing-change-summary", `${option.optionId} is a replan with no change summary`);
+      }
+      if (option.diffId !== null) return refuse("replan-with-diff", `${option.optionId} is a replan that also carries a diff`);
+    } else if (option.diffId === null) {
+      return refuse("missing-diff", `${option.optionId} proposes a change with no diff`);
+    }
     if (option.costKey.length === 0) return refuse("missing-cost", `${option.optionId} states no cost`);
     if (safetyCritical && (option.loadDeltaPct ?? 0) > 0) {
       return refuse("adds-load-under-safety", `${option.optionId} adds load in a safety-critical review`);
@@ -141,6 +153,10 @@ export function assembleOptions(input: AssembleOptionsInput): AssembleResult {
     diffId: option.diffId,
     costSummary: input.renderCost(option),
     expiresAfterDay,
+    // Absent means edit: writing the default explicitly would make every old fixture look changed.
+    ...(option.kind === undefined ? {} : { kind: option.kind }),
+    ...(option.planVersionId === undefined ? {} : { planVersionId: option.planVersionId }),
+    ...(option.changeSummary === undefined ? {} : { changeSummary: option.changeSummary }),
   }));
 
   return { status: "assembled", review: { ...review, options: wireOptions } };

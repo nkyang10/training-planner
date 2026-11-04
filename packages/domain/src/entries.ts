@@ -106,6 +106,15 @@ export interface ReviewEvidence {
   streakDays?: number;
 }
 
+/** ADR-0010: an edit option carries a diff; a replan option carries a staged plan version and its honest size. */
+export interface ReviewOptionChangeSummary {
+  changes: number;
+  sessionsMoved: number;
+  kmBefore: number;
+  kmAfter: number;
+  firstChangedDay?: string | null;
+}
+
 export interface ReviewOption {
   optionId: string;
   labelKey: string;
@@ -113,6 +122,10 @@ export interface ReviewOption {
   diffId: string | null;
   costSummary: string;
   expiresAfterDay: string;
+  /** Absent means edit, so a review written before ADR-0010 stays valid. */
+  kind?: "edit" | "replan";
+  planVersionId?: string | null;
+  changeSummary?: ReviewOptionChangeSummary | null;
 }
 
 export interface Review {

@@ -472,6 +472,10 @@ export function createApi(options: ApiOptions): RequestListener {
         costKey: option.costKey,
         costSlots: option.costSlots,
         loadDeltaPct: option.loadDeltaPct,
+        // ADR-0010: the kind travels with the option; absent means edit, which is every option this engine offers.
+        ...(option.kind === undefined ? {} : { kind: option.kind }),
+        ...(option.planVersionId === undefined ? {} : { planVersionId: option.planVersionId }),
+        ...(option.changeSummary === undefined ? {} : { changeSummary: option.changeSummary }),
       }));
 
       const opened = openReview({
@@ -557,6 +561,10 @@ export function createApi(options: ApiOptions): RequestListener {
         costKey: option.costKey,
         costSlots: option.costSlots,
         loadDeltaPct: option.loadDeltaPct,
+        // ADR-0010: the kind travels with the option; absent means edit, which is every option this engine offers.
+        ...(option.kind === undefined ? {} : { kind: option.kind }),
+        ...(option.planVersionId === undefined ? {} : { planVersionId: option.planVersionId }),
+        ...(option.changeSummary === undefined ? {} : { changeSummary: option.changeSummary }),
       }));
 
       const opened = openReview({

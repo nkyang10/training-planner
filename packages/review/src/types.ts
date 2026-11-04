@@ -57,6 +57,10 @@ export interface ProposedOption {
   optionId: string;
   labelKey: string;
   keepAsIs: boolean;
+  /** ADR-0010: absent means edit. A replan carries a staged plan version instead of a diff. */
+  kind?: "edit" | "replan";
+  planVersionId?: string | null;
+  changeSummary?: import("@training-planner/domain").ReviewOptionChangeSummary | null;
   /** Null only for "keep the plan": an option with no diff proposes no change, which is the point of it. */
   diffId: string | null;
   costKey: string;
@@ -86,7 +90,10 @@ export type AssembleRejectCode =
   | "too-many-options"
   | "missing-diff"
   | "missing-cost"
-  | "adds-load-under-safety";
+  | "adds-load-under-safety"
+  | "missing-plan-version"
+  | "missing-change-summary"
+  | "replan-with-diff";
 
 export type Decision =
   | { kind: "accept"; optionId: string }

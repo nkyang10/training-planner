@@ -339,14 +339,29 @@ export const reviewSchema = z.object({
   }).strict(),
     "horizonDays": z.number().int().min(3).max(28),
     "freezeDays": z.number().int().min(0).max(7).optional(),
-    "options": z.array(z.object({
+    "options": z.array(whenThen(z.object({
     "optionId": z.string(),
     "labelKey": z.string(),
     "keepAsIs": z.boolean(),
     "diffId": z.string().uuid().nullable(),
+    "kind": z.union([z.literal("edit"), z.literal("replan")]).optional(),
+    "planVersionId": z.string().uuid().nullable().optional(),
+    "changeSummary": z.object({
+    "changes": z.number().int().min(0),
+    "sessionsMoved": z.number().int().min(0),
+    "kmBefore": z.number().min(0),
+    "kmAfter": z.number().min(0),
+    "firstChangedDay": z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  }).strict().nullable().optional(),
     "costSummary": z.string().max(200),
     "expiresAfterDay": z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  }).strict()).min(2).max(4),
+  }).strict(), z.object({
+    "kind": z.literal("replan"),
+  }).passthrough(), z.object({
+    "diffId": z.null().optional(),
+    "planVersionId": z.string(),
+    "changeSummary": z.object({}).passthrough(),
+  }).passthrough(), "the object does not satisfy the contract's if/then rule")).min(2).max(4),
     "status": z.union([z.literal("open"), z.literal("accepted"), z.literal("rejected"), z.literal("deferred"), z.literal("expired"), z.literal("superseded")]),
     "chosenOptionId": z.string().nullable().optional(),
     "decidedAtDay": z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
