@@ -18,7 +18,8 @@ repository.appendEntryWithEventAndPointer({ entry, event, superseded? });
 
 | Call | Meaning |
 |---|---|
-| `exportDocument(repository, userId, exportedAt)` | the runner's data as one document (plan versions, entries, events, reviews, comments, prompt deliveries) plus counts; the API and the web page both call it, so "my data" has one definition |
+| `savePainReport(report)` / `listPainReports(userId)` | pain rows keyed by a derived id (a replay stores one row), ordered by day; included in the export |
+| `exportDocument(repository, userId, exportedAt)` | the runner's data as one document (plan versions, entries, events, reviews, comments, prompt deliveries, pain reports) plus counts; the API and the web page both call it, so "my data" has one definition |
 | `savePromptDelivery(delivery)` / `listPromptDeliveries(userId)` | the prompt log: append-only, per user, and the only place `packages/nudges` reads delivery history from |
 | `savePlanVersion(version)` | the plan the runner trains from — saving one makes it **active** |
 | `saveProposedPlanVersion(version)` | a review's offer: staged, not active, invisible to day lookups |

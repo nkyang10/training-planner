@@ -76,7 +76,7 @@ begin
   --     stops the one that holds a grant. The trigger half is invisible to a load test unless
   --     somebody counts it.
   select count(*) into bad
-    from (values ('events'), ('day_entries'), ('system_comments'), ('prompt_deliveries')) as want(tbl)
+    from (values ('events'), ('day_entries'), ('system_comments'), ('prompt_deliveries'), ('pain_reports')) as want(tbl)
    where not exists (
        select 1 from pg_trigger t
          join pg_class c on c.oid = t.tgrelid

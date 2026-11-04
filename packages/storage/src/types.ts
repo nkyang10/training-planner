@@ -12,7 +12,7 @@
  * - **idempotency is a uniqueness rule**: `appendEntryWithEventAndPointer` refuses a second row for an
  *   idempotency key that already exists. A middleware cannot give that guarantee; a unique index can.
  */
-import type { DayEntry, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, PainReport, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent } from "@training-planner/domain";
 import type { Locale } from "@training-planner/i18n";
 
 export interface SupersededPointer {
@@ -93,6 +93,9 @@ export interface Repository {
 
   saveComment(comment: CommentRecord): void;
   listComments(userId: string, day?: string): CommentRecord[];
+  /** Pain reports as rows, oldest day first. The id is derived from the entry, so a replay stores one row. */
+  savePainReport(report: PainReport): void;
+  listPainReports(userId: string): PainReport[];
   /** Every saved plan version for this user, oldest first. The export promises the history, not just the active row. */
   listPlanVersions(userId: string): PlanVersion[];
 }

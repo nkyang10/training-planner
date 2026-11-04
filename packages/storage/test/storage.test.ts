@@ -179,6 +179,40 @@ describe("reviews are readable in the order a page needs them", () => {
   });
 });
 
+describe("pain reports are rows keyed by a derived id", () => {
+  const report = (overrides: Record<string, unknown> = {}) => ({
+    userId: USER_A,
+    id: "11111111-2222-4333-8444-555555555555",
+    day: "2026-11-05",
+    site: "achilles",
+    side: "left" as const,
+    intensity: 6,
+    duringRun: true,
+    nextMorning: false,
+    trendGaitChange: false,
+    nightPain: false,
+    duration: "few-days" as const,
+    knownInjury: false,
+    note: null,
+    ...overrides,
+  });
+
+  it("stores a report once, however often it is saved", () => {
+    const repository = createMemoryRepository();
+    repository.savePainReport(report());
+    repository.savePainReport(report());
+    expect(repository.listPainReports(USER_A)).toHaveLength(1);
+  });
+
+  it("orders by day and never shows one user's reports to another", () => {
+    const repository = createMemoryRepository();
+    repository.savePainReport(report({ id: "aaaaaaaa-2222-4333-8444-555555555555", day: "2026-11-06", site: "shin" }));
+    repository.savePainReport(report());
+    expect(repository.listPainReports(USER_A).map((row) => row.day)).toEqual(["2026-11-05", "2026-11-06"]);
+    expect(repository.listPainReports(USER_B)).toEqual([]);
+  });
+});
+
 describe("the plan version history is listable", () => {
   it("keeps every saved version, oldest first", () => {
     const repository = createMemoryRepository();

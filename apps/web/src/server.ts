@@ -8,7 +8,7 @@
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
 import type { DayEntry, Session } from "@training-planner/domain";
-import { submitEntry } from "@training-planner/entries";
+import { painReportsOf, submitEntry } from "@training-planner/entries";
 import type { EntryDraft } from "@training-planner/entries";
 import { format, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
@@ -453,6 +453,7 @@ export function createWeb(options: WebOptions): RequestListener {
           event: result.event,
           ...(result.superseded === undefined ? {} : { superseded: result.superseded }),
         });
+        for (const report of painReportsOf({ userId, entry: result.entry })) repository.savePainReport(report);
 
         const planForDay = repository.latestPlanVersionFor(userId, result.entry.day);
         if (planForDay === undefined) {

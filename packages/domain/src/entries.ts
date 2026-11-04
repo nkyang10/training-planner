@@ -46,6 +46,27 @@ export interface DayEntryPain {
   knownInjury?: boolean;
 }
 
+/**
+ * One pain report as a row of its own (row 19). It is the projection of `DayEntryPain` that the triage needs: a
+ * trajectory is a query over rows, not an array read out of one entry. The id is derived from the entry's identity
+ * (user, day, revision, index) so a replayed submission writes the same row instead of a second one.
+ */
+export interface PainReport {
+  userId: string;
+  id: string;
+  day: string;
+  site: string;
+  side: "left" | "right" | "central" | null;
+  intensity: number;
+  duringRun: boolean;
+  nextMorning: boolean;
+  trendGaitChange: boolean;
+  nightPain: boolean;
+  duration: "today" | "few-days" | "1-2-weeks" | "over-2-weeks" | "recurring" | null;
+  knownInjury: boolean;
+  note: string | null;
+}
+
 export interface DayEntry {
   /** Writer-assigned (uuidFrom), never client-supplied: a client that could name the row could forge a correction. */
   entryId?: string;

@@ -7,7 +7,7 @@
  * a check that can be forgotten, it is a lookup that cannot be expressed.
  */
 import { promptDeliverySchema } from "@training-planner/domain";
-import type { DayEntry, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, PainReport, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent } from "@training-planner/domain";
 import {
   DuplicateIdempotencyError,
   type AppendEntryInput,
@@ -24,6 +24,7 @@ interface UserState {
   activeVersionId: string | null;
   diffs: Map<string, PlanDiff>;
   promptDeliveries: PromptDelivery[];
+  painReports: Map<string, PainReport>;
   reviews: Map<string, Review>;
   comments: CommentRecord[];
   idempotencyKeys: Set<string>;
@@ -37,6 +38,7 @@ const emptyUser = (): UserState => ({
   activeVersionId: null,
   diffs: new Map(),
   promptDeliveries: [],
+  painReports: new Map(),
   reviews: new Map(),
   comments: [],
   idempotencyKeys: new Set(),
@@ -136,6 +138,17 @@ export function createMemoryRepository(): Repository {
       state.proposed.delete(staged.versionId);
       state.activeVersionId = staged.versionId;
       return staged;
+    },
+
+    savePainReport(report: PainReport): void {
+      // Keyed by the derived id: a replayed submission or a re-derivation writes the same row, never a second one.
+      stateOf(report.userId).painReports.set(report.id, report);
+    },
+
+    listPainReports(userId: string): PainReport[] {
+      return [...stateOf(userId).painReports.values()].sort((left, right) =>
+        left.day < right.day ? -1 : left.day > right.day ? 1 : left.site < right.site ? -1 : 1,
+      );
     },
 
     listPlanVersions(userId: string): PlanVersion[] {
