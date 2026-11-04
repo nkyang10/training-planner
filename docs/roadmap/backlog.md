@@ -33,6 +33,7 @@ findings that do not make a plan unsafe, which is why M1 closed with them record
 | 14 | Terrain-aware session kinds (M1 review F4: no hills in a trail ultra plan) | `hills` exists as a kind and is never selected from terrain | S | trail plans that train like road plans |
 | 15 | Neuromuscular-before-threshold sequencing rule for novices (M1 review F5) | the first 5K block opens with tempo and never with strides | S | a beginner's first quality session is the hardest kind |
 | 16 | A target-peak notion derived from race distance (M1 review F6: race blocks cannot exceed recent volume) | the curve is purely incremental, so a 7-week race block holds volume instead of building it, and the planner cannot tell "hold" from "fail to build" | L | marathon blocks that never build, with nothing in the plan saying so |
+| 17 | Fix the `musoreSoreness` field name in the day-entry wire contract (it reads as a typo of `muscleSoreness`) | the hand-written type deliberately omits it, so the field is currently storable but unreadable by any decision; a wire rename needs a migration window, not a find-and-replace | S | a contract field nobody can use, and a second reader guessing which spelling is real |
 
 ## Next (M3–M5)
 

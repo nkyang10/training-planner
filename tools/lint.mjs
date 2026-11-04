@@ -58,8 +58,12 @@ const scan = (files, rules, message) => {
 
 const packageSources = walk(join(root, "packages")).filter((file) => file.endsWith(".ts") && rel(file).includes("/src/"));
 const plannerSources = packageSources.filter((file) => rel(file).startsWith("packages/planner-core/src/"));
+// The policy evaluator is pure for the same reason the planner is: a comment printed six months from now
+// has to be reproducible from the entry, the plan and the knowledge hash, and a clock read inside the
+// evaluator would make every stored decision unexplainable.
+const policySources = packageSources.filter((file) => rel(file).startsWith("packages/policy/src/"));
 
-scan(plannerSources, PURITY, "planner purity (AGENTS rule 1)");
+scan([...plannerSources, ...policySources], PURITY, "engine purity (AGENTS rule 1)");
 
 const anyRule = [[/\b:\s*any\b/, "`: any`"], [/\bas\s+any\b/, "`as any`"], [/<any>/, "`<any>`"]];
 scan(packageSources, anyRule, "no any in package sources");
@@ -87,4 +91,6 @@ if (problems.length > 0) {
   console.error(`LINT: ${problems.length} problems`);
   process.exit(1);
 }
-console.log(`LINT: OK - ${packageSources.length} package sources, ${textFiles.length} text files, planner purity holds`);
+console.log(
+  `LINT: OK - ${packageSources.length} package sources, ${textFiles.length} text files, engine purity holds`,
+);

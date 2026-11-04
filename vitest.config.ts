@@ -16,6 +16,7 @@ export default defineConfig({
       { find: "@training-planner/domain", replacement: here("./packages/domain/src/index.ts") },
       { find: "@training-planner/knowledge", replacement: here("./packages/knowledge/src/index.ts") },
       { find: "@training-planner/planner-core", replacement: here("./packages/planner-core/src/index.ts") },
+      { find: "@training-planner/policy", replacement: here("./packages/policy/src/index.ts") },
     ],
   },
   test: {
