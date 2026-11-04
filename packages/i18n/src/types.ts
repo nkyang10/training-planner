@@ -60,7 +60,19 @@ export type WebTemplate =
   | "web.sign-out"
   | "web.skip-reason"
   | "web.skip-reason-none"
-  | "web.saved-locally";
+  | "web.saved-locally"
+  | "web.review-banner"
+  | "web.review-title"
+  | "web.review-options-legend"
+  | "web.review-accept"
+  | "web.review-decline"
+  | "web.review-defer"
+  | "web.review-accepted"
+  | "web.review-declined"
+  | "web.review-deferred"
+  | "web.review-freeze"
+  | "web.review-none"
+  | "web.review-cost";
 
 export interface Messages {
   /** One sentence per comment template. `{slot}` placeholders are filled by packages/i18n's formatter. */

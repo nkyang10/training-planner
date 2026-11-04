@@ -12,6 +12,9 @@ import { join } from "node:path";
 import type { PlanVersion } from "@training-planner/domain";
 import { generatePlan } from "@training-planner/planner-core";
 import { loadKnowledge } from "@training-planner/knowledge";
+import { openReview } from "@training-planner/review";
+import type { ProposedOption } from "@training-planner/review";
+import type { Review } from "@training-planner/domain";
 import { createMemoryRepository, createMemorySessions } from "@training-planner/storage";
 import type { Repository } from "@training-planner/storage";
 import { createWeb } from "../src/server";
@@ -281,5 +284,108 @@ describe("the stylesheet is served, and the pages are not injectable", () => {
     const page = await call("/day/2026-11-07", { cookie: "session=token-a" });
     expect(page.html).not.toContain("<script>alert");
     expect(page.html).toContain("&lt;script&gt;");
+  });
+});
+
+describe("the review sheet shows keep-the-plan first, with the cost, and records a decision", () => {
+  const options: ProposedOption[] = [
+    { optionId: "keep", labelKey: "Keep the plan", keepAsIs: true, diffId: null, costKey: "risk", costSlots: {} },
+    {
+      optionId: "reduce",
+      labelKey: "Reduce hard days",
+      keepAsIs: false,
+      diffId: "33333333-3333-4333-8333-333333333333",
+      costKey: "less intensity",
+      costSlots: {},
+      loadDeltaPct: -15,
+    },
+  ];
+
+  const openOne = (): Review => {
+    const opened = openReview({
+      userId: USER_A,
+      today: TODAY,
+      candidate: {
+        kind: "plan-too-big",
+        ruleId: "plan-too-big",
+        anchor: "review-triggers.yaml#plan-too-big",
+        evidence: { signalIds: ["completion"], ruleIds: ["plan-too-big"], evidenceGradeMax: "B" },
+        presentation: "offer-at-next-open",
+      },
+      knowledge,
+      options,
+      renderCost: (option) => option.costKey,
+    });
+    if (opened.status !== "opened") throw new Error("expected a review");
+    repository.saveReview(opened.review);
+    return opened.review;
+  };
+
+  it("puts the banner on the week page while a review is open", async () => {
+    const review = openOne();
+    const page = await call("/", { cookie: "session=token-a" });
+    expect(page.html).toContain("A review is waiting for you.");
+    expect(page.html).toContain(`/review/${review.reviewId}`);
+  });
+
+  it("renders the options in the order the lifecycle decided, with their cost", async () => {
+    const review = openOne();
+    const page = await call(`/review/${review.reviewId}`, { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Keep the plan");
+    expect(page.html).toContain("Reduce hard days");
+    expect(page.html).toContain("Cost: less intensity");
+    expect(page.html).toContain("Nothing changes before 2026-11-11.");
+    const keepIndex = page.html.indexOf("Keep the plan");
+    const reduceIndex = page.html.indexOf("Reduce hard days");
+    expect(keepIndex).toBeGreaterThan(-1);
+    expect(keepIndex).toBeLessThan(reduceIndex);
+  });
+
+  it("accepts a change and says when it starts", async () => {
+    const review = openOne();
+    const page = await call(`/review/${review.reviewId}`, {
+      cookie: "session=token-a",
+      form: { decision: "accept", optionId: "reduce" },
+    });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Accepted. The change starts on 2026-11-11.");
+    expect(repository.getReview(USER_A, review.reviewId)?.status).toBe("accepted");
+    expect(repository.getReview(USER_A, review.reviewId)?.resultDiffId).toBe("33333333-3333-4333-8333-333333333333");
+  });
+
+  it("records a decline as keeping the plan", async () => {
+    const review = openOne();
+    const page = await call(`/review/${review.reviewId}`, {
+      cookie: "session=token-a",
+      form: { decision: "decline", reason: "one more week" },
+    });
+    expect(page.html).toContain("Kept the plan. Nothing changed.");
+    expect(repository.getReview(USER_A, review.reviewId)?.status).toBe("rejected");
+  });
+
+  it("defers to the dwell window and names the day", async () => {
+    const review = openOne();
+    const page = await call(`/review/${review.reviewId}`, {
+      cookie: "session=token-a",
+      form: { decision: "defer" },
+    });
+    expect(page.html).toContain("We will ask again on 2026-11-16.");
+    expect(repository.getReview(USER_A, review.reviewId)?.status).toBe("deferred");
+  });
+
+  it("refuses a second decision on a decided review", async () => {
+    const review = openOne();
+    await call(`/review/${review.reviewId}`, { cookie: "session=token-a", form: { decision: "decline" } });
+    const again = await call(`/review/${review.reviewId}`, { cookie: "session=token-a", form: { decision: "accept", optionId: "reduce" } });
+    expect(again.status).toBe(409);
+    expect(again.html).toContain("not-open");
+    expect(repository.getReview(USER_A, review.reviewId)?.status).toBe("rejected");
+  });
+
+  it("says so when the review does not exist", async () => {
+    const page = await call("/review/00000000-0000-4000-8000-000000000000", { cookie: "session=token-a" });
+    expect(page.status).toBe(404);
+    expect(page.html).toContain("No review is open.");
   });
 });

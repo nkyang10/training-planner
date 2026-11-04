@@ -5,7 +5,7 @@
  * sentence about training. The comment on the day page is the narrator's output, inserted verbatim (escaped),
  * because a page that re-words the coach note would be a second narrator.
  */
-import type { DayEntry, PlanVersion, Session } from "@training-planner/domain";
+import type { DayEntry, PlanVersion, Review, Session } from "@training-planner/domain";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
 import { escapeHtml, layout } from "./html";
@@ -19,6 +19,8 @@ export interface CalendarPageInput {
   commentOf: (day: string) => { text: string } | undefined;
   /** One sentence from `packages/narrator`'s explanation, already rendered and already grounded. */
   intro: string | undefined;
+  /** An open review, if there is one: the banner links to the sheet rather than asking for a decision here. */
+  openReview: Review | undefined;
 }
 
 export interface DayPageInput {
@@ -97,7 +99,12 @@ export function renderCalendar(input: CalendarPageInput): string {
   });
 
   const intro = input.intro === undefined ? "" : `<p class="muted">${escapeHtml(input.intro)}</p>`;
+  const banner =
+    input.openReview === undefined
+      ? ""
+      : `<a class="card banner" href="/review/${escapeHtml(input.openReview.reviewId)}">${escapeHtml(messages.web["web.review-banner"])}</a>`;
   const body = `
+    ${banner}
     <section class="card">
       <h2>${escapeHtml(messages.web["web.calendar-title"])}</h2>
       ${intro}
@@ -198,3 +205,70 @@ export function renderDay(input: DayPageInput): string {
 }
 
 export { OUTCOMES };
+
+export interface ReviewSheetInput {
+  locale: Locale;
+  review: Review;
+  /** The first day a change may land: today + freeze_window_days, never today or tomorrow. */
+  firstEditableDay: string;
+  message: { kind: "accepted"; day: string } | { kind: "declined" } | { kind: "deferred"; day: string } | undefined;
+  error: string | undefined;
+}
+
+/**
+ * The review sheet. The ordering is not a layout choice: `packages/review` refuses an option set whose first
+ * option is not "keep the plan", and this page renders the options in the order it was given. The visible cost
+ * of every option is the narrator's rendered cost, stored on the option.
+ */
+export function renderReview(input: ReviewSheetInput): string {
+  const messages = messagesFor(input.locale);
+  const web = messages.web;
+  const errorBlock = input.error === undefined ? "" : `<p class="error" role="alert">${escapeHtml(input.error)}</p>`;
+  const message =
+    input.message === undefined
+      ? ""
+      : input.message.kind === "accepted"
+        ? `<p class="chip done" role="status">${escapeHtml(format(web["web.review-accepted"], { day: input.message.day }))}</p>`
+        : input.message.kind === "declined"
+          ? `<p class="chip done" role="status">${escapeHtml(web["web.review-declined"])}</p>`
+          : `<p class="chip done" role="status">${escapeHtml(format(web["web.review-deferred"], { day: input.message.day }))}</p>`;
+
+  if (input.review.status !== "open") {
+    return layout({
+      locale: input.locale,
+      title: web["web.review-title"],
+      // A refused decision on a decided review still has to say why: the page is the only place the runner sees it.
+      body: `<section class="card"><p>${escapeHtml(web["web.review-none"])}</p>${errorBlock}${message}</section>`,
+      signedIn: true,
+    });
+  }
+
+  const options = input.review.options
+    .map(
+      (option, index) => `<label class="choice">
+        <input type="radio" name="optionId" value="${escapeHtml(option.optionId)}"${index === 0 ? " checked" : ""}>
+        <span>${escapeHtml(option.labelKey)}<br><small class="muted">${escapeHtml(
+          format(web["web.review-cost"], { cost: option.costSummary }),
+        )}</small></span>
+      </label>`,
+    )
+    .join("\n");
+
+  const body = `
+    <section class="card">
+      <h2>${escapeHtml(web["web.review-title"])}</h2>
+      <p class="muted">${escapeHtml(format(web["web.review-freeze"], { day: input.firstEditableDay }))}</p>
+      ${errorBlock}
+      ${message}
+    </section>
+    <form method="post" action="/review/${escapeHtml(input.review.reviewId)}" class="card stack">
+      <fieldset>
+        <legend>${escapeHtml(web["web.review-options-legend"])}</legend>
+        ${options}
+      </fieldset>
+      <button type="submit" name="decision" value="accept">${escapeHtml(web["web.review-accept"])}</button>
+      <button type="submit" name="decision" value="decline" class="quiet">${escapeHtml(web["web.review-decline"])}</button>
+      <button type="submit" name="decision" value="defer" class="quiet">${escapeHtml(web["web.review-defer"])}</button>
+    </form>`;
+  return layout({ locale: input.locale, title: web["web.review-title"], body, signedIn: true });
+}

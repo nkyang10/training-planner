@@ -63,6 +63,8 @@ export interface Repository {
 
   saveReview(review: Review): void;
   getReview(userId: string, reviewId: string): Review | undefined;
+  /** Every review for a user, newest first: the calendar needs to know whether one is waiting. */
+  listReviews(userId: string): Review[];
 
   saveComment(comment: CommentRecord): void;
   listComments(userId: string, day?: string): CommentRecord[];
