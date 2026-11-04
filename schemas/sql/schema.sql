@@ -714,7 +714,7 @@ create table system_comments (
 -- What the product asked the runner, and when. Append-only for the same reason the comment is: the shared
 -- prompt budget is computed from this log (feedback-prompts.yaml#prompt_budget_per_day), so rewriting a
 -- delivery would rewrite the reason a later prompt was or was not allowed. The wire shape is
--- `PromptDelivery` in packages/domain; it has no JSON contract yet, which is backlog row 31.
+-- `PromptDelivery` in packages/domain and prompt-delivery.schema.json in schemas/json/.
 create table prompt_deliveries (
   user_id      uuid not null references users(id) on delete cascade,
   day          date not null,                 -- the training day it was delivered on: what the budget counts

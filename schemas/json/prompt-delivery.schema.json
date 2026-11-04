@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://training-planner.local/schemas/json/prompt-delivery.schema.json",
+  "title": "Prompt delivery",
+  "description": "One prompt the product actually delivered. This is the input to the shared prompt budget (knowledge/heuristics/feedback-prompts.yaml#prompt_budget_per_day), so the shape is a fact, not a message: the copy lives in the message catalogue and the policy that reads this row is packages/nudges. The row is append-only in schemas/sql/schema.sql (no UPDATE/DELETE policy, refuse_mutation trigger), because rewriting a delivery would rewrite the reason a later prompt was or was not allowed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["userId", "kind", "day", "forDay", "atMinute"],
+  "properties": {
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Server-assigned from the session (AGENTS rule 7); row-level security is the enforcement, and this field is the audit that the enforcement has something to key on."
+    },
+    "kind": {
+      "enum": ["nudge", "review", "weekly-summary"],
+      "description": "Which prompt was delivered. Every kind spends the same budget (feedback-prompts.yaml#one-budget-for-all-prompts), so the value is what a refusal is counted against."
+    },
+    "day": {
+      "type": "string",
+      "format": "date",
+      "description": "The training day the prompt was delivered on. This is what the shared budget counts; a prompt delivered at 00:30 on the 6th still belongs to the training day the runner was in."
+    },
+    "forDay": {
+      "type": "string",
+      "format": "date",
+      "description": "The day the prompt asked about: equal to `day` for a same-day nudge, earlier for a silence-ladder prompt. JSON Schema cannot order two dates, so `forDay <= day` is enforced by a CHECK in the DDL and by the policy that builds the row, not here."
+    },
+    "atMinute": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1439,
+      "description": "Local minute-of-day the prompt was scheduled for (0 = 00:00, 1439 = 23:59). Local, not UTC: the quiet-hours rule is about the runner's evening, and a UTC minute would move the window for every runner east of Greenwich."
+    }
+  }
+}

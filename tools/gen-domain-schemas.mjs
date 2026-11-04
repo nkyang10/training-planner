@@ -28,6 +28,7 @@ const CONTRACTS = [
   ["review", "review"],
   ["signal", "signal"],
   ["events", "event"],
+  ["prompt-delivery", "promptDelivery"],
 ];
 
 const IGNORED = new Set([

@@ -15,6 +15,7 @@ schemas/
     signal.schema.json             a computed signal with confidence
     review.schema.json             a review, its options, and its outcome
     events.schema.json             envelope for the append-only event log
+prompt-delivery.schema.json    one delivered prompt (the input to the shared prompt budget)
   sql/
     schema.sql                Postgres DDL sketch: tables, RLS, key constraints
   README.md

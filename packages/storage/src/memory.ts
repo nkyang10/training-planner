@@ -6,6 +6,7 @@
  * Per-user isolation is structural: every read and write is keyed by `userId` first, so a cross-user read is not
  * a check that can be forgotten, it is a lookup that cannot be expressed.
  */
+import { promptDeliverySchema } from "@training-planner/domain";
 import type { DayEntry, PlanDiff, PlanVersion, PromptDelivery, Review, TrainingEvent } from "@training-planner/domain";
 import {
   DuplicateIdempotencyError,
@@ -160,6 +161,13 @@ export function createMemoryRepository(): Repository {
     },
 
     savePromptDelivery(delivery: PromptDelivery): void {
+      // A row the contract rejects is not storable: the same backstop the entry pipeline has. The Postgres
+      // adapter gets the same enforcement from the DDL's CHECK constraints and the for_day <= day constraint.
+      const parsed = promptDeliverySchema.safeParse(delivery);
+      if (!parsed.success) {
+        const issues = parsed.error.issues.map((issue) => `${issue.path.join(".") || "delivery"}: ${issue.message}`);
+        throw new Error(`prompt delivery does not satisfy prompt-delivery.schema.json: ${issues.join("; ")}`);
+      }
       stateOf(delivery.userId).promptDeliveries.push(delivery);
     },
 

@@ -189,6 +189,22 @@ describe("prompt deliveries are a log, not a flag", () => {
     expect(deliveries[0]?.atMinute).toBe(19 * 60);
   });
 
+  it("refuses a delivery the contract rejects", () => {
+    const repository = createMemoryRepository();
+    // atMinute 1440 is the first minute of tomorrow: the contract bounds it to 0..1439, and the DDL CHECK says
+    // the same, so the reference adapter refuses the row rather than storing something no real minute can be.
+    expect(() =>
+      repository.savePromptDelivery({
+        userId: USER_A,
+        kind: "nudge",
+        day: "2026-11-05",
+        forDay: "2026-11-05",
+        atMinute: 1440,
+      }),
+    ).toThrow(/prompt-delivery\.schema\.json/);
+    expect(repository.listPromptDeliveries(USER_A)).toEqual([]);
+  });
+
   it("never shows one user's prompts to another", () => {
     const repository = createMemoryRepository();
     repository.savePromptDelivery({ userId: USER_A, kind: "nudge", day: "2026-11-05", forDay: "2026-11-05", atMinute: 19 * 60 });
