@@ -23,6 +23,7 @@ import { generatePlan, uuidFrom } from "@training-planner/planner-core";
 import type { Evidence, PlanState } from "@training-planner/planner-core";
 import { evaluatePolicy } from "@training-planner/policy";
 import { computeSignals } from "@training-planner/signals";
+import { evaluateTriggers } from "@training-planner/triggers";
 import { decideReview } from "@training-planner/review";
 import type { Decision } from "@training-planner/review";
 import { DuplicateIdempotencyError } from "@training-planner/storage";
@@ -279,6 +280,33 @@ export function createApi(options: ApiOptions): RequestListener {
       sendJson(response, 200, { asOfDay: today, signals: output.signals, unavailable: output.unavailable });
       return;
     }
+    // GET /reviews/candidates - what the corpus rules would say, without opening anything.
+    //
+    // Opening needs candidate options with diffs and costs, and the engine that produces those is M3's re-planning
+    // engine. This route stops exactly where the evidence ends: it reports the candidate and the rules it could not
+    // evaluate, and it never invents an option to make a review look ready.
+    if (segments.length === 2 && segments[0] === "reviews" && segments[1] === "candidates") {
+      if (method !== "GET") return fail(response, 405, "method-not-allowed", "use GET /reviews/candidates");
+      const plan = repository.latestPlanVersionFor(userId, today);
+      if (plan === undefined) return fail(response, 404, "no-plan", "no plan version covers this day yet");
+      const signals = computeSignals({
+        userId,
+        today,
+        entries: repository.listEntries(userId),
+        plan,
+        knowledge,
+        computedAt: at,
+      });
+      const output = evaluateTriggers({ userId, today, signals, knowledge });
+      sendJson(response, 200, {
+        asOfDay: today,
+        candidate: output.candidate ?? null,
+        fired: output.fired,
+        unevaluable: output.unevaluable,
+      });
+      return;
+    }
+
     // GET /entries/:day
     if (segments.length === 2 && segments[0] === "entries") {
       if (method !== "GET") return fail(response, 405, "method-not-allowed", "use GET /entries/:day");
