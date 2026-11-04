@@ -3,5 +3,5 @@
  */
 export { childPlanVersion, proposePlanOptions } from "./propose";
 export type { ProposedPlan, ReplanRefusal, ReplanRequest, ReplanResult } from "./types";
-export { proposeOrientationReplan } from "./orientation";
+export { evidenceFromPlan, proposeOrientationReplan } from "./orientation";
 export type { OrientationReplan, OrientationReplanInput, OrientationReplanSummary } from "./orientation";

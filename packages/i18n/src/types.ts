@@ -93,6 +93,7 @@ export type WebTemplate =
   | "web.review-freeze"
   | "web.review-none"
   | "web.review-cost"
+  | "web.review-replan-summary"
   | "web.season-link"
   | "web.season-title"
   | "web.season-back"

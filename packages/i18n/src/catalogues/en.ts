@@ -108,6 +108,7 @@ export const en: Messages = {
     "web.review-freeze": "Nothing changes before {day}.",
     "web.review-none": "No review is open.",
     "web.review-cost": "Cost: {cost}",
+    "web.review-replan-summary": "This re-cuts the block: {changes} days change, {kmBefore} km to {kmAfter} km.",
     "web.season-link": "Season",
     "web.season-title": "Season",
     "web.season-back": "Back to the week",

@@ -131,3 +131,25 @@ export function proposeOrientationReplan(input: OrientationReplanInput): Orienta
     ),
   };
 }
+
+
+/**
+ * Evidence for a re-plan, derived from the plan the runner is on: the last three ISO weeks of planned kilometres,
+ * oldest first. It is deliberately labelled "low" confidence and has no measured baseline - a plan is a statement of
+ * intent, not a measurement, and a re-plan built on a made-up pace would be the invented-fact failure the advisor
+ * gates exist to catch. The caller may supply better evidence; this is the honest floor.
+ */
+export function evidenceFromPlan(plan: PlanVersion, today: string): Evidence | null {
+  const weeks = new Map<string, number>();
+  for (const session of plan.sessions) {
+    if (session.day > today) continue;
+    const week = weekStart(session.day);
+    weeks.set(week, (weeks.get(week) ?? 0) + (session.kind === "rest" ? 0 : (session.distanceKm ?? 0)));
+  }
+  const recentWeeklyKm = [...weeks.entries()]
+    .sort(([left], [right]) => (left < right ? -1 : 1))
+    .slice(-3)
+    .map(([, km]) => km);
+  if (recentWeeklyKm.length === 0) return null;
+  return { recentWeeklyKm, layoffDays: 0, baselinePaceSecPerKm: null, baselineConfidence: "low" };
+}

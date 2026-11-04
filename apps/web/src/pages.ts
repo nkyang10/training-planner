@@ -421,7 +421,17 @@ export function renderReview(input: ReviewSheetInput): string {
         <input type="radio" name="optionId" value="${escapeHtml(option.optionId)}"${index === 0 ? " checked" : ""}>
         <span>${escapeHtml(option.labelKey)}<br><small class="muted">${escapeHtml(
           format(web["web.review-cost"], { cost: option.costSummary }),
-        )}</small></span>
+        )}</small>${
+          option.kind === "replan" && option.changeSummary !== undefined && option.changeSummary !== null
+            ? `<br><small class="muted">${escapeHtml(
+                format(web["web.review-replan-summary"], {
+                  changes: formatNumber(option.changeSummary.changes),
+                  kmBefore: formatNumber(option.changeSummary.kmBefore),
+                  kmAfter: formatNumber(option.changeSummary.kmAfter),
+                }),
+              )}</small>`
+            : ""
+        }</span>
       </label>`,
     )
     .join("\n");

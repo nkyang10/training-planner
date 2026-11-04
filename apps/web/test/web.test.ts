@@ -731,3 +731,44 @@ describe("the operator console (ADR-0009)", () => {
     expect(duplicate.html).toContain("That version already exists.");
   });
 });
+
+
+describe("the review sheet tells a re-plan's honest size (ADR-0010)", () => {
+  it("renders the change count and the kilometres before and after", async () => {
+    const opened = openReview({
+      userId: USER_A,
+      today: TODAY,
+      candidate: {
+        kind: "manual",
+        ruleId: null,
+        anchor: null,
+        evidence: { signalIds: [], ruleIds: [], evidenceGradeMax: "C" },
+        presentation: "recorded",
+      },
+      knowledge,
+      options: [
+        { optionId: "keep", labelKey: "keep-the-plan", keepAsIs: true, diffId: null, costKey: "risk-noted", costSlots: {}, loadDeltaPct: 0 },
+        {
+          optionId: "replan",
+          labelKey: "replan-for-orientation",
+          keepAsIs: false,
+          kind: "replan",
+          planVersionId: "12345678-1234-4234-8234-123456789012",
+          changeSummary: { changes: 11, sessionsMoved: 8, kmBefore: 27.2, kmAfter: 48.5, firstChangedDay: "2026-11-16" },
+          diffId: null,
+          costKey: "the-block-is-recut",
+          costSlots: {},
+          loadDeltaPct: 78.3,
+        },
+      ],
+      renderCost: (option) => option.costKey,
+    });
+    if (opened.status !== "opened") throw new Error(`expected opened, got ${JSON.stringify(opened)}`);
+    repository.saveReview(opened.review);
+
+    const page = await call(`/review/${opened.review.reviewId}`, { cookie: "session=token-a", locale: "en" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("This re-cuts the block: 11 days change, 27.2 km to 48.5 km.");
+    expect(page.html).toContain('name="optionId" value="replan"');
+  });
+});
