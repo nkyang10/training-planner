@@ -432,6 +432,14 @@ export const eventSchema = whenThen(whenThen(whenThen(z.object({
     "causationId": requiredAny,
   }).passthrough(), "Safety events are raised by the system, never by a tap, and an override records which flag it overrode. A safety event without a cause chain is the one audit gap that must never be possible (AGENTS rule 3).");
 
+export const promptDeliverySchema = z.object({
+    "userId": z.string().uuid(),
+    "kind": z.union([z.literal("nudge"), z.literal("review"), z.literal("weekly-summary")]),
+    "day": z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    "forDay": z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    "atMinute": z.number().int().min(0).max(1439),
+  }).strict();
+
 export type AthleteProfileContract = z.infer<typeof athleteProfileSchema>;
 export type DayEntryContract = z.infer<typeof dayEntrySchema>;
 export type PlanVersionContract = z.infer<typeof planVersionSchema>;
@@ -439,3 +447,4 @@ export type PlanDiffContract = z.infer<typeof planDiffSchema>;
 export type ReviewContract = z.infer<typeof reviewSchema>;
 export type SignalContract = z.infer<typeof signalSchema>;
 export type EventContract = z.infer<typeof eventSchema>;
+export type PromptDeliveryContract = z.infer<typeof promptDeliverySchema>;

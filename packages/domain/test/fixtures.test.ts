@@ -19,6 +19,7 @@ import {
   athleteProfileSchema,
   dayEntrySchema,
   eventSchema,
+  promptDeliverySchema,
   planDiffSchema,
   planVersionSchema,
   reviewSchema,
@@ -46,6 +47,7 @@ const contracts: Record<string, z.ZodTypeAny> = {
   review: reviewSchema,
   signal: signalSchema,
   events: eventSchema,
+  "prompt-delivery": promptDeliverySchema,
 };
 
 const readJson = (path: string): unknown => JSON.parse(readFileSync(path, "utf8"));
