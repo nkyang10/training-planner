@@ -109,6 +109,7 @@ export const zhHant: Messages = {
     "web.review-freeze": "{day} 之前唔會有任何改動。",
     "web.review-none": "而家冇回顧。",
     "web.review-cost": "代價:{cost}",
+    "web.review-replan-summary": "呢個會重切個 block：{changes} 日改動，由 {kmBefore} 公里變 {kmAfter} 公里。",
     "web.season-link": "整季",
     "web.season-title": "整季",
     "web.season-back": "返去今個星期",

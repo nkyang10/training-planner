@@ -26,11 +26,12 @@ const USER_C = "abababab-abab-4bab-8bab-abababababab";
 const USER_D = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
 const USER_E = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const USER_F = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+const USER_G = "90909090-9090-4090-8090-909090909090";
 const NOW = "2026-11-05T22:40:00.000Z";
 const TODAY = "2026-11-05";
 
 const repository: Repository = createMemoryRepository();
-const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "token-c": USER_C, "token-d": USER_D, "token-e": USER_E, "token-f": USER_F });
+const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "token-c": USER_C, "token-d": USER_D, "token-e": USER_E, "token-f": USER_F, "token-g": USER_G });
 let server: Server;
 let base = "";
 
@@ -915,5 +916,66 @@ describe("a manual review is the runner asking, and the runner still decides (AD
     const refused = await call("/reviews/manual", { method: "POST", token: "token-f", body: {} });
     expect(refused.status).toBe(404);
     expect((refused.body.error as { code: string }).code).toBe("no-plan");
+  });
+});
+
+
+describe("the orientation re-plan is offered, and accepting it activates the staged version (ADR-0010)", () => {
+  const profile = {
+    userId: "90909090-9090-4090-8090-909090909090",
+    revision: 1,
+    age: 35,
+    availability: { days: ["Mon", "Wed", "Fri"] },
+    goal: { type: "finish", event: null },
+    preferences: { units: "metric", locale: "en", timezone: "Asia/Taipei" },
+    health: {},
+  };
+
+  it("opens a review with keep and replan, then activates the staged version on accept", async () => {
+    const plan = await call("/plan", {
+      token: "token-g",
+      body: {
+        profile: fixture.input.profile,
+        evidence: fixture.input.evidence,
+        state: { planStartDay: "2026-11-02", horizonDays: 21 },
+        seed: "orientation-review",
+      },
+    });
+    expect(plan.status).toBe(201);
+
+    // Save a profile first: the stored one says "time", the answers then move to "finish".
+    await call("/wizard", { method: "POST", token: "token-g", body: { stepId: "goal", answer: { value: "time" } } });
+    const applied = await call("/wizard/apply", { method: "POST", token: "token-g", body: { profile } });
+    expect(applied.status).toBe(201);
+    await call("/wizard", { method: "POST", token: "token-g", body: { stepId: "goal", answer: { value: "finish" }, source: "settings" } });
+
+    const orientation = await call("/reviews/orientation", { method: "POST", token: "token-g", body: {} });
+    expect(orientation.status).toBe(201);
+    expect(orientation.body.status).toBe("opened");
+    const options = orientation.body.options as Array<{ optionId: string; kind?: string; planVersionId?: string; changeSummary?: unknown }>;
+    expect(options).toHaveLength(2);
+    expect(options[0]?.optionId).toBe("keep");
+    expect(options[1]?.kind).toBe("replan");
+    expect(options[1]?.planVersionId).toBeTruthy();
+    const review = orientation.body.review as { options: Array<{ kind?: string; planVersionId?: string }>; reviewId: string; status: string };
+    expect(review.options[1]?.kind).toBe("replan");
+    expect(review.status).toBe("open");
+
+    const accepted = await call(`/reviews/${review.reviewId}/decision`, {
+      method: "POST",
+      token: "token-g",
+      body: { decision: { kind: "accept", optionId: "replan" } },
+    });
+    expect(accepted.status).toBe(200);
+    expect(accepted.body.status).toBe("accepted");
+    expect(accepted.body.appliedVersionId).toBe(options[1]?.planVersionId);
+    expect(repository.getActivePlanVersion(USER_G)?.versionId).toBe(options[1]?.planVersionId);
+  });
+
+  it("refuses when there is no stored profile to compare against", async () => {
+    // USER_A has a plan (created in beforeAll) and no stored profile, so the profile gate is the one that answers.
+    const refused = await call("/reviews/orientation", { method: "POST", token: "token-a", body: {} });
+    expect(refused.status).toBe(400);
+    expect((refused.body.error as { code: string }).code).toBe("no-profile");
   });
 });

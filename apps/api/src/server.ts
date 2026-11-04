@@ -40,7 +40,7 @@ import { decideReview, openReview } from "@training-planner/review";
 import type { ProposedOption, ReviewCandidate } from "@training-planner/review";
 import { decideNudge } from "@training-planner/nudges";
 import { seasonSummary } from "@training-planner/season";
-import { proposePlanOptions } from "@training-planner/replan";
+import { evidenceFromPlan, proposeOrientationReplan, proposePlanOptions } from "@training-planner/replan";
 import type { Decision } from "@training-planner/review";
 import { DuplicateIdempotencyError, exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
@@ -516,6 +516,110 @@ export function createApi(options: ApiOptions): RequestListener {
       return;
     }
 
+    // POST /reviews/orientation - offer the ADR-0010 re-plan option: a changed orientation, taken to a new block,
+    // with the past and the freeze window kept. The option is staged; accepting it is the runner's decision.
+    if (segments.length === 2 && segments[0] === "reviews" && segments[1] === "orientation") {
+      if (method !== "POST") return fail(response, 405, "method-not-allowed", "use POST /reviews/orientation");
+      const plan = repository.latestPlanVersionFor(userId, today);
+      if (plan === undefined) return fail(response, 404, "no-plan", "no plan version covers this day yet");
+      const stored = repository.getAthleteProfile(userId);
+      if (stored === undefined) return fail(response, 400, "no-profile", "save a profile first (POST /wizard/apply)");
+      const folded = profileFromWizard(stored, repository.listWizardAnswers(userId));
+      if (!folded.ok || folded.profile === undefined) {
+        return fail(response, 400, "invalid-profile", folded.detail ?? "the folded profile is not valid");
+      }
+      const orientationDiff = profileDiffOf(stored, folded.profile);
+      if (orientationDiff.length === 0) {
+        return fail(response, 409, "no-change", "the answers already match the stored profile; there is nothing to re-plan for");
+      }
+      const evidence = evidenceFromPlan(plan, today);
+      if (evidence === null) return fail(response, 400, "no-history", "the plan has no days up to today to derive evidence from");
+
+      const proposal = proposeOrientationReplan({
+        plan,
+        profile: folded.profile,
+        evidence,
+        today,
+        seed: `orientation-${today}-${stored.revision}`,
+        knowledge,
+      });
+      if (proposal.invariantViolations.length > 0) {
+        sendJson(response, 200, {
+          status: "not-offerable",
+          violations: proposal.invariantViolations,
+          note: "the re-plan would violate the planner's own invariants; it is not offered, and the deterministic path stays",
+        });
+        return;
+      }
+
+      const summary = proposal.summary;
+      const loadDeltaPct =
+        summary.kmBefore === 0 ? 0 : Math.round(((summary.kmAfter - summary.kmBefore) / summary.kmBefore) * 1000) / 10;
+      const proposed: ProposedOption[] = [
+        { optionId: "keep", labelKey: "keep-the-plan", keepAsIs: true, diffId: null, costKey: "risk-noted", costSlots: {}, loadDeltaPct: 0 },
+        {
+          optionId: "replan",
+          labelKey: "replan-for-orientation",
+          keepAsIs: false,
+          kind: "replan",
+          planVersionId: proposal.version.versionId,
+          changeSummary: summary,
+          diffId: null,
+          costKey: "the-block-is-recut",
+          costSlots: { changes: summary.changes, kmBefore: summary.kmBefore, kmAfter: summary.kmAfter },
+          loadDeltaPct,
+        },
+      ];
+
+      const history = repository.listReviews(userId);
+      const weekAgo = addDays(today, -7);
+      const promptsThisWeek = history.filter((review) => review.openedAtDay > weekAgo).length;
+      const accepted = history
+        .filter((review) => review.status === "accepted" && review.decidedAtDay !== null && review.decidedAtDay !== undefined)
+        .sort((a, b) => ((a.decidedAtDay ?? "") < (b.decidedAtDay ?? "") ? 1 : -1))[0];
+
+      const opened = openReview({
+        userId,
+        today,
+        candidate: {
+          kind: "manual",
+          ruleId: null,
+          anchor: null,
+          evidence: { signalIds: [], ruleIds: [], evidenceGradeMax: "C" },
+          presentation: "recorded",
+        },
+        knowledge,
+        options: proposed,
+        renderCost: (option) =>
+          option.kind === "replan"
+            ? `the block is re-cut: ${summary.changes} days change, ${summary.kmBefore} km to ${summary.kmAfter} km`
+            : "nothing changes",
+        promptsThisWeek,
+        daysSinceAcceptedReview:
+          accepted?.decidedAtDay === undefined || accepted?.decidedAtDay === null ? null : daysBetween(accepted.decidedAtDay, today),
+        daysSinceTrigger: { manual: null },
+      });
+
+      if (opened.status === "suppressed") {
+        sendJson(response, 200, { status: "suppressed", reason: opened.reason, detail: opened.detail, ruleId: opened.ruleId });
+        return;
+      }
+      if (opened.status === "refused") return fail(response, 409, opened.code, opened.detail);
+
+      // Staged, never active: the version exists for the review to point at, and only an accept activates it.
+      repository.saveProposedPlanVersion(proposal.version);
+      repository.saveReview(opened.review);
+      sendJson(response, 201, {
+        status: "opened",
+        review: opened.review,
+        options: proposed,
+        orientation: { changed: true, diff: orientationDiff },
+        replan: { summary, exceedsReviewChangeLimit: proposal.exceedsReviewChangeLimit },
+        note: "the re-plan is staged; accepting it activates the plan version, declining leaves the current plan",
+      });
+      return;
+    }
+
     // POST /reviews/manual - a review the runner asked for (review-trigger-policy.md 1.1: "just check me",
     // "I changed my goal"). The candidate is manual, so packages/review records openedBy "user-request"; the options
     // are the same bounded set the engine may offer, and the runner still decides. Nothing here applies a change.
@@ -658,9 +762,16 @@ export function createApi(options: ApiOptions): RequestListener {
       // An accepted change must become the plan the runner actually runs. Keep-the-plan has no diff, so there is
       // nothing to apply - and the active version stays exactly where it was.
       let appliedVersionId: string | null = null;
-      if (result.status === "accepted" && result.resultDiffId !== null) {
+      if (result.status === "accepted") {
+        // ADR-0010: an accepted replan activates the plan version it carried; an accepted edit activates the version
+        // its diff predicts. Two kinds, one decision, and neither may invent a plan.
         try {
-          appliedVersionId = repository.activatePlanVersionForDiff(userId, result.resultDiffId).versionId;
+          if (result.option.kind === "replan" && result.option.planVersionId !== undefined && result.option.planVersionId !== null) {
+            repository.activatePlanVersion(userId, result.option.planVersionId);
+            appliedVersionId = result.option.planVersionId;
+          } else if (result.resultDiffId !== null) {
+            appliedVersionId = repository.activatePlanVersionForDiff(userId, result.resultDiffId).versionId;
+          }
         } catch (error) {
           const detail = error instanceof Error ? error.message : String(error);
           return fail(response, 409, "missing-proposed-version", detail);
