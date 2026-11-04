@@ -27,6 +27,13 @@ production: a missing translation is a crash, and a stale key is copy nobody not
 - numbers render with at most one decimal, no thousands separators: `12`, `2.5`, never `1,234.0`;
 - whitespace collapses, so a template that drops an optional word does not leave a double space.
 
+## Two sentence families
+
+- `comment.*` — the daily comment, rendered by `packages/narrator` from a `CommentFacts` object.
+- `explain.*` — the plan explanation (summary, first week, partial week, peak week). Plural forms are separate
+  keys (`explain.week-one` / `explain.week-many`) rather than string logic in code; Chinese uses the same
+  wording for both, which is what a language without plurals looks like when the key set stays uniform.
+
 ## Copy rules that live elsewhere
 
 Tone, banned phrases, exclamation limits and script matching are enforced in

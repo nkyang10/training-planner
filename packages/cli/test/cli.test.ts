@@ -11,7 +11,7 @@ import { GOLDEN_FIXTURE_COUNT } from "@training-planner/golden-fixtures";
 import { planVersionSchema } from "@training-planner/domain";
 import { canonicalJson } from "@training-planner/knowledge/canonical";
 import { checkInvariants } from "@training-planner/planner-core";
-import { diffFiles, explainLines, knowledgeBundle, planFromFixture, readVersionFile } from "../src/commands";
+import { diffFiles, explainLines, explainWeekLines, knowledgeBundle, planFromFixture, readVersionFile } from "../src/commands";
 
 const directory = join(process.cwd(), "eval", "golden-plans");
 const scratch = mkdtempSync(join(tmpdir(), "tp-cli-"));
@@ -65,6 +65,22 @@ describe("planner diff", () => {
     const broken = join(scratch, "not-a-version.json");
     writeFileSync(broken, JSON.stringify({ hello: "world" }), "utf8");
     expect(() => readVersionFile(broken)).toThrow(/not a plan version/);
+  });
+});
+
+describe("planner explain --weeks", () => {
+  it("states the partial first week with its normalised rate", () => {
+    const generated = planFromFixture(join(directory, "novice-5k.json"), bundle);
+    const lines = explainWeekLines(generated.version, "en").join(" ");
+    expect(lines).toContain("partial");
+    expect(lines).toContain("6.8");
+    expect(lines).toContain("3.9");
+  });
+
+  it("speaks Traditional Chinese when asked", () => {
+    const generated = planFromFixture(join(directory, "novice-5k.json"), bundle);
+    const lines = explainWeekLines(generated.version, "zh-Hant").join(" ");
+    expect(lines).toMatch(/[\\u4e00-\\u9fff]/);
   });
 });
 

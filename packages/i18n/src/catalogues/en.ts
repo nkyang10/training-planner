@@ -42,6 +42,13 @@ export const en: Messages = {
     "bone-referral": "Stop running and get this pain assessed by a clinician before the next session.",
     "pain-hold": "Do not run through this pain today; it needs a clinician's opinion before the next session.",
   },
+  explain: {
+    "explain.summary": "{sessions} sessions over {weeks} weeks, {km} km in total.",
+    "explain.week-one": "Week of {weekday}: {km} km, {hard} hard session.",
+    "explain.week-many": "Week of {weekday}: {km} km, {hard} hard sessions.",
+    "explain.partial": "The first week is partial: {km} km over {days} days, which is {rate} km at a full week's rate.",
+    "explain.peak": "Peak week {km} km, longest run {long} km.",
+  },
   weekday: { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" },
   kind: {
     rest: "rest",

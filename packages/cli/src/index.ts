@@ -9,13 +9,14 @@
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { PLANNER_VERSION } from "@training-planner/planner-core";
-import { diffFiles, explainLines, planFromFixture, readVersionFile } from "./commands";
+import { isLocale } from "@training-planner/i18n";
+import { diffFiles, explainLines, explainWeekLines, planFromFixture, readVersionFile } from "./commands";
 
 const USAGE = `planner ${PLANNER_VERSION}
 
   planner gen --fixture <path> [--out <path>] [--canonical]
   planner diff --from <path> --to <path> --created <YYYY-MM-DD> [--reason <text>]
-  planner explain --version <path> [--day <YYYY-MM-DD>]
+  planner explain --version <path> [--day <YYYY-MM-DD>] [--weeks [--locale en|zh-Hant]]
 
 Paths are relative to the working directory. Knowledge is always read from knowledge/heuristics and
 never from a flag: a plan that could name a knowledge version this repository does not have would be
@@ -38,6 +39,8 @@ const { values, positionals } = parseArgs({
     reason: { type: "string" },
     version: { type: "string" },
     day: { type: "string" },
+    weeks: { type: "boolean", default: false },
+    locale: { type: "string" },
     help: { type: "boolean", short: "h", default: false },
   },
 });
@@ -69,7 +72,14 @@ try {
     console.error(`planner: ${diff.changes.length} change(s), within the two-change limit: ${diff.changeCountWithinLimit}`);
   } else if (command === "explain") {
     if (typeof values.version !== "string") fail("explain needs --version <path>");
-    for (const line of explainLines(readVersionFile(values.version), values.day)) console.log(line);
+    const version = readVersionFile(values.version);
+    if (values.weeks === true) {
+      const locale = values.locale ?? "en";
+      if (!isLocale(locale)) fail(`unknown locale ${locale}; expected en or zh-Hant`);
+      for (const line of explainWeekLines(version, locale)) if (line.length > 0) console.log(line);
+    } else {
+      for (const line of explainLines(version, values.day)) console.log(line);
+    }
   } else {
     fail(`unknown command '${command}'\n\n${USAGE}`);
   }

@@ -43,6 +43,21 @@ habit. Two kinds of number are legitimate:
 
 The check accepts both and nothing else.
 
+## The explanation surface
+
+```ts
+renderPlanExplanation(version, { locale });
+// "42 sessions over 7 weeks, 42.9 km in total."
+// "Week of Monday: 3.9 km, 1 hard session."
+// "The first week is partial: 3.9 km over 4 days, which is 6.8 km at a full week's rate."
+// "Peak week 8.5 km, longest run 2.7 km."
+```
+
+The partial-week sentence is M1 review finding **F3**: the novice block begins on a Thursday, so its raw first
+week (3.9 km) looks like a collapse next to week two (7.3 km) while the 7-day-normalised rate moves +8%. A
+correct plan that reads as wrong is a plan the runner stops trusting, so the explanation states **both**
+numbers. `summariseWeeks()` exposes the same facts for the UI.
+
 ## Ordering
 
 - normal days: **acknowledge → interpret → redirect** (the AIR contract);

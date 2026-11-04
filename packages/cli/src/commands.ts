@@ -11,6 +11,8 @@ import { loadKnowledge } from "@training-planner/knowledge";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
 import { canonicalJson, hashOf } from "@training-planner/knowledge/canonical";
 import { checkInvariants, diffPlans, generatePlan } from "@training-planner/planner-core";
+import { renderPlanExplanation } from "@training-planner/narrator";
+import type { Locale } from "@training-planner/i18n";
 import type { InvariantViolation, PlanDiff, PlanInput, PlanVersion } from "@training-planner/planner-core";
 import { fixtureSchema } from "../../../eval/golden-plans/fixture";
 
@@ -70,6 +72,16 @@ export function diffFiles(fromPath: string, toPath: string, createdAtDay: string
     maxChanges: 2,
     ...(reason === undefined ? {} : { reason }),
   });
+}
+
+/**
+ * The runner-facing explanation of the whole block: what it is, the week that peaks, and - when the plan
+ * begins or ends mid-week - the 7-day-normalised rate that makes the first week comparable instead of
+ * alarming (M1 review finding F3). Same guardrails as a comment, because it is read by the same person.
+ */
+export function explainWeekLines(version: PlanVersion, locale: Locale = "en"): string[] {
+  const explanation = renderPlanExplanation(version, { locale });
+  return [...explanation.sentences, ""];
 }
 
 /** The lines `planner explain` prints. Pure, so a test can read them. */

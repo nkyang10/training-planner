@@ -5,6 +5,8 @@
  * guardrails and falls back to these sentences on any failure; the deterministic path stays the baseline.
  */
 export { renderComment, renderAdjustment, nudgeLabel } from "./render";
+export { renderPlanExplanation, summariseWeeks } from "./explain";
+export type { ExplainOptions, PlanExplanation, WeekSummary } from "./explain";
 export type { RenderOptions, RenderedComment } from "./render";
 export {
   BANNED,
