@@ -37,7 +37,7 @@ import { guidelineSchema } from "@training-planner/domain";
 import { computeSignals } from "@training-planner/signals";
 import { evaluateTriggers } from "@training-planner/triggers";
 import { decideReview, openReview } from "@training-planner/review";
-import type { ProposedOption } from "@training-planner/review";
+import type { ProposedOption, ReviewCandidate } from "@training-planner/review";
 import { decideNudge } from "@training-planner/nudges";
 import { seasonSummary } from "@training-planner/season";
 import { proposePlanOptions } from "@training-planner/replan";
@@ -508,6 +508,90 @@ export function createApi(options: ApiOptions): RequestListener {
         options: proposed,
         refusals: proposal.refusals,
         unevaluable: triggers.unevaluable,
+      });
+      return;
+    }
+
+    // POST /reviews/manual - a review the runner asked for (review-trigger-policy.md 1.1: "just check me",
+    // "I changed my goal"). The candidate is manual, so packages/review records openedBy "user-request"; the options
+    // are the same bounded set the engine may offer, and the runner still decides. Nothing here applies a change.
+    if (segments.length === 2 && segments[0] === "reviews" && segments[1] === "manual") {
+      if (method !== "POST") return fail(response, 405, "method-not-allowed", "use POST /reviews/manual");
+      const plan = repository.latestPlanVersionFor(userId, today);
+      if (plan === undefined) return fail(response, 404, "no-plan", "no plan version covers this day yet");
+
+      const candidate: ReviewCandidate = {
+        kind: "manual",
+        ruleId: null,
+        anchor: null,
+        evidence: { signalIds: [], ruleIds: [], evidenceGradeMax: "C" },
+        presentation: "recorded",
+      };
+      const proposal = proposePlanOptions({ plan, today, candidate, knowledge });
+      if (proposal.options.length < 2) {
+        sendJson(response, 200, { status: "no-option", refusals: proposal.refusals });
+        return;
+      }
+
+      // What the runner's answers would change in their stored profile, if anything. This is evidence for the
+      // review, not a change: the plan is not regenerated here.
+      const stored = repository.getAthleteProfile(userId);
+      const folded = stored === undefined ? undefined : profileFromWizard(stored, repository.listWizardAnswers(userId));
+      const orientationDiff =
+        stored !== undefined && folded !== undefined && folded.ok && folded.profile !== undefined
+          ? profileDiffOf(stored, folded.profile)
+          : [];
+
+      const history = repository.listReviews(userId);
+      const weekAgo = addDays(today, -7);
+      const promptsThisWeek = history.filter((review) => review.openedAtDay > weekAgo).length;
+      const accepted = history
+        .filter((review) => review.status === "accepted" && review.decidedAtDay !== null && review.decidedAtDay !== undefined)
+        .sort((a, b) => ((a.decidedAtDay ?? "") < (b.decidedAtDay ?? "") ? 1 : -1))[0];
+
+      const proposed: ProposedOption[] = proposal.options.map((option) => ({
+        optionId: option.optionId,
+        labelKey: option.labelKey,
+        keepAsIs: option.keepAsIs,
+        diffId: option.diffId,
+        costKey: option.costKey,
+        costSlots: option.costSlots,
+        loadDeltaPct: option.loadDeltaPct,
+      }));
+
+      const opened = openReview({
+        userId,
+        today,
+        candidate,
+        knowledge,
+        options: proposed,
+        renderCost: (option) => `${option.costKey} ${JSON.stringify(option.costSlots)}`,
+        promptsThisWeek,
+        daysSinceAcceptedReview:
+          accepted?.decidedAtDay === undefined || accepted?.decidedAtDay === null ? null : daysBetween(accepted.decidedAtDay, today),
+        daysSinceTrigger: { manual: null },
+      });
+
+      if (opened.status === "suppressed") {
+        sendJson(response, 200, { status: "suppressed", reason: opened.reason, detail: opened.detail, ruleId: opened.ruleId });
+        return;
+      }
+      if (opened.status === "refused") {
+        return fail(response, 409, opened.code, opened.detail);
+      }
+
+      for (const option of proposal.options) {
+        if (option.diff !== null) repository.savePlanDiff(option.diff);
+        if (option.version !== null) repository.saveProposedPlanVersion(option.version);
+      }
+      repository.saveReview(opened.review);
+      sendJson(response, 201, {
+        status: "opened",
+        review: opened.review,
+        options: proposed,
+        refusals: proposal.refusals,
+        orientation: { changed: orientationDiff.length > 0, diff: orientationDiff },
+        note: "the review proposes; the plan changes only when the runner accepts an option",
       });
       return;
     }

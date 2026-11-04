@@ -24,11 +24,13 @@ const USER_A = "66666666-6666-4666-8666-666666666666";
 const USER_B = "77777777-7777-4777-8777-777777777777";
 const USER_C = "abababab-abab-4bab-8bab-abababababab";
 const USER_D = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
+const USER_E = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const USER_F = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 const NOW = "2026-11-05T22:40:00.000Z";
 const TODAY = "2026-11-05";
 
 const repository: Repository = createMemoryRepository();
-const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "token-c": USER_C, "token-d": USER_D });
+const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "token-c": USER_C, "token-d": USER_D, "token-e": USER_E, "token-f": USER_F });
 let server: Server;
 let base = "";
 
@@ -856,5 +858,62 @@ describe("applying the answers to the stored profile (ADR-0009)", () => {
     const refused = await call("/wizard/apply", { method: "POST", token: "token-b", body: {} });
     expect(refused.status).toBe(400);
     expect((refused.body.error as { code: string }).code).toBe("no-profile");
+  });
+});
+
+
+describe("a manual review is the runner asking, and the runner still decides (ADR-0009)", () => {
+  const profile = {
+    userId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    revision: 1,
+    age: 34,
+    availability: { days: ["Mon", "Wed", "Fri"] },
+    goal: { type: "finish", event: null },
+    preferences: { units: "metric", locale: "en", timezone: "Asia/Taipei" },
+    health: {},
+  };
+
+  it("opens with the bounded options, records user-request, and applies nothing", async () => {
+    const plan = await call("/plan", {
+      token: "token-e",
+      body: {
+        profile: fixture.input.profile,
+        evidence: fixture.input.evidence,
+        state: { planStartDay: "2026-11-02", horizonDays: 21 },
+        seed: "manual-review",
+      },
+    });
+    expect(plan.status).toBe(201);
+    const plansBefore = repository.listPlanVersions(USER_E).length;
+
+    const first = await call("/wizard", { method: "POST", token: "token-e", body: { stepId: "goal", answer: { value: "time" } } });
+    expect(first.status).toBe(201);
+    const applied = await call("/wizard/apply", { method: "POST", token: "token-e", body: { profile } });
+    expect(applied.status).toBe(201);
+    // The runner changes their mind after saving: the stored profile says time, the answers now say finish.
+    const changed = await call("/wizard", { method: "POST", token: "token-e", body: { stepId: "goal", answer: { value: "finish" }, source: "settings" } });
+    expect(changed.status).toBe(201);
+
+    const manual = await call("/reviews/manual", { method: "POST", token: "token-e", body: {} });
+    expect(manual.status).toBe(201);
+    expect(manual.body.status).toBe("opened");
+    const review = manual.body.review as { openedBy: string; evidence: { ruleIds: string[] }; status: string };
+    expect(review.openedBy).toBe("user-request");
+    expect(review.evidence.ruleIds).toEqual([]);
+    expect(review.status).toBe("open");
+    const options = manual.body.options as Array<{ optionId: string; keepAsIs: boolean }>;
+    expect(options.length).toBeGreaterThanOrEqual(2);
+    expect(options.some((option) => option.keepAsIs)).toBe(true);
+    const orientation = manual.body.orientation as { changed: boolean; diff: Array<{ path: string }> };
+    expect(orientation.changed).toBe(true);
+    expect(orientation.diff.map((entry) => entry.path)).toContain("goal.type");
+    // The review exists; no plan version was added and no option was applied.
+    expect(repository.listPlanVersions(USER_E).length).toBe(plansBefore);
+  });
+
+  it("refuses a manual review when there is no plan to review", async () => {
+    const refused = await call("/reviews/manual", { method: "POST", token: "token-f", body: {} });
+    expect(refused.status).toBe(404);
+    expect((refused.body.error as { code: string }).code).toBe("no-plan");
   });
 });
