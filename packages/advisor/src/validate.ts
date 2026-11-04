@@ -36,15 +36,29 @@ export interface ValidateProposalInput {
 }
 
 /** Numbers the request actually contains, for the grounding check. */
+function collectNumbers(value: unknown, into: Set<number>): void {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    into.add(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectNumbers(item, into);
+    return;
+  }
+  if (value !== null && typeof value === "object") {
+    for (const item of Object.values(value as Record<string, unknown>)) collectNumbers(item, into);
+  }
+}
+
+/**
+ * Every number that appears anywhere in the request. The grounding rule is "a number the model uses must be one it
+ * was shown"; the request is what it was shown. A hand-picked subset was wrong in the honest direction but wrong:
+ * a model that cited `vocabulary.maxChanges` was told the request "did not contain" a number the request contained.
+ * Collecting the whole request keeps the rule true and still refuses a number that appears nowhere in it.
+ */
 function contextNumbers(request: AdvisorRequest): Set<number> {
   const numbers = new Set<number>();
-  for (const km of Object.values(request.vocabulary.plannedKmByDay)) numbers.add(km);
-  for (const entry of request.context.entries) {
-    if (typeof entry.completedKm === "number") numbers.add(entry.completedKm);
-    if (typeof entry.rpe === "number") numbers.add(entry.rpe);
-    if (typeof entry.pain === "number") numbers.add(entry.pain);
-  }
-  for (const signal of request.context.signals) if (typeof signal.value === "number") numbers.add(signal.value);
+  collectNumbers(request, numbers);
   return numbers;
 }
 

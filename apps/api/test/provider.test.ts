@@ -86,6 +86,7 @@ describe("the port posts the request the contract says, and parses the answer", 
     expect(messages[0]?.content).toContain("never invent a number");
     expect(messages[0]?.content).toContain("proposedChanges");
     expect(messages[0]?.content).toContain("reasonCode");
+    expect(messages[0]?.content).toContain("costSlots is always an OBJECT");
     expect(messages[1]?.content).toContain("guidelineVersionHash" in (JSON.parse(messages[1]?.content ?? "{}") as object) ? "x" : "guidelineId");
   });
 

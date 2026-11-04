@@ -72,6 +72,44 @@ So the first `llm-main-default` rejection was a **prompt/contract mismatch**, no
 answers the same way once the system prompt names the exact keys. Both models are usable; neither was asked to decide
 anything the gates had not first bounded.
 
+## The scenario harness (`eval/live/scenario-live-check.ts`)
+
+A second manual harness sends the **context** of all 10 `eval/advisor-scenarios` to the real model (the fixture's
+expected proposal is not sent) and runs the deterministic gates on whatever comes back. One run on 2026-11-04 with
+`dgx/general`:
+
+### Before the grounding fix
+
+| Result | Count | Cause |
+|---|---|---|
+| accepted | 1 / 10 | only the safety scenario's `no-change` |
+| rejected | 9 / 10 | 8 × `fact maxChanges carries 2, which the request did not contain`; 1 × `proposedChanges.0.costSlots: Expected object, received array` |
+
+The first rejection was a **gate bug, not a model hallucination**: `vocabulary.maxChanges: 2` *is* in the request, but
+`contextNumbers` only collected planned kilometres, entry numbers and signal values. The gate said "the request did not
+contain" a number the request contained.
+
+### The fix
+
+- `packages/advisor/src/validate.ts`: `contextNumbers` now collects **every number anywhere in the request** (the
+  request is what the model was shown). The rule is unchanged; its implementation is now true.
+- The provider's system prompt now says facts must describe the runner or the plan and must not cite vocabulary limits,
+  and that `costSlots` is always an object (`{"days": 2}`), never an array.
+- Two new advisor tests pin both directions: a fact citing `vocabulary.maxChanges` is **accepted**; a number that appears
+  nowhere in the request is still **rejected**.
+
+### After the fix
+
+| Result | Count |
+|---|---|
+| accepted | **10 / 10** |
+| rejected | 0 / 10 |
+| errors | 0 / 10 |
+
+Nine answers were `no-change`; the high-pain scenario produced `propose-change`, and the gates accepted it. "Accepted"
+means **contract-valid and gate-clean**, not "the model made the right call": a `no-change` answer is a legitimate
+decision, and the fixtures' expected proposals describe the fixture proposals, not the model's judgement.
+
 ## What this does and does not establish
 
 | Established | Not established |
