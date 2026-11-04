@@ -711,6 +711,22 @@ create table system_comments (
 -- Immutable: no UPDATE or DELETE policy below, and the text a runner read three months ago
 -- has to be exactly the text they read.
 
+-- What the product asked the runner, and when. Append-only for the same reason the comment is: the shared
+-- prompt budget is computed from this log (feedback-prompts.yaml#prompt_budget_per_day), so rewriting a
+-- delivery would rewrite the reason a later prompt was or was not allowed. The wire shape is
+-- `PromptDelivery` in packages/domain; it has no JSON contract yet, which is backlog row 31.
+create table prompt_deliveries (
+  user_id      uuid not null references users(id) on delete cascade,
+  day          date not null,                 -- the training day it was delivered on: what the budget counts
+  kind         text not null check (kind in ('nudge', 'review', 'weekly-summary')),
+  for_day      date not null,                 -- the day it asked about; equal to day for a same-day nudge
+  at_minute    smallint not null check (at_minute between 0 and 1439),
+  delivered_at timestamptz not null default now(),
+  primary key (user_id, day, kind),
+  -- A prompt cannot ask about a day that has not happened yet.
+  constraint prompt_for_day_not_future check (for_day <= day)
+);
+
 -- =====================================================================================
 -- DERIVED (rebuildable: a metric fix is a backfill, never a migration of history)
 -- =====================================================================================
@@ -775,6 +791,7 @@ select app.enforce_tenant('plan_diff_changes');
 select app.enforce_tenant('reviews');
 select app.enforce_tenant('safety_events');
 select app.enforce_tenant('system_comments');
+select app.enforce_tenant('prompt_deliveries');
 select app.enforce_tenant('metrics_daily');
 select app.enforce_tenant('signals_current');
 select app.enforce_tenant('pace_estimates');
@@ -792,6 +809,10 @@ drop policy "profile_revisions_delete" on profile_revisions;
 drop policy "pace_estimates_delete"  on pace_estimates;
 drop policy "system_comments_update" on system_comments;
 drop policy "system_comments_delete" on system_comments;
+drop policy "prompt_deliveries_update" on prompt_deliveries;
+drop policy "prompt_deliveries_delete" on prompt_deliveries;
+create trigger prompt_deliveries_no_mutation before update or delete on prompt_deliveries
+  for each row execute function app.refuse_mutation();
 create trigger system_comments_no_mutation before update or delete on system_comments
   for each row execute function app.refuse_mutation();
 create trigger day_entries_no_mutation before update or delete on day_entries
@@ -820,7 +841,7 @@ grant usage, select on all sequences in schema public to app_user, worker;
 -- set_config('app.user_id', ..., true) per user. Costs a loop; buys the guarantee that no
 -- background job can read across tenants, which is the one place a "convenient" cross-user
 -- query would otherwise appear.
-revoke update, delete, truncate on events, day_entries, system_comments, profile_revisions from app_user, worker;
+revoke update, delete, truncate on events, day_entries, system_comments, prompt_deliveries, profile_revisions from app_user, worker;
 -- `users` loses DELETE for a different reason, and only running the deletion path found it: a
 -- runner deleting their own row reaches day_entries through a foreign key, and the append-only
 -- guard refuses -- correctly, because "erase everything I did" and "rewrite what I did" are the
@@ -959,6 +980,7 @@ $$ begin
   delete from provider_connections where user_id = target;
   delete from safety_events      where user_id = target;
   delete from system_comments    where user_id = target;
+  delete from prompt_deliveries  where user_id = target;
   delete from metrics_daily      where user_id = target;
   delete from signals_current    where user_id = target;
   delete from pace_estimates     where user_id = target;
