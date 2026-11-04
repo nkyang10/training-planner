@@ -276,7 +276,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
-        with: { version: 10 }
+        with: { version: 11 }
       - uses: actions/setup-node@v7
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
@@ -285,7 +285,7 @@ jobs:
       - run: pnpm test
       - name: Golden plans
         run: pnpm test:golden
-      - name: Catalogue parity en vs zh-Hant
-        run: node tools/check-i18n-parity.mjs
-      - name: Narrator never invents a number or crosses a banned topic
-        run: pnpm test -- narrator
+      # Catalogue parity and the narrator test moved to M2 with their subjects: there are no catalogues
+      # and no narrator before the daily loop exists, and a step that cannot fail is not a gate. They are
+      # written as criteria in docs/engineering/phases/M2.md, where a phase that claims them has to show
+      # the evidence. See docs/engineering/phases/README.md.
