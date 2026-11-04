@@ -1,0 +1,66 @@
+{
+  "id": "three-days-a-week",
+  "description": "Three fixed days including a weekend long run, one hard day allowed",
+  "input": {
+    "profile": {
+      "userId": "9a7f0004-1c2b-4d3e-8f90-1234567890ab",
+      "revision": 1,
+      "age": 38,
+      "availability": {
+        "days": [
+          "Tue",
+          "Thu",
+          "Sat"
+        ],
+        "hardDaysAllowed": 1,
+        "preferredLongRunDay": "Sat"
+      },
+      "goal": {
+        "type": "fitness-maintenance",
+        "event": null,
+        "riskAppetite": "moderate",
+        "planStyle": "flexible"
+      },
+      "preferences": {
+        "units": "metric",
+        "locale": "en",
+        "timezone": "Asia/Taipei",
+        "dayStartHour": 6
+      },
+      "health": {},
+      "measurement": {
+        "method": "none"
+      }
+    },
+    "evidence": {
+      "recentWeeklyKm": [
+        18,
+        20,
+        19
+      ],
+      "layoffDays": 0,
+      "baselinePaceSecPerKm": 360,
+      "baselineConfidence": "low"
+    },
+    "state": {
+      "planStartDay": "2026-11-05",
+      "horizonDays": 56
+    },
+    "clock": {
+      "today": "2026-11-04"
+    },
+    "seed": "golden-three-days-a-week"
+  },
+  "expect": {
+    "sessionCount": 56,
+    "firstDay": "2026-11-05",
+    "lastDay": "2026-12-30",
+    "restDaysMin": 4,
+    "hardDaysMaxPerWeek": 1,
+    "minHoursBetweenHardDays": 48,
+    "weeklyIncrementPctMax": 10,
+    "longRunMaxKm": 10,
+    "invariantsHold": true,
+    "planHash": null
+  }
+}

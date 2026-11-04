@@ -68,6 +68,14 @@ export interface DiffOptions {
   /** Present for a safety-originated diff, which may only subtract (AGENTS rule 3). */
   isSafety?: boolean;
   maxChanges?: 1 | 2;
+  /** Why the review happened, in the runner's terms. Recorded on every change it produces. */
+  reason?: string;
+  /** The signals that justified the review; the contract requires one signalId per change. */
+  signalIds?: string[];
+  /** What the runner gives up by accepting the change. A diff without a cost is a sales pitch. */
+  expectedCost?: string;
+  /** The knowledge knobs the change used, so the change can be explained later. */
+  knobsUsed?: string[];
 }
 
 export type { PlanDiff, PlanVersion };

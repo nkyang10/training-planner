@@ -31,11 +31,13 @@ export type DiffChangeKind =
   | "day.became-rest" | "day.swapped" | "session.moved" | "structure.changed"
   | "session.downgraded" | "distance.reduced" | "pace.band-widened" | "pace.band-relaxed";
 
+/** The contract requires only `goal.type`; a race date or distance may genuinely be missing (a runner
+ * who has not picked a race yet). The planner must handle that case instead of assuming a date exists. */
 export interface GoalEvent {
   name?: string;
-  date: string;
-  distanceKm: number;
-  priority: "A" | "B" | "C";
+  date?: string;
+  distanceKm?: number;
+  priority?: "A" | "B" | "C";
   terrain?: Terrain;
 }
 
@@ -43,7 +45,16 @@ export interface Availability {
   days: DayName[];
   hardDaysAllowed?: number;
   preferredLongRunDay?: DayName;
-  sessionBudgetMin?: { min: number; max: number };
+  /** The contract declares an object and no members, so this is a bag until the contract names them. */
+  sessionBudgetMin?: Record<string, unknown>;
+}
+
+/** The contract records an injury as a fact with a site and a year, not as a word in a list. */
+export interface InjuryRecord {
+  site?: string;
+  year?: number;
+  resolved?: boolean;
+  loadSensitive?: boolean;
 }
 
 export interface AthleteProfile {
@@ -59,7 +70,7 @@ export interface AthleteProfile {
     planStyle?: PlanStyle;
   };
   preferences: { units: Units; locale: Locale; timezone: string; dayStartHour?: number };
-  health: { flags?: string[]; injuryHistory?: string[]; clinicianClearance?: boolean | null };
+  health: { flags?: string[]; injuryHistory?: InjuryRecord[]; clinicianClearance?: boolean | null };
   measurement?: {
     hrMax?: number | null;
     restingHr?: number | null;

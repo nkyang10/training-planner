@@ -6,13 +6,17 @@ const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
 export default defineConfig({
   resolve: {
-    alias: {
-      "@training-planner/domain": here("./packages/domain/src/index.ts"),
-      "@training-planner/knowledge": here("./packages/knowledge/src/index.ts"),
-      "@training-planner/knowledge/canonical": here("./packages/knowledge/src/canonical.ts"),
-      "@training-planner/golden-fixtures": here("./eval/golden-plans/fixture.ts"),
-      "@training-planner/planner-core": here("./packages/planner-core/src/index.ts"),
-    },
+    // Order matters: Vite aliases match by prefix, so a subpath alias must come before its package, or
+    // "@training-planner/knowledge" swallows "@training-planner/knowledge/canonical" and the import
+    // resolves to index.ts/canonical. That failure looked like a missing module, which is why it is
+    // written down here rather than discovered twice.
+    alias: [
+      { find: "@training-planner/knowledge/canonical", replacement: here("./packages/knowledge/src/canonical.ts") },
+      { find: "@training-planner/golden-fixtures", replacement: here("./eval/golden-plans/fixture.ts") },
+      { find: "@training-planner/domain", replacement: here("./packages/domain/src/index.ts") },
+      { find: "@training-planner/knowledge", replacement: here("./packages/knowledge/src/index.ts") },
+      { find: "@training-planner/planner-core", replacement: here("./packages/planner-core/src/index.ts") },
+    ],
   },
   test: {
     environment: "node",

@@ -1,0 +1,64 @@
+{
+  "id": "novice-5k",
+  "description": "First 5K, three days a week, no race date yet, no measurement history",
+  "input": {
+    "profile": {
+      "userId": "9a7f0001-1c2b-4d3e-8f90-1234567890ab",
+      "revision": 1,
+      "age": 29,
+      "availability": {
+        "days": [
+          "Tue",
+          "Thu",
+          "Sat"
+        ]
+      },
+      "goal": {
+        "type": "finish",
+        "event": null,
+        "riskAppetite": "conservative",
+        "planStyle": "structured"
+      },
+      "preferences": {
+        "units": "metric",
+        "locale": "en",
+        "timezone": "Asia/Taipei",
+        "dayStartHour": 4
+      },
+      "health": {},
+      "measurement": {
+        "method": "none"
+      }
+    },
+    "evidence": {
+      "recentWeeklyKm": [
+        8,
+        9,
+        10
+      ],
+      "layoffDays": 0,
+      "baselinePaceSecPerKm": null,
+      "baselineConfidence": "low"
+    },
+    "state": {
+      "planStartDay": "2026-11-05",
+      "horizonDays": 42
+    },
+    "clock": {
+      "today": "2026-11-04"
+    },
+    "seed": "golden-novice-5k"
+  },
+  "expect": {
+    "sessionCount": 42,
+    "firstDay": "2026-11-05",
+    "lastDay": "2026-12-16",
+    "restDaysMin": 4,
+    "hardDaysMaxPerWeek": 1,
+    "minHoursBetweenHardDays": 48,
+    "weeklyIncrementPctMax": 10,
+    "longRunMaxKm": 8,
+    "invariantsHold": true,
+    "planHash": null
+  }
+}

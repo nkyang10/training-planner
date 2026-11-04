@@ -81,7 +81,7 @@ export type SignalWindowKind = "rolling-ema" | "rolling-days" | "iso-week" | "ph
 
 export interface SignalWindow {
   kind: SignalWindowKind;
-  days?: number;
+  days?: number | null;
 }
 
 export interface Signal {

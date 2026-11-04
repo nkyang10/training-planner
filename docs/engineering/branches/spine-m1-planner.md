@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 kind: branch-brief
 ---
 
@@ -24,7 +24,7 @@ Nothing here touches a screen. The interface is frozen first so client and plann
 
 ## First pull requests, each one reviewable in an hour
 
-1. Freeze the signature: generatePlan({ profile, history, calendar, feedback, clock, seed, knowledgeBundle })
+1. Freeze the signature: generatePlan({ profile, evidence, state, clock, seed, knowledge, revisionRequest? }) -> { version, openQuestions } — **done 2026-11-04**, corrected against docs/engine/planner-engine.md §1; the older `{ profile, history, calendar, feedback }` spelling in this brief and in packages/planner-core/README.md was the disagreement
 2. Purity guard: a CI step that fails on Date, Math.random, fs, net or LLM imports inside planner-core
 3. Rule registry: appliedRules[] records which knob fired, with its value and range
 

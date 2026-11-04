@@ -1,0 +1,77 @@
+{
+  "id": "trail-ultra",
+  "description": "Trail ultra in ten weeks, five days a week, the longest long run of the six",
+  "input": {
+    "profile": {
+      "userId": "9a7f0006-1c2b-4d3e-8f90-1234567890ab",
+      "revision": 5,
+      "age": 36,
+      "availability": {
+        "days": [
+          "Tue",
+          "Wed",
+          "Fri",
+          "Sat",
+          "Sun"
+        ],
+        "hardDaysAllowed": 2,
+        "preferredLongRunDay": "Sat"
+      },
+      "goal": {
+        "type": "finish",
+        "event": {
+          "name": "Ridge Ultra 50",
+          "date": "2027-01-10",
+          "distanceKm": 50,
+          "priority": "A",
+          "terrain": "trail",
+          "elevationGainM": 2400
+        },
+        "riskAppetite": "moderate",
+        "planStyle": "structured"
+      },
+      "preferences": {
+        "units": "metric",
+        "locale": "en",
+        "timezone": "Asia/Taipei",
+        "dayStartHour": 4
+      },
+      "health": {},
+      "measurement": {
+        "hrMax": 186,
+        "restingHr": 50,
+        "method": "lab"
+      }
+    },
+    "evidence": {
+      "recentWeeklyKm": [
+        42,
+        45,
+        44
+      ],
+      "layoffDays": 0,
+      "baselinePaceSecPerKm": 340,
+      "baselineConfidence": "medium"
+    },
+    "state": {
+      "planStartDay": "2026-11-05",
+      "horizonDays": 70
+    },
+    "clock": {
+      "today": "2026-11-04"
+    },
+    "seed": "golden-trail-ultra"
+  },
+  "expect": {
+    "sessionCount": 70,
+    "firstDay": "2026-11-05",
+    "lastDay": "2027-01-13",
+    "restDaysMin": 2,
+    "hardDaysMaxPerWeek": 2,
+    "minHoursBetweenHardDays": 48,
+    "weeklyIncrementPctMax": 10,
+    "longRunMaxKm": 20,
+    "invariantsHold": true,
+    "planHash": null
+  }
+}

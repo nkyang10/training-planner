@@ -1,0 +1,78 @@
+{
+  "id": "competitive-marathon",
+  "description": "A-race marathon seven weeks out, six days a week, Sunday long run",
+  "input": {
+    "profile": {
+      "userId": "9a7f0002-1c2b-4d3e-8f90-1234567890ab",
+      "revision": 3,
+      "age": 34,
+      "availability": {
+        "days": [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sun"
+        ],
+        "hardDaysAllowed": 2,
+        "preferredLongRunDay": "Sun"
+      },
+      "goal": {
+        "type": "time",
+        "event": {
+          "name": "Taipei Marathon",
+          "date": "2026-12-20",
+          "distanceKm": 42.195,
+          "priority": "A",
+          "terrain": "road"
+        },
+        "riskAppetite": "moderate",
+        "planStyle": "structured"
+      },
+      "preferences": {
+        "units": "metric",
+        "locale": "en",
+        "timezone": "Asia/Taipei",
+        "dayStartHour": 4
+      },
+      "health": {},
+      "measurement": {
+        "hrMax": 190,
+        "restingHr": 48,
+        "lactateThresholdPaceSecPerKm": 260,
+        "method": "field-test"
+      }
+    },
+    "evidence": {
+      "recentWeeklyKm": [
+        52,
+        55,
+        58
+      ],
+      "layoffDays": 0,
+      "baselinePaceSecPerKm": 300,
+      "baselineConfidence": "high"
+    },
+    "state": {
+      "planStartDay": "2026-11-05",
+      "horizonDays": 49
+    },
+    "clock": {
+      "today": "2026-11-04"
+    },
+    "seed": "golden-competitive-marathon"
+  },
+  "expect": {
+    "sessionCount": 49,
+    "firstDay": "2026-11-05",
+    "lastDay": "2026-12-23",
+    "restDaysMin": 1,
+    "hardDaysMaxPerWeek": 2,
+    "minHoursBetweenHardDays": 48,
+    "weeklyIncrementPctMax": 10,
+    "longRunMaxKm": 24,
+    "invariantsHold": true,
+    "planHash": null
+  }
+}

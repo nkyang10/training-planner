@@ -6,6 +6,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "lint": "node tools/lint.mjs",
+    "gen:domain": "node tools/gen-domain-schemas.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:golden": "vitest run packages/planner-core/test/golden.test.ts",
