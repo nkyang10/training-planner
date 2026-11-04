@@ -575,11 +575,17 @@ export function createApi(options: ApiOptions): RequestListener {
 
       let output: unknown;
       try {
-        output = await port.complete(call);
+        output = await port.complete(call, { userId });
       } catch (error) {
         // A provider outage must be invisible to the runner: the deterministic path is the fallback, not an error page.
+        // A budget or an open breaker is a state, not a failure, and it is named as such.
         const detail = error instanceof Error ? error.message : String(error);
-        sendJson(response, 200, { status: "model-failed", fallback: "deterministic-replan", detail });
+        const code = detail.startsWith("budget-exceeded")
+          ? "budget-exceeded"
+          : detail.startsWith("circuit-open")
+            ? "circuit-open"
+            : "model-failed";
+        sendJson(response, 200, { status: code, fallback: "deterministic-replan", detail });
         return;
       }
 

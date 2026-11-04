@@ -37,9 +37,10 @@ const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "t
 // The model is a port (ADR-0009): the test injects a fake, so no network is involved and the failure modes are testable.
 let nextModelOutput: unknown = null;
 let modelThrows = false;
+let modelFailure = "provider down";
 const modelPort = {
   complete: async (): Promise<unknown> => {
-    if (modelThrows) throw new Error("provider down");
+    if (modelThrows) throw new Error(modelFailure);
     return nextModelOutput;
   },
 };
@@ -1115,5 +1116,18 @@ describe("the advisor loop: consent, gates, audit, and the deterministic fallbac
     expect(failed.status).toBe(200);
     expect(failed.body.status).toBe("model-failed");
     expect(failed.body.fallback).toBe("deterministic-replan");
+  });
+
+  it("names a budget or an open breaker as a state, not as a failure", async () => {
+    modelThrows = true;
+    modelFailure = "budget-exceeded: 10 calls already today for this runner";
+    const budget = await call("/reviews/advisor", { method: "POST", token: "token-h", body: {} });
+    expect(budget.body.status).toBe("budget-exceeded");
+    expect(budget.body.fallback).toBe("deterministic-replan");
+    modelFailure = "circuit-open: the provider breaker is open until later";
+    const breaker = await call("/reviews/advisor", { method: "POST", token: "token-h", body: {} });
+    expect(breaker.body.status).toBe("circuit-open");
+    modelThrows = false;
+    modelFailure = "provider down";
   });
 });
