@@ -6,6 +6,7 @@
  * because a page that re-words the coach note would be a second narrator.
  */
 import type { DayEntry, PlanVersion, Review, Session } from "@training-planner/domain";
+import type { SeasonSummary } from "@training-planner/season";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
 import { escapeHtml, layout } from "./html";
@@ -114,6 +115,7 @@ export function renderCalendar(input: CalendarPageInput): string {
       <h2>${escapeHtml(messages.web["web.calendar-title"])}</h2>
       ${intro}
       <ul class="week">${rows.join("\n")}</ul>
+      <p class="muted"><a href="/season">${escapeHtml(messages.web["web.season-link"])}</a></p>
     </section>`;
   return layout({ locale: input.locale, title: messages.web["web.calendar-title"], body, signedIn: true });
 }
@@ -135,6 +137,68 @@ const outcomeLabel = (locale: Locale, outcome: (typeof OUTCOMES)[number]): strin
       return web["web.outcome-missed"];
   }
 };
+
+export interface SeasonPageInput {
+  locale: Locale;
+  /** Undefined when there is no plan: a season with no plan is not an empty season, it is a missing one. */
+  summary: SeasonSummary | undefined;
+}
+
+/**
+ * The season view: the plan's weeks with planned and done kilometres. Every number here comes from
+ * packages/season; this page chooses words and nothing else.
+ */
+export function renderSeason(input: SeasonPageInput): string {
+  const messages = messagesFor(input.locale);
+  const summary = input.summary;
+  if (summary === undefined) {
+    return layout({
+      locale: input.locale,
+      title: messages.web["web.season-title"],
+      body: `<section class="card"><p>${escapeHtml(messages.web["web.season-empty"])}</p></section>`,
+      signedIn: true,
+    });
+  }
+
+  const statusLabel = (status: SeasonSummary["weeks"][number]["status"]): string =>
+    status === "past"
+      ? messages.web["web.season-past"]
+      : status === "current"
+        ? messages.web["web.season-current"]
+        : messages.web["web.season-future"];
+
+  const rows = summary.weeks.map((week) => {
+    const facts = [
+      format(messages.web["web.season-planned"], { km: formatNumber(week.plannedKm) }),
+      format(messages.web["web.season-done"], { km: formatNumber(week.completedKm) }),
+      format(messages.web["web.season-sessions"], { done: week.completedSessions, planned: week.plannedSessions }),
+      format(messages.web["web.season-hard"], { count: week.hardDays }),
+      format(messages.web["web.season-logged"], { count: week.loggedDays }),
+    ];
+    return `<li class="row${week.status === "current" ? " today" : ""}">
+      <span class="day">${escapeHtml(format(messages.web["web.season-week"], { day: week.weekStart }))}</span>
+      <span class="chip quiet">${escapeHtml(statusLabel(week.status))}</span>
+      <span class="session">${escapeHtml(facts.join(" · "))}</span>
+    </li>`;
+  });
+
+  const adherence =
+    summary.adherencePct === null
+      ? messages.web["web.season-adherence-none"]
+      : format(messages.web["web.season-adherence"], { pct: formatNumber(summary.adherencePct) });
+
+  const body = `
+    <section class="card">
+      <h2>${escapeHtml(messages.web["web.season-title"])}</h2>
+      <p class="muted">${escapeHtml(adherence)}</p>
+      <ul class="week">${rows.join("\n")}</ul>
+      <p class="muted">
+        <a href="/">${escapeHtml(messages.web["web.season-back"])}</a> ·
+        <a href="/export">${escapeHtml(messages.web["web.export-link"])}</a>
+      </p>
+    </section>`;
+  return layout({ locale: input.locale, title: messages.web["web.season-title"], body, signedIn: true });
+}
 
 export function renderDay(input: DayPageInput): string {
   const messages = messagesFor(input.locale);

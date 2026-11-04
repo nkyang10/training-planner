@@ -32,7 +32,8 @@
       "@training-planner/triggers": ["packages/triggers/src/index.ts"],
       "@training-planner/replan": ["packages/replan/src/index.ts"],
       "@training-planner/worker": ["packages/worker/src/index.ts"],
-      "@training-planner/nudges": ["packages/nudges/src/index.ts"]
+      "@training-planner/nudges": ["packages/nudges/src/index.ts"],
+      "@training-planner/season": ["packages/season/src/index.ts"]
     }
   },
   "include": [

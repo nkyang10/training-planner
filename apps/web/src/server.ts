@@ -16,13 +16,15 @@ import { loadKnowledge } from "@training-planner/knowledge";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
 import { renderComment, renderPlanExplanation } from "@training-planner/narrator";
 import { decideNudge } from "@training-planner/nudges";
+import { seasonSummary } from "@training-planner/season";
 import { addDays, eachDay, uuidFrom, weekStart } from "@training-planner/planner-core";
 import { evaluatePolicy } from "@training-planner/policy";
 import { decideReview, firstEditableDay } from "@training-planner/review";
+import { exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
 import { localClockOf } from "./local-clock";
-import { renderCalendar, renderDay, renderLogin, renderReview } from "./pages";
+import { renderCalendar, renderDay, renderLogin, renderReview, renderSeason } from "./pages";
 import { STYLES } from "./styles";
 
 export interface WebOptions {
@@ -61,6 +63,17 @@ function parseCookies(header: string | undefined): Record<string, string> {
     if (name.length > 0) cookies[name] = decodeURIComponent(value);
   }
   return cookies;
+}
+
+function sendJson(response: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
+  const payload = JSON.stringify(body);
+  response.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "content-length": Buffer.byteLength(payload),
+    "cache-control": "no-store",
+    ...headers,
+  });
+  response.end(payload);
 }
 
 function sendHtml(response: ServerResponse, status: number, html: string, headers: Record<string, string> = {}): void {
@@ -234,6 +247,25 @@ export function createWeb(options: WebOptions): RequestListener {
           prompt,
         }),
       );
+      return;
+    }
+
+    // The season: the same summary the API returns, rendered as weeks. The page computes nothing itself.
+    if (method === "GET" && url.pathname === "/season") {
+      const plan = repository.latestPlanVersionFor(userId, state.now.slice(0, 10));
+      const summary =
+        plan === undefined
+          ? undefined
+          : seasonSummary({ plan, entries: repository.listEntries(userId), today: state.now.slice(0, 10) });
+      sendHtml(response, 200, renderSeason({ locale: state.locale, summary }));
+      return;
+    }
+
+    // The export: the same document the API returns, offered as a download. One definition, two doors.
+    if (method === "GET" && url.pathname === "/export") {
+      sendJson(response, 200, exportDocument(repository, userId, state.now), {
+        "content-disposition": 'attachment; filename="training-planner-export.json"',
+      });
       return;
     }
 

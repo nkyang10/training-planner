@@ -374,6 +374,77 @@ describe("POST /reviews/open closes the chain: log, signals, triggers, bounded o
   });
 });
 
+describe("GET /season and GET /export are the runner s season and the runner s data", () => {
+  const D_TODAY = "2026-11-05";
+
+  beforeAll(async () => {
+    const created = await call("/plan", {
+      token: "token-d",
+      day: D_TODAY,
+      body: {
+        profile: fixture.input.profile,
+        evidence: fixture.input.evidence,
+        state: { planStartDay: D_TODAY, horizonDays: 21 },
+        seed: "prompt-chain",
+      },
+    });
+    expect(created.status).toBe(201);
+  });
+
+  it("returns the plan s weeks, planned against done", async () => {
+    const response = await call("/season", { token: "token-d" });
+    expect(response.status).toBe(200);
+    expect(response.body["status"]).toBe("ok");
+    const summary = response.body["summary"] as {
+      firstDay: string;
+      lastDay: string;
+      weeks: { weekStart: string; status: string; plannedDays: number }[];
+      adherencePct: number | null;
+    };
+    expect(summary.firstDay).toBe("2026-11-05");
+    // 11-05 is a Thursday, so the first week is the calendar week of 11-02 with four plan days in it.
+    // 21 days from 11-05 end on 11-25, so the last week is the calendar week of 11-23 with three plan days in it.
+    expect(summary.weeks.map((week) => week.weekStart)).toEqual(["2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23"]);
+    expect(summary.weeks[0]?.plannedDays).toBe(4);
+    expect(summary.weeks[3]?.plannedDays).toBe(3);
+    expect(summary.weeks[0]?.status).toBe("current");
+    expect(summary.weeks[1]?.status).toBe("future");
+    // Today s 8 km are planned and nothing is logged: zero per cent is the honest number, not null.
+    expect(summary.adherencePct).toBe(0);
+  });
+
+  it("answers no-plan when the day has no plan", async () => {
+    const response = await call("/season", { token: "token-b" });
+    expect(response.status).toBe(200);
+    expect(response.body["status"]).toBe("no-plan");
+  });
+
+  it("exports every row the repository holds for this runner, with counts that match", async () => {
+    const response = await call("/export", { token: "token-d" });
+    expect(response.status).toBe(200);
+    expect(response.body["status"]).toBe("ok");
+    const exported = response.body["export"] as {
+      exportedAt: string;
+      userId: string;
+      counts: Record<string, number>;
+      planVersions: unknown[];
+      entries: unknown[];
+      events: unknown[];
+      reviews: unknown[];
+      comments: unknown[];
+      promptDeliveries: unknown[];
+    };
+    expect(exported.exportedAt).toBe(NOW);
+    expect(exported.userId).toBe(USER_D);
+    expect(exported.counts["planVersions"]).toBe(repository.listPlanVersions(USER_D).length);
+    expect(exported.counts["entries"]).toBe(repository.listEntries(USER_D).length);
+    expect(exported.counts["events"]).toBe(repository.listEvents(USER_D).length);
+    expect(exported.counts["promptDeliveries"]).toBe(repository.listPromptDeliveries(USER_D).length);
+    expect(exported.planVersions).toHaveLength(exported.counts["planVersions"] ?? -1);
+    expect(exported.entries).toHaveLength(exported.counts["entries"] ?? -1);
+  });
+});
+
 describe("GET /prompts/next applies the prompt policy and records the delivery", () => {
   const D_TODAY = "2026-11-05";
 

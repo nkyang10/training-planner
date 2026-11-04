@@ -138,6 +138,12 @@ export function createMemoryRepository(): Repository {
       return staged;
     },
 
+    listPlanVersions(userId: string): PlanVersion[] {
+      return [...stateOf(userId).plans.values()].sort((left, right) =>
+        left.generatedAtDay < right.generatedAtDay ? -1 : left.generatedAtDay > right.generatedAtDay ? 1 : 0,
+      );
+    },
+
     getPlanVersion(userId: string, versionId: string): PlanVersion | undefined {
       return stateOf(userId).plans.get(versionId);
     },

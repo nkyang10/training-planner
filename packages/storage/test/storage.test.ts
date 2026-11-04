@@ -179,6 +179,26 @@ describe("reviews are readable in the order a page needs them", () => {
   });
 });
 
+describe("the plan version history is listable", () => {
+  it("keeps every saved version, oldest first", () => {
+    const repository = createMemoryRepository();
+    const first = makePlan([{ day: "2026-11-02", kind: "easy", km: 6, rpe: 4 }], "2026-11-01");
+    // makePlan stamps one fixed versionId, so a second version needs its own id to be a second row.
+    const second = {
+      ...makePlan([{ day: "2026-11-09", kind: "easy", km: 6, rpe: 4 }], "2026-11-08"),
+      versionId: "33333333-3333-4333-8333-333333333333",
+    };
+    repository.savePlanVersion(first);
+    repository.savePlanVersion(second);
+    // makePlan stamps its own userId, so the list is read for the user the fixture wrote under.
+    expect(repository.listPlanVersions(first.userId).map((version) => version.versionId)).toEqual([
+      first.versionId,
+      second.versionId,
+    ]);
+    expect(repository.listPlanVersions(USER_B)).toEqual([]);
+  });
+});
+
 describe("prompt deliveries are a log, not a flag", () => {
   it("keeps every delivery for a user, in order", () => {
     const repository = createMemoryRepository();

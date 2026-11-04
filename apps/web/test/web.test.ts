@@ -317,6 +317,48 @@ describe("the stylesheet is served, and the pages are not injectable", () => {
   });
 });
 
+describe("the season page and the export", () => {
+  it("renders the plan s weeks and says what has happened so far", async () => {
+    const response = await call("/season", { cookie: "session=token-a" });
+    expect(response.status).toBe(200);
+    // The plan starts on Monday 11-09, so the page is three calendar weeks and the first one is the current week.
+    expect(response.html).toContain("Week of 2026-11-09");
+    expect(response.html).toContain("Week of 2026-11-23");
+    expect(response.html).toContain("this week");
+    expect(response.html).toContain("still ahead");
+    expect(response.html).toContain("Download my data (JSON)");
+  });
+
+  it("offers the week a way to reach the season", async () => {
+    const response = await call("/", { cookie: "session=token-a" });
+    expect(response.html).toContain('href="/season"');
+  });
+
+  it("downloads the runner s data as one JSON document", async () => {
+    const response = await call("/export", { cookie: "session=token-a" });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toContain("attachment");
+    const exported = JSON.parse(response.html) as {
+      userId: string;
+      counts: Record<string, number>;
+      planVersions: unknown[];
+      entries: unknown[];
+    };
+    expect(exported.userId).toBe(USER_A);
+    // The week tests above logged days, and the plan was saved in beforeAll: both are in the file.
+    expect(exported.counts["planVersions"]).toBe(1);
+    expect(exported.counts["entries"]).toBeGreaterThan(0);
+    expect(exported.planVersions).toHaveLength(1);
+    expect(exported.entries).toHaveLength(exported.counts["entries"] ?? -1);
+  });
+
+  it("shows the season empty state rather than an empty table when there is no plan", async () => {
+    const response = await call("/season", { cookie: "session=token-b" });
+    expect(response.status).toBe(200);
+    expect(response.html).toContain("No plan yet");
+  });
+});
+
 describe("the review sheet shows keep-the-plan first, with the cost, and records a decision", () => {
   const options: ProposedOption[] = [
     { optionId: "keep", labelKey: "Keep the plan", keepAsIs: true, diffId: null, costKey: "risk", costSlots: {} },
