@@ -1,0 +1,11 @@
+{
+  "day": "2026-11-07",
+  "outcome": "completed",
+  "revision": 1,
+  "tzAtEvent": "Asia/Taipei",
+  "sessionTaken": "as-prescribed",
+  "rpe": 6,
+  "legs": 2,
+  "wellness": { "muscleSoreness": 3, "sleepHours": 7.5 },
+  "idempotencyKey": "contract-wellness-canonical-0001"
+}

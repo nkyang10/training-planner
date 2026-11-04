@@ -152,6 +152,37 @@ describe("a partial day says what part it did", () => {
   });
 });
 
+describe("one spelling of soreness reaches storage", () => {
+  it("renames the legacy spelling instead of storing two names for one fact", () => {
+    const result = accepted(
+      submitEntry(draft({ wellness: { musoreSoreness: 3 } }), emptyLog, options()),
+    );
+    expect(result.entry.wellness?.muscleSoreness).toBe(3);
+    expect(result.entry.wellness).not.toHaveProperty("musoreSoreness");
+    expect(dayEntrySchema.safeParse(result.entry).success).toBe(true);
+  });
+
+  it("leaves the canonical spelling alone", () => {
+    const result = accepted(
+      submitEntry(draft({ wellness: { muscleSoreness: 4, sleepHours: 7.5 } }), emptyLog, options()),
+    );
+    expect(result.entry.wellness?.muscleSoreness).toBe(4);
+    expect(result.entry.wellness?.sleepHours).toBe(7.5);
+  });
+
+  it("refuses a write that carries both spellings, because two values for one fact is not a fact", () => {
+    const result = submitEntry(
+      draft({ wellness: { musoreSoreness: 3, muscleSoreness: 4 } }),
+      emptyLog,
+      options(),
+    );
+    expect(result.status).toBe("rejected");
+    if (result.status !== "rejected") throw new Error("unreachable");
+    expect(result.code).toBe("invalid-entry");
+    expect(result.detail).toContain("musoreSoreness");
+  });
+});
+
 describe("the past is bounded by the knowledge window", () => {
   it("refuses a silent backfill older than 72 hours", () => {
     const result = submitEntry(draft({ day: "2026-11-06", idempotencyKey: "idem-key-old" }), emptyLog, options());

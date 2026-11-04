@@ -9,7 +9,7 @@
  *   disagree about what an entry is.
  */
 import { dayEntrySchema, eventSchema } from "@training-planner/domain";
-import type { DayEntry, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, DayEntryWellness, TrainingEvent } from "@training-planner/domain";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
 import { addDays, daysBetween, uuidFrom } from "@training-planner/planner-core";
 import type { EntryDraft, EntryLog, RejectCode, SubmitOptions, SubmitResult } from "./types";
@@ -20,6 +20,19 @@ const CORRECTED = "entry.corrected";
 /** Days a backfill may be silent, from missed-session-rules.yaml#unlogged_backfill_grace_hours (72 h). */
 function backfillGraceDays(knowledge: KnowledgeBundle): number {
   return Math.floor(knowledge.number("missed-session-rules.yaml#unlogged_backfill_grace_hours") / 24);
+}
+
+/**
+ * One spelling for one fact. The wire keeps `musoreSoreness` alive for a migration window (row 17); storage does
+ * not, so a legacy write is renamed here and the old key never reaches a row.
+ */
+function normaliseWellness(
+  wellness: (DayEntryWellness & { musoreSoreness?: number | null }) | null | undefined,
+): DayEntryWellness | null {
+  if (wellness === undefined || wellness === null) return null;
+  const { musoreSoreness, ...canonical } = wellness;
+  if (musoreSoreness === undefined) return canonical;
+  return { ...canonical, muscleSoreness: canonical.muscleSoreness ?? musoreSoreness };
 }
 
 /** Every revision of one day, oldest first. The log is append-only, so "latest" is a search, not a pointer. */
@@ -104,7 +117,7 @@ export function submitEntry(draft: EntryDraft, log: EntryLog, options: SubmitOpt
     rpe: draft.rpe ?? null,
     legs: draft.legs ?? null,
     mood: draft.mood ?? null,
-    wellness: draft.wellness ?? null,
+    wellness: normaliseWellness(draft.wellness),
     pain: draft.pain ?? [],
     note: draft.note ?? null,
     intent: draft.intent ?? null,
@@ -122,6 +135,13 @@ export function submitEntry(draft: EntryDraft, log: EntryLog, options: SubmitOpt
   }
   if (draft.outcome === "partial" && draft.completedKm == null && draft.durationMin == null) {
     coherence.push("completedKm or durationMin is required when outcome is partial");
+  }
+  // Row 17: `musoreSoreness` is the old spelling of `muscleSoreness`, accepted for a migration window that ends
+  // 2027-02-04. A row that carries both is ambiguous - two values for one fact - so the write is refused rather
+  // than silently preferring one; a row that carries only the old spelling is normalised before storage.
+  const legacySoreness = draft.wellness?.musoreSoreness;
+  if (legacySoreness !== undefined && draft.wellness?.muscleSoreness !== undefined) {
+    coherence.push("wellness carries both musoreSoreness and muscleSoreness; send only the canonical muscleSoreness");
   }
   if (draft.outcome === "completed" && draft.sessionTaken === "none") {
     coherence.push("sessionTaken none is not legal on a completed day");

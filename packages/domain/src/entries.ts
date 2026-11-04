@@ -15,8 +15,9 @@ export type DayEntryIntent =
 
 /**
  * Tier 2 wellness, as the policy evaluator reads it. The hand-written type lists only what a decision may
- * read: `musoreSoreness` is in the wire contract (a typo the contract owns) and is deliberately absent here,
- * because a field nobody decides on should not be in the frozen interface the engine is written against.
+ * read. `muscleSoreness` is canonical since 2026-11-04: the old spelling `musoreSoreness` stays in the wire for a
+ * migration window (ends 2027-02-04) and is normalised to this name before storage, so the frozen interface has
+ * one spelling and a decision can finally read it.
  */
 export interface DayEntryWellness {
   sleepHours?: number | null;
@@ -25,6 +26,8 @@ export interface DayEntryWellness {
   hrvLnRMSSD?: number | null;
   stress?: number | null;
   fatigue?: number | null;
+  /** Canonical since 2026-11-04; the wire's legacy `musoreSoreness` is normalised to this at write time. */
+  muscleSoreness?: number | null;
   /** `below-neck`, `fever`, `chest` and `GI` are hard-stop inputs (safety-hard-stops.yaml). */
   illnessSymptoms?: Array<"none" | "above-neck" | "below-neck" | "fever" | "GI" | "chest" | "other">;
   fuelingNote?: string | null;
