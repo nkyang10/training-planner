@@ -82,6 +82,19 @@ const EXPLAIN_SLOTS: Record<ExplainTemplate, Record<string, string | number>> = 
   "explain.peak": { km: 52.1, long: 16.7 },
 };
 
+describe("both catalogues cover the same page keys", () => {
+  it("has the same web keys in both languages, and every one renders", () => {
+    const enKeys = Object.keys(catalogues.en.web).sort();
+    const zhKeys = Object.keys(catalogues["zh-Hant"].web).sort();
+    expect(zhKeys).toEqual(enKeys);
+    for (const key of enKeys) expect(catalogues.en.web[key as keyof typeof catalogues.en.web].length).toBeGreaterThan(0);
+  });
+
+  it("has the same explain keys in both languages", () => {
+    expect(Object.keys(catalogues["zh-Hant"].explain).sort()).toEqual(Object.keys(catalogues.en.explain).sort());
+  });
+});
+
 describe("both catalogues explain a plan in both languages", () => {
   for (const locale of LOCALES) {
     it(`${locale}: explanation keys are complete and render`, () => {
