@@ -83,7 +83,7 @@ scan(allSources, anyRule, "no any in package and app sources");
 
 const consoleRule = [[/\bconsole\.(log|debug|info)\s*\(/, "console output"]];
 scan(
-  allSources.filter((file) => !rel(file).startsWith("packages/cli/") && !rel(file).startsWith("apps/api/src/index.ts")),
+  allSources.filter((file) => !rel(file).startsWith("packages/cli/") && !/^apps\/[^/]+\/src\/index\.ts$/.test(rel(file))),
   consoleRule,
   "library code must not log",
 );

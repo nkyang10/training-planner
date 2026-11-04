@@ -5,6 +5,6 @@
 export { catalogues, messagesFor, weekdayName, format, formatNumber, placeholdersOf } from "./format";
 export type { SlotValue } from "./format";
 export { LOCALES, isLocale } from "./types";
-export type { Locale, Messages, ExplainTemplate } from "./types";
+export type { Locale, Messages, ExplainTemplate, WebTemplate } from "./types";
 export { en } from "./catalogues/en";
 export { zhHant } from "./catalogues/zh-Hant";

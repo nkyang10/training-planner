@@ -29,6 +29,38 @@ export type ExplainTemplate =
   | "explain.partial"
   | "explain.peak";
 
+/** The server-rendered pages: labels and short sentences, never numbers the engine did not produce. */
+export type WebTemplate =
+  | "web.title"
+  | "web.login-title"
+  | "web.login-hint"
+  | "web.login-button"
+  | "web.calendar-title"
+  | "web.day-link"
+  | "web.day-title"
+  | "web.session"
+  | "web.rest-day"
+  | "web.logged"
+  | "web.not-logged"
+  | "web.form-legend"
+  | "web.outcome-completed"
+  | "web.outcome-partial"
+  | "web.outcome-skipped"
+  | "web.outcome-rest"
+  | "web.outcome-missed"
+  | "web.rpe"
+  | "web.legs"
+  | "web.note"
+  | "web.save"
+  | "web.comment-title"
+  | "web.saved"
+  | "web.adjusted"
+  | "web.error"
+  | "web.no-plan"
+  | "web.sign-out"
+  | "web.skip-reason"
+  | "web.skip-reason-none";
+
 export interface Messages {
   /** One sentence per comment template. `{slot}` placeholders are filled by packages/i18n's formatter. */
   comment: Record<FactTemplate, string>;
@@ -43,6 +75,8 @@ export interface Messages {
   kind: Record<SessionKind, string>;
   /** One sentence per explanation line. Same formatter, same guardrails as a comment. */
   explain: Record<ExplainTemplate, string>;
+  /** The server-rendered pages. */
+  web: Record<WebTemplate, string>;
   /** Labels the chip and the nudge carry; not sentences. */
   label: {
     changedBecause: string;
