@@ -24,6 +24,13 @@ evening       runner opens the day cell → 5-tap entry → POST /entries
 
 ---
 
+## Prompts are a policy, not a notification
+
+The daily prompt had no policy while the rare review had a full one (M2 review F1). It now has the same kind of
+rule: [packages/nudges](../../packages/nudges/README.md) decides *when* a prompt may be delivered - nothing to ask,
+one shared budget, no second nudge, quiet hours as a hard stop, the runner's own median local logging hour - and
+`knowledge/heuristics/feedback-prompts.yaml` owns every number. The words are `prompt.*` in the message catalogue.
+
 ## 1. The entry: what we ask, and why each field earns its place
 
 Design rule: **every field must be answerable in under two seconds from memory, and must change

@@ -24,7 +24,6 @@ findings that do not make a plan unsafe, which is why M1 closed with them record
 | 5 | Entry-form timing instrumented from day one of M2 | adherence is the business risk; we must see it in week 1 | S | guessing at the biggest risk |
 | 6 | Remaining contracts: `plan-version` and `events` JSON Schema, then `schemas/sql/schema.sql` | `plan-diff` and `review` are written; the DDL is where RLS becomes real | M | engine and UI inventing two different shapes |
 | 7 | `docs/engine/explanation-and-trust.md` + `docs/vision/personas-and-journeys.md` | the comment is half the product; explaining a plan is the trust surface | S | trust work deferred until it is a redesign |
-| 8 | Feedback-prompt policy: nudge hour from the runner's own behaviour, quiet hours, the 3-day/7-day silence ladder, one shared prompt budget (**F1**) | the rare event (a review) is exhaustively specified and the daily one is absent | S | the loop quietly stops and we read it as low motivation |
 | 9 | Say how long today takes and what the alternate dose gave up (**F2**, **F10**) | elapsed time is an input today and an output nowhere; race day has no card | S | the time-poor runner cannot plan the evening they actually have |
 | 10 | Sessions the runner does not control: club night, parkrun, pacing a friend (**F3**) | the group decides Tuesday; the plan has to survive that | S | every club runner's first week is fiction |
 | 11 | Surfaces for what is already posture: season view, heat/altitude cost, travel week shift, export and delete (**F4**–**F6**, **F9**) | a promise with no screen is not a promise | M | trust decays exactly where the runner is most exposed |
@@ -57,6 +56,7 @@ Rows that were open and are now shipped, kept here so the backlog stays a list o
 | 18 | The `day.closed` event type | PR #43: the catalogue row, an `events.schema.json` clause that lets only the system or the worker close a day, `DayCloseStatus`/`DayClosePayload`, `closeEventFor` in `packages/entries`, and the sweep now returns the events a writer should append |
 | 17 | `muscleSoreness` is the one spelling | PR #44: canonical name in the wire and the frozen interface, the legacy spelling kept for a window ending 2027-02-04, a write-path normalisation and a refusal when both are present |
 | 15 | Neuromuscular before threshold | PR #45: `session-classes.yaml#first_quality_kind` (read with the new `knowledge.text`), the sequencing rule in the planner, `knowledge/plan-construction/quality-sequencing.md`, four planner-core tests, and the golden fixture `novice-first-quality-strides` plus the `qualityKinds` expectation it needed |
+| 8 | Feedback-prompt policy (F1) | PR #46: `knowledge/heuristics/feedback-prompts.yaml` (hour, lookback, sample floor, quiet window, ladder, two budgets) plus `packages/nudges` with five gates and 17 tests; copy is `prompt.*` in both catalogues; delivery and persistence stay with the worker/API rows |
 
 ## Next (M3–M5)
 

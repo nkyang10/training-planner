@@ -30,6 +30,8 @@ export type ExplainTemplate =
   | "explain.peak";
 
 /** The server-rendered pages: labels and short sentences, never numbers the engine did not produce. */
+export type PromptTemplate = "prompt.log-day" | "prompt.log-gap";
+
 export type WebTemplate =
   | "web.title"
   | "web.login-title"
@@ -91,6 +93,8 @@ export interface Messages {
   explain: Record<ExplainTemplate, string>;
   /** The server-rendered pages. */
   web: Record<WebTemplate, string>;
+  /** The prompt's copy. packages/nudges decides *when*; the words are here, in both languages. */
+  prompt: Record<PromptTemplate, string>;
   /** Labels the chip and the nudge carry; not sentences. */
   label: {
     changedBecause: string;

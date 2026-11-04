@@ -110,6 +110,10 @@ export const en: Messages = {
     test: "test",
     race: "race",
   },
+  prompt: {
+    "prompt.log-day": "How did {weekday} go? Two taps is enough.",
+    "prompt.log-gap": "{weekday} is still unlogged.",
+  },
   label: {
     changedBecause: "changed because",
     gaveUp: "trade-off:",

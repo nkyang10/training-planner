@@ -1,0 +1,98 @@
+schema_version: 1
+id: feedback-prompts
+status: draft
+owner: fb-agent
+last_reviewed: 2026-11-04
+provenance:
+  docs:
+    - docs/engine/feedback-loop.md
+    - docs/ux/feedback-microcopy.md
+  sources: [FB-S1, FB-S9]
+applies_to: [all]
+
+notes: >
+  The rare event - a review - is exhaustively specified in review-triggers.yaml, and the daily one, asking the
+  runner to log the day, had no policy at all (M2 review F1: "the loop quietly stops and we read it as low
+  motivation"). This file owns the *when* and never the words: copy lives in the message catalogue and the
+  narrator owns the sentence. The budget is shared on purpose - a review prompt that does not count is a prompt
+  that arrives on top of the nudge and teaches the runner to ignore both.
+
+knobs:
+  nudge_hour_default:
+    value: 19
+    range: [6, 22]
+    unit: local-hour
+    confidence: medium
+    rationale: "Evening is when a day's training is over and the memory is fresh. A default, not a rule: the runner's own logging hour wins once there is enough history."
+    persona_overridable: true
+  nudge_hour_lookback_days:
+    value: 14
+    range: [7, 28]
+    unit: days
+    confidence: low
+    rationale: "Two weeks of history is enough to see a habit and short enough to follow a changed routine."
+    persona_overridable: false
+  nudge_hour_min_samples:
+    value: 3
+    range: [1, 7]
+    unit: logged-days
+    confidence: medium
+    rationale: "One late night is not a habit. Below this the default stands, because a median of two points is one point with a tie-break."
+    persona_overridable: false
+  quiet_hours_start:
+    value: 21
+    range: [18, 23]
+    unit: local-hour
+    confidence: high
+    rationale: "A prompt at night is an interruption about tomorrow, not about today. The quiet window is a hard stop."
+    persona_overridable: false
+  quiet_hours_end:
+    value: 7
+    range: [4, 9]
+    unit: local-hour
+    confidence: high
+    rationale: "Before the working day starts is the only other hour a prompt can be moved to without becoming a nag."
+    persona_overridable: false
+  silence_ladder_days:
+    value: [1, 3, 7]
+    range: null
+    unit: days-after-the-unlogged-day
+    confidence: medium
+    rationale: "Three attempts, spaced apart, then stop. A fourth attempt is not persistence; it is the runner learning to swipe the notification away."
+    persona_overridable: false
+  prompt_budget_per_day:
+    value: 2
+    range: [0, 5]
+    unit: prompts
+    confidence: high
+    rationale: "One nudge and one other prompt is already a lot of the runner's attention for one day."
+    persona_overridable: false
+  prompt_budget_per_week:
+    value: 5
+    range: [0, 21]
+    unit: prompts
+    confidence: medium
+    rationale: "Seven days of silence is better than seven days of prompts; the weekly budget is what keeps the ladder from becoming noise when the runner is away."
+    persona_overridable: false
+
+rules:
+  - id: one-budget-for-all-prompts
+    when: "any prompt of any kind is about to be delivered"
+    then: "count it against prompt_budget_per_day and prompt_budget_per_week; a review prompt is not free"
+    severity: constraint
+    explain: "shared-prompt-budget"
+  - id: nudge-hour-follows-the-runner
+    when: "the runner has at least nudge_hour_min_samples logged days inside nudge_hour_lookback_days"
+    then: "the nudge hour is the median local logging hour of those days; otherwise nudge_hour_default"
+    severity: constraint
+    explain: "nudge-hour"
+  - id: quiet-hours-are-not-negotiable
+    when: "the candidate hour falls inside quiet_hours_start..quiet_hours_end"
+    then: "move it to quiet_hours_end; never deliver inside the quiet window"
+    severity: hard-stop
+    explain: "quiet-hours"
+  - id: silence-ladder
+    when: "a day is unlogged and unanswered"
+    then: "prompt on days 1, 3 and 7 after it; say nothing in between"
+    severity: constraint
+    explain: "silence-ladder"
