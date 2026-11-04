@@ -12,7 +12,7 @@ import { createServer, type IncomingMessage, type RequestListener, type ServerRe
 import { z } from "zod";
 import { athleteProfileSchema, planVersionSchema } from "@training-planner/domain";
 import type { DayEntry } from "@training-planner/domain";
-import { submitEntry } from "@training-planner/entries";
+import { painReportsOf, submitEntry } from "@training-planner/entries";
 import type { EntryDraft } from "@training-planner/entries";
 import { format, isLocale, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
@@ -225,6 +225,9 @@ export function createApi(options: ApiOptions): RequestListener {
           event: result.event,
           ...(result.superseded === undefined ? {} : { superseded: result.superseded }),
         });
+        // The pain the entry carries becomes rows of its own, with ids derived from the entry: a replay writes the
+        // same rows, and the triage gets a trajectory instead of an array read out of one day (row 19).
+        for (const report of painReportsOf({ userId, entry: result.entry })) repository.savePainReport(report);
       } catch (error) {
         // Two requests with the same key racing: the unique constraint wins and the retry reads the winner.
         if (error instanceof DuplicateIdempotencyError) {
@@ -323,6 +326,13 @@ export function createApi(options: ApiOptions): RequestListener {
         evidence: decision.evidence,
         budget: decision.budget,
       });
+      return;
+    }
+
+    // GET /pain - the runner's pain reports as rows, oldest day first.
+    if (segments.length === 1 && segments[0] === "pain") {
+      if (method !== "GET") return fail(response, 405, "method-not-allowed", "use GET /pain");
+      sendJson(response, 200, { status: "ok", reports: repository.listPainReports(userId) });
       return;
     }
 

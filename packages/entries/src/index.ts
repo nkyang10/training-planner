@@ -4,6 +4,8 @@
  */
 export { submitEntry, entriesForDay, resolveCurrent, pendingDays } from "./submit";
 export { closeEventFor, DAY_CLOSED } from "./close";
+export { painReportsOf } from "./pain";
+export type { PainReportInput } from "./pain";
 export type { CloseEventInput } from "./close";
 export type {
   AcceptedSubmission,

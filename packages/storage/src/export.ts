@@ -6,7 +6,7 @@
  * they asked. It reads through the `Repository` interface and computes nothing: an export that transformed the
  * facts would be a second, unversioned interpretation of them.
  */
-import type { DayEntry, PlanVersion, PromptDelivery, Review, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, PainReport, PlanVersion, PromptDelivery, Review, TrainingEvent } from "@training-planner/domain";
 import type { CommentRecord } from "./types";
 import type { Repository } from "./types";
 
@@ -17,6 +17,7 @@ export interface ExportCounts {
   reviews: number;
   comments: number;
   promptDeliveries: number;
+  painReports: number;
 }
 
 export interface ExportDocument {
@@ -31,6 +32,7 @@ export interface ExportDocument {
   reviews: Review[];
   comments: CommentRecord[];
   promptDeliveries: PromptDelivery[];
+  painReports: PainReport[];
 }
 
 export function exportDocument(repository: Repository, userId: string, exportedAt: string): ExportDocument {
@@ -40,6 +42,7 @@ export function exportDocument(repository: Repository, userId: string, exportedA
   const reviews = repository.listReviews(userId);
   const comments = repository.listComments(userId);
   const promptDeliveries = repository.listPromptDeliveries(userId);
+  const painReports = repository.listPainReports(userId);
   return {
     exportedAt,
     userId,
@@ -50,6 +53,7 @@ export function exportDocument(repository: Repository, userId: string, exportedA
       reviews: reviews.length,
       comments: comments.length,
       promptDeliveries: promptDeliveries.length,
+      painReports: painReports.length,
     },
     planVersions,
     entries,
@@ -57,5 +61,6 @@ export function exportDocument(repository: Repository, userId: string, exportedA
     reviews,
     comments,
     promptDeliveries,
+    painReports,
   };
 }

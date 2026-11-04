@@ -343,10 +343,17 @@ create table pain_reports (
   id          uuid not null default gen_random_uuid(),
   day         date not null,
   site        text not null,
+  -- The four fields below were missing until row 19: the entry has carried side, night pain, duration and
+  -- known-injury since the first day-entry contract, and a table that cannot store them cannot answer the triage's
+  -- decisive questions (night pain and a gait change are what turn "modify" into "stop").
+  side        text check (side in ('left', 'right', 'central')),
   intensity   smallint not null check (intensity between 0 and 10),
   during_run  boolean not null default false,
   next_morning boolean not null default false,
   trend_gait_change boolean not null default false,
+  night_pain  boolean not null default false,
+  duration    text check (duration in ('today', 'few-days', '1-2-weeks', 'over-2-weeks', 'recurring')),
+  known_injury boolean not null default false,
   note        text,
   primary key (user_id, id)
 );
@@ -811,7 +818,11 @@ drop policy "system_comments_update" on system_comments;
 drop policy "system_comments_delete" on system_comments;
 drop policy "prompt_deliveries_update" on prompt_deliveries;
 drop policy "prompt_deliveries_delete" on prompt_deliveries;
+drop policy "pain_reports_update" on pain_reports;
+drop policy "pain_reports_delete" on pain_reports;
 create trigger prompt_deliveries_no_mutation before update or delete on prompt_deliveries
+  for each row execute function app.refuse_mutation();
+create trigger pain_reports_no_mutation before update or delete on pain_reports
   for each row execute function app.refuse_mutation();
 create trigger system_comments_no_mutation before update or delete on system_comments
   for each row execute function app.refuse_mutation();
@@ -841,7 +852,7 @@ grant usage, select on all sequences in schema public to app_user, worker;
 -- set_config('app.user_id', ..., true) per user. Costs a loop; buys the guarantee that no
 -- background job can read across tenants, which is the one place a "convenient" cross-user
 -- query would otherwise appear.
-revoke update, delete, truncate on events, day_entries, system_comments, prompt_deliveries, profile_revisions from app_user, worker;
+revoke update, delete, truncate on events, day_entries, system_comments, prompt_deliveries, pain_reports, profile_revisions from app_user, worker;
 -- `users` loses DELETE for a different reason, and only running the deletion path found it: a
 -- runner deleting their own row reaches day_entries through a foreign key, and the append-only
 -- guard refuses -- correctly, because "erase everything I did" and "rewrite what I did" are the

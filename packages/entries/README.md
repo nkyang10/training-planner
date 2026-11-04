@@ -16,6 +16,9 @@ rewriting history (AGENTS rule 4).
 
 ## The four rules this package exists to enforce
 
+| Export | What it does |
+|---|---|
+| `painReportsOf({ userId, entry })` | projects the entry's pain array into rows shaped like `pain_reports`, with ids derived from the entry's identity, so a replay or a re-derivation writes the same row |
 | Rule | Why it is worth a package |
 |---|---|
 | **A retry never writes twice** | `idempotencyKey` is unique per (user, day, revision); a double tap on a flaky train returns the first entry and no second event. Every adherence number depends on this. |

@@ -374,6 +374,62 @@ describe("POST /reviews/open closes the chain: log, signals, triggers, bounded o
   });
 });
 
+describe("GET /pain returns the rows an entry wrote", () => {
+  const PAIN_TODAY = "2026-11-05";
+
+  beforeAll(async () => {
+    const created = await call("/plan", {
+      token: "token-c",
+      day: PAIN_TODAY,
+      body: {
+        profile: fixture.input.profile,
+        evidence: fixture.input.evidence,
+        state: { planStartDay: PAIN_TODAY, horizonDays: 21 },
+        seed: "pain-chain",
+      },
+    });
+    expect(created.status).toBe(201);
+  });
+
+  it("writes one row per pain report and serves them", async () => {
+    const key = "pain-key-1";
+    const posted = await call("/entries", {
+      token: "token-c",
+      day: PAIN_TODAY,
+      body: draft({
+        idempotencyKey: key,
+        pain: [
+          { site: "achilles", side: "left", intensity: 6, duringRun: true, nightPain: true, duration: "few-days" },
+          { site: "shin", intensity: 2 },
+        ],
+      }),
+    });
+    expect(posted.status).toBe(201);
+    const response = await call("/pain", { token: "token-c" });
+    expect(response.status).toBe(200);
+    const reports = response.body["reports"] as { site: string; side: string | null; nightPain: boolean; duration: string | null }[];
+    expect(reports.map((report) => report.site)).toEqual(["achilles", "shin"]);
+    expect(reports[0]).toMatchObject({ side: "left", nightPain: true, duration: "few-days" });
+    expect(reports[1]).toMatchObject({ side: null, nightPain: false, duration: null });
+  });
+
+  it("writes nothing twice for the same idempotency key", async () => {
+    const before = (await call("/pain", { token: "token-c" })).body["reports"] as unknown[];
+    const retry = await call("/entries", {
+      token: "token-c",
+      day: PAIN_TODAY,
+      body: draft({
+        idempotencyKey: "pain-key-1",
+        pain: [{ site: "achilles", side: "left", intensity: 6, duringRun: true, nightPain: true, duration: "few-days" }],
+      }),
+    });
+    expect(retry.status).toBe(200);
+    expect(retry.body["status"]).toBe("duplicate");
+    const after = (await call("/pain", { token: "token-c" })).body["reports"] as unknown[];
+    expect(after).toHaveLength(before.length);
+  });
+});
+
 describe("GET /season and GET /export are the runner s season and the runner s data", () => {
   const D_TODAY = "2026-11-05";
 
