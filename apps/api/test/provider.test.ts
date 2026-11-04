@@ -8,7 +8,7 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AdvisorCall } from "@training-planner/advisor";
-import { createHttpModelPort, modelPortFromEnv, ProviderError } from "../src/provider";
+import { chatCompletionsUrl, createHttpModelPort, modelPortFromEnv, ProviderError } from "../src/provider";
 
 /** A minimal call: the port only serialises `request` and hashes nothing itself. */
 const call = (): AdvisorCall =>
@@ -84,6 +84,8 @@ describe("the port posts the request the contract says, and parses the answer", 
     const messages = sent?.body["messages"] as Array<{ role: string; content: string }>;
     expect(messages[0]?.role).toBe("system");
     expect(messages[0]?.content).toContain("never invent a number");
+    expect(messages[0]?.content).toContain("proposedChanges");
+    expect(messages[0]?.content).toContain("reasonCode");
     expect(messages[1]?.content).toContain("guidelineVersionHash" in (JSON.parse(messages[1]?.content ?? "{}") as object) ? "x" : "guidelineId");
   });
 
@@ -163,6 +165,16 @@ describe("the deployment's port comes from the environment, and absent variables
     expect(modelPortFromEnv({ TRAINING_PLANNER_MODEL_ENDPOINT: "http://x", TRAINING_PLANNER_MODEL_NAME: "m" })).toBeUndefined();
   });
 
+  it("accepts a base URL as an alternative to a full endpoint", () => {
+    expect(modelPortFromEnv({ TRAINING_PLANNER_MODEL_BASE_URL: "http://x/v1", TRAINING_PLANNER_MODEL_API_KEY: "k" })).toBeUndefined();
+    const built = modelPortFromEnv({
+      TRAINING_PLANNER_MODEL_BASE_URL: "http://x/v1",
+      TRAINING_PLANNER_MODEL_API_KEY: "k",
+      TRAINING_PLANNER_MODEL_NAME: "m",
+    });
+    expect(built).toBeDefined();
+  });
+
   it("builds a port when the endpoint, key and model are all present", () => {
     const built = modelPortFromEnv({
       TRAINING_PLANNER_MODEL_ENDPOINT: "http://127.0.0.1:1/v1/chat/completions",
@@ -185,5 +197,23 @@ describe("the port's errors are the port's, not the product's", () => {
       expect((error as ProviderError).code).toBe("http-error");
     }
     mode = "ok";
+  });
+});
+
+
+describe("a base URL becomes the chat-completions URL without being doubled", () => {
+  it("appends the path once", () => {
+    expect(chatCompletionsUrl("http://host:8102/v1")).toBe("http://host:8102/v1/chat/completions");
+    expect(chatCompletionsUrl("http://host:8102/v1/")).toBe("http://host:8102/v1/chat/completions");
+    expect(chatCompletionsUrl("http://host:8102/v1/chat/completions")).toBe("http://host:8102/v1/chat/completions");
+  });
+
+  it("a port built from a base URL posts to the appended path", async () => {
+    mode = "ok";
+    requests = [];
+    const fromBase = createHttpModelPort({ baseUrl: `${base}/v1`, apiKey: "k", model: "m" });
+    const output = await fromBase.complete(call(), { userId: "base-url-user" });
+    expect(output).toMatchObject({ decision: "no-change" });
+    expect(requests).toHaveLength(1);
   });
 });
