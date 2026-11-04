@@ -26,6 +26,7 @@ import {
   latestWizardAnswers,
   nextWizardRevision,
   originalWizardAnswers,
+  profileFromWizard,
   validateWizardAnswer,
   wizardProgress,
   WIZARD_STEPS,
@@ -626,6 +627,28 @@ export function createApi(options: ApiOptions): RequestListener {
         return;
       }
       return fail(response, 405, "method-not-allowed", "use GET or POST /wizard");
+    }
+
+    // POST /wizard/profile - fold the recorded answers into the profile the planner would take. A preview: the
+    // profile is returned, never stored, because a changed orientation becomes a plan through a review (ADR-0009).
+    if (segments.length === 2 && segments[0] === "wizard" && segments[1] === "profile") {
+      if (method !== "POST") return fail(response, 405, "method-not-allowed", "use POST /wizard/profile");
+      const body = await readBody(request);
+      if (!isObject(body)) return fail(response, 400, "invalid-body", "expected a JSON object");
+      const base = athleteProfileSchema.safeParse(body["profile"]);
+      if (!base.success) {
+        return fail(response, 400, "invalid-profile", base.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "));
+      }
+      const folded = profileFromWizard(base.data, repository.listWizardAnswers(userId));
+      if (!folded.ok) return fail(response, 400, "invalid-profile", folded.detail ?? "the folded profile is not valid");
+      sendJson(response, 200, {
+        status: "ok",
+        profile: folded.profile,
+        applied: folded.applied,
+        unapplied: folded.unapplied,
+        note: "preview only: nothing is stored, and the plan changes only through a review the runner decides",
+      });
+      return;
     }
 
     // GET /console - the runner's own choices, original next to current, and the public guidelines only.

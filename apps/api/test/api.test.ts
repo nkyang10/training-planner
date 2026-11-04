@@ -780,3 +780,35 @@ describe("the operator guideline console (ADR-0009)", () => {
     expect((refused.body.error as { code: string }).code).toBe("invalid-body");
   });
 });
+
+
+describe("the wizard profile preview (ADR-0009)", () => {
+  const base = {
+    userId: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+    revision: 1,
+    age: 33,
+    availability: { days: ["Mon", "Wed"] },
+    goal: { type: "finish", event: null },
+    preferences: { units: "metric", locale: "en", timezone: "Asia/Taipei" },
+    health: {},
+  };
+
+  it("folds the recorded answers and stores nothing", async () => {
+    const preview = await call("/wizard/profile", { method: "POST", token: "token-d", body: { profile: base } });
+    expect(preview.status).toBe(200);
+    expect(preview.body.applied).toEqual(["goal"]);
+    const profile = preview.body.profile as { goal: { type: string }; availability: { days: string[] } };
+    expect(profile.goal.type).toBe("time");
+    expect(profile.availability.days).toEqual(["Mon", "Wed"]);
+    expect(String(preview.body.note)).toContain("preview only");
+
+    const after = await call("/wizard", { token: "token-d" });
+    expect(after.body.progress).toMatchObject({ answered: 1 });
+  });
+
+  it("refuses a base profile that does not satisfy the contract", async () => {
+    const refused = await call("/wizard/profile", { method: "POST", token: "token-d", body: { profile: { age: 33 } } });
+    expect(refused.status).toBe(400);
+    expect((refused.body.error as { code: string }).code).toBe("invalid-profile");
+  });
+});

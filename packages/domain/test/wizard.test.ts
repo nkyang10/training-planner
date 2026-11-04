@@ -6,7 +6,9 @@
  * answers to avoid.
  */
 import { describe, expect, it } from "vitest";
+import type { AthleteProfile } from "../src/types";
 import {
+  profileFromWizard,
   GOAL_TYPES,
   RISK_APPETITES,
   latestWizardAnswers,
@@ -94,5 +96,55 @@ describe("progress walks the steps in order", () => {
     expect(WIZARD_STEPS.map((step) => step.id)).toEqual(["goal", "availability", "risk-appetite", "weekly-hours"]);
     expect(GOAL_TYPES).toContain("return-to-running");
     expect(RISK_APPETITES).toHaveLength(3);
+  });
+});
+
+
+describe("the answers fold into the profile the planner takes", () => {
+  const base: AthleteProfile = {
+    userId: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+    revision: 1,
+    age: 33,
+    availability: { days: ["Mon", "Wed"] },
+    goal: { type: "finish", event: null },
+    preferences: { units: "metric", locale: "en", timezone: "Asia/Taipei" },
+    health: {},
+  };
+
+  it("maps goal, availability and risk appetite, and says which steps applied", () => {
+    const folded = profileFromWizard(base, [
+      answer("goal", { value: "time" }),
+      answer("availability", { values: ["Sat", "Tue", "Sat"] }),
+      answer("risk-appetite", { value: "aggressive" }),
+    ]);
+    expect(folded.ok).toBe(true);
+    expect(folded.profile?.goal.type).toBe("time");
+    expect(folded.profile?.goal.riskAppetite).toBe("aggressive");
+    expect(folded.profile?.availability.days).toEqual(["Tue", "Sat"]);
+    expect(folded.applied).toEqual(["goal", "availability", "risk-appetite"]);
+  });
+
+  it("records weekly hours as unapplied instead of dropping them silently", () => {
+    const folded = profileFromWizard(base, [answer("weekly-hours", { value: 6 })]);
+    expect(folded.ok).toBe(true);
+    expect(folded.applied).toEqual([]);
+    expect(folded.unapplied).toHaveLength(1);
+    expect(folded.unapplied[0]?.stepId).toBe("weekly-hours");
+    expect(folded.unapplied[0]?.reason).toContain("no weekly-hours field");
+  });
+
+  it("keeps the base when there are no answers", () => {
+    const folded = profileFromWizard(base, []);
+    expect(folded.ok).toBe(true);
+    expect(folded.profile).toEqual(base);
+    expect(folded.applied).toEqual([]);
+  });
+
+  it("refuses a base profile that is not valid, and names the field", () => {
+    const broken = { ...base, userId: undefined } as unknown as AthleteProfile;
+    const folded = profileFromWizard(broken, [answer("goal", { value: "time" })]);
+    expect(folded.ok).toBe(false);
+    expect(folded.detail).toContain("userId");
+    expect(folded.profile).toBeUndefined();
   });
 });

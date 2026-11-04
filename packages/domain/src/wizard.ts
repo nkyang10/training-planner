@@ -8,7 +8,8 @@
  *
  * This module is pure: it validates and folds recorded answers, and it never reads a clock or storage.
  */
-import type { DayName } from "./types";
+import type { AthleteProfile, DayName } from "./types";
+import { athleteProfileSchema } from "./schemas";
 
 export const WIZARD_STEP_IDS = ["goal", "availability", "risk-appetite", "weekly-hours"] as const;
 export type WizardStepId = (typeof WIZARD_STEP_IDS)[number];
@@ -148,4 +149,77 @@ export function wizardProgress(answers: readonly WizardAnswerRecord[]): WizardPr
     total: WIZARD_STEPS.length,
     next: nextWizardStep(answers),
   };
+}
+
+
+export interface ProfileFromWizard {
+  ok: boolean;
+  /** The merged profile, present only when `ok`. It is a preview: nothing is stored by this function. */
+  profile?: AthleteProfile;
+  applied: WizardStepId[];
+  /** Answers that were recorded but cannot reach the profile yet, with the reason - not silently dropped. */
+  unapplied: Array<{ stepId: WizardStepId; reason: string }>;
+  detail?: string;
+}
+
+/**
+ * Fold the runner's answers into the profile the planner takes.
+ *
+ * This is the bridge from "what the runner chose" to "what the planner may use", and it is deliberately a preview:
+ * the function returns the merged profile and never writes it. Turning a changed orientation into a plan is a review
+ * (proposal first, runner's decision after), not a silent replacement.
+ *
+ * Safety is not negotiable here and is not consulted here: the planner's safety layer runs after the profile, so a
+ * runner who asks for six running days still gets the corpus's hard-day cap. The conflict order
+ * (safety/non-negotiable > constraint > preference) is enforced by the pipeline, not by this fold.
+ */
+export function profileFromWizard(base: AthleteProfile, answers: readonly WizardAnswerRecord[]): ProfileFromWizard {
+  const current = latestWizardAnswers(answers);
+  const applied: WizardStepId[] = [];
+  const unapplied: ProfileFromWizard["unapplied"] = [];
+
+  const profile: AthleteProfile = {
+    ...base,
+    availability: { ...base.availability, days: [...base.availability.days] },
+    goal: { ...base.goal },
+  };
+
+  const goalAnswer = current.goal?.["value"];
+  if (typeof goalAnswer === "string" && (GOAL_TYPES as readonly string[]).includes(goalAnswer)) {
+    profile.goal = { ...profile.goal, type: goalAnswer as AthleteProfile["goal"]["type"] };
+    applied.push("goal");
+  }
+
+  const availability = current.availability?.["values"];
+  if (Array.isArray(availability)) {
+    const days = DAY_NAMES.filter((day) => availability.includes(day));
+    if (days.length > 0) {
+      profile.availability = { ...profile.availability, days };
+      applied.push("availability");
+    }
+  }
+
+  const appetite = current["risk-appetite"]?.["value"];
+  if (typeof appetite === "string" && (RISK_APPETITES as readonly string[]).includes(appetite)) {
+    profile.goal = { ...profile.goal, riskAppetite: appetite as NonNullable<AthleteProfile["goal"]["riskAppetite"]> };
+    applied.push("risk-appetite");
+  }
+
+  if (current["weekly-hours"] !== undefined) {
+    unapplied.push({
+      stepId: "weekly-hours",
+      reason: "the athlete profile has no weekly-hours field yet; the answer is recorded and read by the advisor, not by the planner",
+    });
+  }
+
+  const parsed = athleteProfileSchema.safeParse(profile);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      applied,
+      unapplied,
+      detail: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "),
+    };
+  }
+  return { ok: true, profile: parsed.data, applied, unapplied };
 }

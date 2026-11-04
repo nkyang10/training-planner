@@ -5,7 +5,7 @@ ADR-0009 splits the review path in three: the operator's guidelines, the runner'
 
 | Export | What it does |
 |---|---|
-| `buildAdvisorRequest(input)` | what the model may see: effective guidelines (latest version per id with `effectiveFrom <= today`), wizard answers and settings, the plan's days and hard days, recent entries and signals, the allowed vocabularies, and the first editable day (`today + freeze_window_days`). Returns the request plus `guidelineVersionHash`, `promptHash` and `knowledgeHash` for the audit row. |
+| `buildAdvisorRequest(input)` | what the model may see: the folded profile when supplied (`goalType`, `riskAppetite`, `availabilityDays`), effective guidelines (latest version per id with `effectiveFrom <= today`), wizard answers and settings, the plan's days and hard days, recent entries and signals, the allowed vocabularies, and the first editable day (`today + freeze_window_days`). Returns the request plus `guidelineVersionHash`, `promptHash` and `knowledgeHash` for the audit row. |
 | `validateProposal({ output, request, plan, today, knowledge })` | the gates: contract parse, decision/change agreement, reason vocabulary, number grounding, future-only and outside the freeze window, `fromKm` equals the plan's prescription, kind is one the plan uses, safety guidelines forbid adding kilometres, cost key in the vocabulary, **never adds weekly load**, and `needsHuman` when a pain report of 7+ is in context. |
 | `advisorProposalSchema` / `ADVISOR_REASON_CODES` | the strict shape and the reason vocabulary; a new reason is a deliberate addition. |
 | `ModelPort` | the port the caller implements. P1 tests use a fake; P3 wires a provider behind consent, budget and a circuit breaker. |

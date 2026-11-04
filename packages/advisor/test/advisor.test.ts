@@ -128,6 +128,29 @@ describe("the request is deterministic and carries the hashes the audit needs", 
     expect(digest[0]?.version).toBe(2);
   });
 
+  it("carries the folded profile when one is supplied, and null when it is not", () => {
+    const withoutProfile = buildAdvisorRequest(input());
+    expect(withoutProfile.request.runner.profile).toBe(null);
+    const withProfile = buildAdvisorRequest(
+      input({
+        profile: {
+          userId: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+          revision: 1,
+          age: 33,
+          availability: { days: ["Tue", "Thu", "Sat"] },
+          goal: { type: "finish", event: null, riskAppetite: "conservative" },
+          preferences: { units: "metric", locale: "en", timezone: "Asia/Taipei" },
+          health: {},
+        },
+      }),
+    );
+    expect(withProfile.request.runner.profile).toEqual({
+      goalType: "finish",
+      riskAppetite: "conservative",
+      availabilityDays: ["Tue", "Thu", "Sat"],
+    });
+  });
+
   it("carries the first editable day from the freeze window and the plan's own facts", () => {
     const { request } = buildAdvisorRequest(input());
     // review-triggers.yaml#freeze_window_days = 2
