@@ -13,6 +13,15 @@ import { addDays, daysBetween, weekStart } from "./civil";
 
 export interface InvariantOptions {
   knowledge?: KnowledgeBundle;
+  /**
+   * The plan this one was derived from, when it is a review candidate rather than a fresh build.
+   *
+   * With a base, the weekly-increment check answers "does this plan add load relative to the plan the runner was
+   * already on?" instead of "is the recomputed ratio above the ceiling?". The difference matters: reducing week N
+   * lowers the base of week N+1, so the second question fires on a week whose absolute load never changed, and the
+   * review engine would refuse the very reduction it exists to offer.
+   */
+  baseVersion?: PlanVersion;
 }
 
 const ROUNDING_TOLERANCE_KM = 0.11;
@@ -28,7 +37,7 @@ export function checkInvariants(output: PlanOutput, options: InvariantOptions = 
   checkRestIsRest(sessions, violations);
   const hardDays = checkSpacing(sessions, violations);
   checkHardCap(hardDays, violations);
-  checkVolumeCurve(sessions, options.knowledge, violations);
+  checkVolumeCurve(sessions, options.knowledge, options.baseVersion, violations);
   checkSafetySubtracts(version, sessions, violations);
   return violations;
 }
@@ -110,7 +119,12 @@ function checkHardCap(hardDays: string[], violations: InvariantViolation[]): voi
   }
 }
 
-function checkVolumeCurve(sessions: Session[], knowledge: KnowledgeBundle | undefined, violations: InvariantViolation[]): void {
+function checkVolumeCurve(
+  sessions: Session[],
+  knowledge: KnowledgeBundle | undefined,
+  baseVersion: PlanVersion | undefined,
+  violations: InvariantViolation[],
+): void {
   if (!knowledge) return;
   // Normalise every week to a 7-day equivalent before comparing: a horizon that starts on a Thursday
   // has a four-day first week, and comparing its raw sum with the next full week would flag a jump that
@@ -123,6 +137,20 @@ function checkVolumeCurve(sessions: Session[], knowledge: KnowledgeBundle | unde
   }
   const perWeek = new Map<string, { rate: number; days: number }>();
   for (const [key, total] of totals) perWeek.set(key, { rate: total.days === 0 ? 0 : (total.km * 7) / total.days, days: total.days });
+  // When a base plan is present, each week is compared against the base plan week that preceded it: a change to
+  // week N is judged by whether the following week adds load, not by the ratio the reduction created.
+  const basePerWeek = new Map<string, { rate: number; days: number }>();
+  if (baseVersion !== undefined) {
+    const baseTotals = new Map<string, { km: number; days: number }>();
+    for (const session of baseVersion.sessions) {
+      const key = weekStart(session.day);
+      const current = baseTotals.get(key) ?? { km: 0, days: 0 };
+      baseTotals.set(key, { km: current.km + (session.distanceKm ?? 0), days: current.days + 1 });
+    }
+    for (const [key, total] of baseTotals) {
+      basePerWeek.set(key, { rate: total.days === 0 ? 0 : (total.km * 7) / total.days, days: total.days });
+    }
+  }
   const incrementPct = knowledge.number("load-progression.yaml#weekly_increment_pct");
   const incrementKmAbs = knowledge.number("load-progression.yaml#weekly_increment_km_abs");
   const keys = [...perWeek.keys()].sort();
@@ -133,17 +161,19 @@ function checkVolumeCurve(sessions: Session[], knowledge: KnowledgeBundle | unde
     const previous = perWeek.get(previousKey);
     const current = perWeek.get(currentKey);
     if (!previous || !current) continue;
+    // The baseline is the base plan week when the base had one: that is the load the runner was already on.
+    const baseline = basePerWeek.get(previousKey) ?? previous;
     // A week with no running day has no rate to grow from: a horizon can begin on a single rest day, and
     // a percentage ceiling computed from zero would flag the first real week as a jump. The check starts
     // at the first week that carried load.
-    if (previous.rate <= 0) continue;
-    const delta = current.rate - previous.rate;
+    if (baseline.rate <= 0) continue;
+    const delta = current.rate - baseline.rate;
     if (delta <= 0) continue;
-    const ceiling = Math.min((previous.rate * incrementPct) / 100, incrementKmAbs);
+    const ceiling = Math.min((baseline.rate * incrementPct) / 100, incrementKmAbs);
     // Distances are rounded to 0.1 km per session, so a rate carries at most 0.05 * 7 / days of error.
     // A tolerance that ignored that would flag rounding as a training error, and a gate that cries wolf
     // gets switched off.
-    const tolerance = ROUNDING_TOLERANCE_KM + (0.05 * 7) / previous.days + (0.05 * 7) / current.days;
+    const tolerance = ROUNDING_TOLERANCE_KM + (0.05 * 7) / baseline.days + (0.05 * 7) / current.days;
     if (delta > ceiling + tolerance) {
       violations.push({
         invariant: "weekly-increment-ceiling",

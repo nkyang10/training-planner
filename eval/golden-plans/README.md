@@ -11,6 +11,14 @@ existing is the first-week-of-phase reduction. They are the specification (see
 [milestones.md](../../docs/roadmap/milestones.md), M1): the planner is correct when these pass, and a
 rule change is *allowed* to break exactly the fixtures it should break.
 
+## Where a plan-pair fixture goes
+
+The format below is a **planner input**, so it cannot express a candidate plan derived from a base plan. The
+`baseVersion` rule for the volume curve is therefore encoded as a plan pair in
+[`review-reduction.json`](../../packages/planner-core/test/fixtures/review-reduction.json): it names the base
+sessions, the reduction, the addition and the extra week that the four invariant tests exercise. The golden suite
+still has to pass unchanged — this change does not move any generated plan.
+
 ## Fixture format
 
 One JSON file per fixture, `*.json`, in this directory, validated by

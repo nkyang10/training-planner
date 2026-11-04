@@ -162,11 +162,11 @@ describe("the child version is a real plan version", () => {
     }
   });
 
-  it("does not refuse a reduction for a ratio artefact in a later week", () => {
-    // A plan whose first week carries all its volume. Removing the easy day lowers week N, so week N+1 now "adds"
-    // volume against a lower base and `weekly-increment-ceiling` fires on week N+1 - while the absolute load there
-    // is untouched. The guard is scoped to the days the option changes, so the option stays offerable; refusing it
-    // would block the remedy a plan-too-big review exists to offer.
+  it("judges a reduction against the base plan, not against the ratio it created", () => {
+    // A plan whose first week carries all its volume. Removing the easy day lowers week N; without a base version,
+    // week N+1 would look like a jump against the lower base and `weekly-increment-ceiling` would fire on a week
+    // whose absolute load never changed. `checkInvariants` is called with `baseVersion`, so the reduction is judged
+    // by whether the plan adds load relative to the plan the runner was already on - and it does not.
     const firstWeekHeavy = makePlan(
       [
         { day: "2026-11-02", kind: "easy", km: 6, rpe: 4 },
@@ -183,8 +183,8 @@ describe("the child version is a real plan version", () => {
     const option = result.options.find((candidateOption) => candidateOption.optionId === "rest-instead-of-easy");
     expect(option).toBeDefined();
     expect(option?.diff?.changes).toHaveLength(1);
-    // And the option s own changed day introduces no violation of its own.
     expect(option?.diff?.changes[0]?.day).toBe("2026-11-06");
+    expect(result.refusals).toEqual([]);
   });
 });
 
