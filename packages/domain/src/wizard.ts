@@ -223,3 +223,23 @@ export function profileFromWizard(base: AthleteProfile, answers: readonly Wizard
   }
   return { ok: true, profile: parsed.data, applied, unapplied };
 }
+
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** The leaf changes between two profiles, as JSON paths. Used for the `profile_revisions` row, not for display. */
+export function profileDiffOf(before: AthleteProfile, after: AthleteProfile): Array<{ path: string; from: unknown; to: unknown }> {
+  const changes: Array<{ path: string; from: unknown; to: unknown }> = [];
+  const walk = (left: unknown, right: unknown, path: string): void => {
+    if (isRecord(left) && isRecord(right)) {
+      const keys = [...new Set([...Object.keys(left), ...Object.keys(right)])].sort();
+      for (const key of keys) walk(left[key], right[key], path.length === 0 ? key : `${path}.${key}`);
+      return;
+    }
+    if (JSON.stringify(left) === JSON.stringify(right)) return;
+    changes.push({ path, from: left === undefined ? null : left, to: right === undefined ? null : right });
+  };
+  walk(before, after, "");
+  return changes;
+}

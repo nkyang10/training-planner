@@ -27,6 +27,8 @@ comment in the runner's language. The client never re-derives a number.
 | `POST /entries` | the daily loop |
 | `GET /pain` | the runner's pain reports as rows, oldest day first, plus `trend` from `painTrendOf` (direction, days, peak, night-pain and gait-change flags). An accepted or corrected entry writes one row per report it carries, with ids derived from the entry so a replay is not a second report |
 | `GET /season` | the plan's weeks with planned and done kilometres, sessions, hard days, logged days and one adherence rate - computed by `packages/season`, so the page and the JSON cannot disagree |
+| `POST /wizard/apply` | `{ profile? }` → stores the folded profile with a `profile_revisions` row (`changedBy: runner`, `source: user`, leaf `diff`); answers 200 `unchanged` when nothing moves. **The plan is not touched**: the note says a changed orientation becomes a plan only through a review the runner decides |
+| `GET /profile` | the stored profile and its revision history (`no-profile` when the runner has never saved one) |
 | `POST /wizard/profile` | `{ profile }` → the profile the answers fold into (`applied` / `unapplied` steps), **preview only**: nothing is stored, and the note says a plan change still needs a review |
 | `GET /admin/guidelines` | **operator only** (`Bearer <operatorToken>`); every version, internal ones included. Without a configured operator token the route is closed (403), not open |
 | `POST /admin/guidelines` | **operator only**; validates the `guideline` contract, appends a version, and answers `409 duplicate-version` rather than overwriting history |

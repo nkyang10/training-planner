@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import type { AthleteProfile } from "../src/types";
 import {
+  profileDiffOf,
   profileFromWizard,
   GOAL_TYPES,
   RISK_APPETITES,
@@ -146,5 +147,33 @@ describe("the answers fold into the profile the planner takes", () => {
     expect(folded.ok).toBe(false);
     expect(folded.detail).toContain("userId");
     expect(folded.profile).toBeUndefined();
+  });
+});
+
+
+describe("the profile diff is a path list, not a second copy of the profile", () => {
+  const before: AthleteProfile = {
+    userId: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+    revision: 1,
+    age: 33,
+    availability: { days: ["Mon", "Wed"] },
+    goal: { type: "finish", event: null },
+    preferences: { units: "metric", locale: "en", timezone: "Asia/Taipei" },
+    health: {},
+  };
+
+  it("names each changed leaf with its path, old value and new value", () => {
+    const after: AthleteProfile = {
+      ...before,
+      goal: { ...before.goal, type: "time", riskAppetite: "moderate" },
+      availability: { days: ["Tue", "Sat"] },
+    };
+    const diff = profileDiffOf(before, after);
+    expect(diff.map((entry) => entry.path)).toEqual(["availability.days", "goal.riskAppetite", "goal.type"]);
+    expect(diff.find((entry) => entry.path === "goal.type")).toEqual({ path: "goal.type", from: "finish", to: "time" });
+  });
+
+  it("is empty when nothing changed", () => {
+    expect(profileDiffOf(before, { ...before })).toEqual([]);
   });
 });

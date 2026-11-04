@@ -812,3 +812,49 @@ describe("the wizard profile preview (ADR-0009)", () => {
     expect((refused.body.error as { code: string }).code).toBe("invalid-profile");
   });
 });
+
+
+describe("applying the answers to the stored profile (ADR-0009)", () => {
+  const base = {
+    userId: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+    revision: 1,
+    age: 33,
+    availability: { days: ["Mon", "Wed"] },
+    goal: { type: "finish", event: null },
+    preferences: { units: "metric", locale: "en", timezone: "Asia/Taipei" },
+    health: {},
+  };
+
+  it("saves the folded profile with a revision row and never touches the plan", async () => {
+    const plansBefore = repository.listPlanVersions(USER_D).length;
+    const saved = await call("/wizard/apply", { method: "POST", token: "token-d", body: { profile: base } });
+    expect(saved.status).toBe(201);
+    expect(saved.body.status).toBe("saved");
+    const revision = saved.body.revision as { changedBy: string; source: string; diff: Array<{ path: string }> };
+    expect(revision.changedBy).toBe("runner");
+    expect(revision.source).toBe("user");
+    expect(revision.diff.map((entry) => entry.path)).toContain("goal.type");
+    expect(String(saved.body.note)).toContain("review");
+
+    const read = await call("/profile", { token: "token-d" });
+    expect(read.status).toBe(200);
+    expect(read.body.status).toBe("ok");
+    expect((read.body.profile as { goal: { type: string } }).goal.type).toBe("time");
+    expect((read.body.revisions as unknown[]).length).toBe(1);
+
+    expect(repository.listPlanVersions(USER_D).length).toBe(plansBefore);
+  });
+
+  it("says unchanged when the answers already match the stored profile", async () => {
+    const again = await call("/wizard/apply", { method: "POST", token: "token-d", body: {} });
+    expect(again.status).toBe(200);
+    expect(again.body.status).toBe("unchanged");
+    expect((again.body.profile as { goal: { type: string } }).goal.type).toBe("time");
+  });
+
+  it("refuses to fold without a profile at all", async () => {
+    const refused = await call("/wizard/apply", { method: "POST", token: "token-b", body: {} });
+    expect(refused.status).toBe(400);
+    expect((refused.body.error as { code: string }).code).toBe("no-profile");
+  });
+});
