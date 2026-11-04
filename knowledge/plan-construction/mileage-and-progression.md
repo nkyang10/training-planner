@@ -5,7 +5,7 @@ status: contested
 confidence: medium
 evidence: [review, practitioner]
 applies_to: [plan-generator, review-engine, safety-layer]
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 owner: unowned
 supersedes: []
 sources: [PLAN-S7, PLAN-S11, PLAN-S12]
@@ -58,6 +58,14 @@ running_days_{n+1} ≤ running_days_n + 1, and ≥ 2 weeks since the last day ad
 - **Load-equivalent km** = easy km × 1.0 + threshold/MP km × 1.3 + interval/repeat km × 1.6 (weights
   are engineering defaults, not measured; they exist so that swapping 10 easy km for 10×400 m does not
   look like zero change). status: contested — replace when a validated load metric exists.
+
+**Review candidates are judged against the base plan, not against their own ratio.** When
+`checkInvariants` is given the plan a candidate was derived from (`baseVersion`), the increment
+ceiling asks *"does this plan add load relative to the plan the runner was already on?"*. Without
+that, a reduction of week *n* lowers the base of week *n+1*, and week *n+1* then looks like a jump
+although its absolute load never changed. The review engine would refuse the reduction it exists to
+offer — the engine would be blocked by an artefact of its own arithmetic. A plan built from scratch
+has no base and is checked against itself, as before.
 
 ### Step cycles
 

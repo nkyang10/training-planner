@@ -156,15 +156,12 @@ export function proposePlanOptions(request: ReplanRequest): ReplanResult {
       continue;
     }
 
-    // Attribution is scoped to the days the option actually changes.
-    //
-    // The alternative - refusing on any new violation anywhere in the plan - deadlocks the engine: a reduction of
-    // week N lowers the base of week N+1, so `weekly-increment-ceiling` fires on week N+1 even though the absolute
-    // load there is unchanged. That is a ratio artefact of the plan s own shape, not something the reduction makes
-    // unsafe, and refusing it would block the very remedy the review exists to offer. Every option here is
-    // subtractive, so the direction that would matter (added load) cannot happen.
+    // Attribution is scoped to the days the option actually changes, on top of the base-version comparison the
+    // invariant now does: a violation on a day this option did not touch is not this option s doing.
     const changedDays = new Set([candidateOption.session.day]);
-    const introduced = checkInvariants({ version: child, openQuestions: [] }, { knowledge }).filter(
+    // `baseVersion` is the difference between "is the recomputed ratio above the ceiling" and "does this plan add
+    // load relative to the plan the runner was already on". Only the second question is the review engine s.
+    const introduced = checkInvariants({ version: child, openQuestions: [] }, { knowledge, baseVersion: plan }).filter(
       (violation) =>
         !baselineViolations.has(`${violation.invariant}:${(violation.days ?? []).join(",")}`) &&
         (violation.days ?? []).some((day) => changedDays.has(day)),

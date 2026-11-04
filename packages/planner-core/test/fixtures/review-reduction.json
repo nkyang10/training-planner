@@ -1,0 +1,21 @@
+{
+  "reason": "A review that reduces week N lowers the base of week N+1. The volume curve must judge the change against the plan the runner was already on, not against the ratio the reduction created.",
+  "sessions": [
+    { "day": "2026-11-02", "kind": "easy", "km": 6 },
+    { "day": "2026-11-04", "kind": "easy", "km": 6 },
+    { "day": "2026-11-06", "kind": "easy", "km": 6 },
+    { "day": "2026-11-09", "kind": "easy", "km": 6 },
+    { "day": "2026-11-11", "kind": "easy", "km": 6 },
+    { "day": "2026-11-13", "kind": "easy", "km": 6 },
+    { "day": "2026-11-16", "kind": "easy", "km": 6 },
+    { "day": "2026-11-18", "kind": "easy", "km": 6 },
+    { "day": "2026-11-20", "kind": "easy", "km": 6 }
+  ],
+  "reduction": { "day": "2026-11-06", "toKm": 0, "toKind": "rest" },
+  "addition": { "day": "2026-11-11", "toKm": 12 },
+  "extraWeek": [
+    { "day": "2026-11-23", "kind": "easy", "km": 6 },
+    { "day": "2026-11-25", "kind": "easy", "km": 6 },
+    { "day": "2026-11-27", "kind": "easy", "km": 6 }
+  ]
+}

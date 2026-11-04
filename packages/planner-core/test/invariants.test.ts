@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { PlanVersion, Session } from "@training-planner/domain";
 import { checkInvariants, generatePlan, weekStart } from "../src/index";
 import type { PlanOutput } from "../src/types";
 import { knowledge, makeInput } from "./helpers";
@@ -92,6 +95,124 @@ describe("every invariant can fail, or it is not an invariant", () => {
     const output = broken();
     output.version.appliedRules.push({ ruleId: "a-rule-that-adds", anchor: "safety-hard-stops.yaml#no-double-hard-weekend", effect: "dosed", isSafety: true });
     expect(names(output)).toContain("safety-subtracts-only");
+  });
+});
+
+describe("the volume curve is judged against the base plan when there is one", () => {
+  // The fixture encodes the reason for `baseVersion`: a review reduces week N, and without a base the following
+  // week looks like a jump although its absolute load never changed.
+  interface ReductionFixture {
+    sessions: Array<{ day: string; kind: Session["kind"]; km: number }>;
+    reduction: { day: string; toKm: number; toKind: Session["kind"] };
+    addition: { day: string; toKm: number };
+    extraWeek: Array<{ day: string; kind: Session["kind"]; km: number }>;
+  }
+  const fixture: ReductionFixture = JSON.parse(
+    readFileSync(join(process.cwd(), "packages", "planner-core", "test", "fixtures", "review-reduction.json"), "utf8"),
+  ) as ReductionFixture;
+
+  // Start from a real generated version, so the plan carries every frozen field, and replace only what the fixture
+  // is about: the sessions and the window. A hand-built literal would drift from the contract.
+  const template = (): PlanVersion => generatePlan(makeInput()).version;
+  const planOf = (sessions: Array<{ day: string; kind: Session["kind"]; km: number }>, versionId: string): PlanVersion => ({
+    ...template(),
+    versionId,
+    generatedBy: "initial-build",
+    generatedAtDay: "2026-11-01",
+    firstDay: sessions[0]?.day ?? "2026-11-02",
+    lastDay: sessions[sessions.length - 1]?.day ?? "2026-11-02",
+    sessions: sessions.map((session) => ({
+      day: session.day,
+      kind: session.kind,
+      outcome: session.kind === "rest" ? ("rest" as const) : ("planned" as const),
+      restDay: session.kind === "rest",
+      hardDay: false,
+      distanceKm: session.km,
+      targetRpe: null,
+      summaryText: `${session.kind} ${session.km} km`,
+    })),
+  });
+
+  const base = (): PlanVersion => planOf(fixture.sessions, "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa");
+  const withReduction = (): PlanVersion => {
+    const version = base();
+    return {
+      ...version,
+      versionId: "bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb",
+      parentVersionId: version.versionId,
+      generatedBy: "review-accepted",
+      generatedAtDay: "2026-11-05",
+      sessions: version.sessions.map((session) =>
+        session.day === fixture.reduction.day
+          ? {
+              ...session,
+              kind: fixture.reduction.toKind,
+              outcome: fixture.reduction.toKind === "rest" ? ("rest" as const) : ("planned" as const),
+              restDay: fixture.reduction.toKind === "rest",
+              distanceKm: fixture.reduction.toKm,
+              summaryText: `${fixture.reduction.toKind} ${fixture.reduction.toKm} km`,
+            }
+          : session,
+      ),
+    };
+  };
+
+  it("fires on the ratio artefact when it has no base to compare against", () => {
+    // Week 11-02 drops from 42.0 to 28.0 km/wk, so week 11-09 now "adds" 14 km/wk against a base the runner was
+    // never on. The invariant cannot know that without being told what the base plan was.
+    expect(checkInvariants({ version: withReduction(), openQuestions: [] }, { knowledge }).map((violation) => violation.invariant)).toContain(
+      "weekly-increment-ceiling",
+    );
+  });
+
+  it("does not fire on the same reduction when the base plan is given", () => {
+    const violations = checkInvariants({ version: withReduction(), openQuestions: [] }, { knowledge, baseVersion: base() });
+    expect(violations.map((violation) => violation.invariant)).not.toContain("weekly-increment-ceiling");
+  });
+
+  it("still fires when the candidate actually adds load", () => {
+    const version = base();
+    const added: PlanVersion = {
+      ...version,
+      versionId: "cccccccc-1111-4111-8111-cccccccccccc",
+      parentVersionId: version.versionId,
+      generatedAtDay: "2026-11-05",
+      sessions: version.sessions.map((session) =>
+        session.day === fixture.addition.day ? { ...session, distanceKm: fixture.addition.toKm } : session,
+      ),
+    };
+    expect(checkInvariants({ version: added, openQuestions: [] }, { knowledge, baseVersion: base() }).map((violation) => violation.invariant)).toContain(
+      "weekly-increment-ceiling",
+    );
+  });
+
+  it("still fires for a new week the base plan never had", () => {
+    // The base has no week of 11-23, so the fallback baseline is the candidate's own previous week - and the extra
+    // week is a genuine jump against it. A base must not blind the check to load the runner never agreed to.
+    const version = base();
+    const extended: PlanVersion = {
+      ...version,
+      versionId: "dddddddd-1111-4111-8111-dddddddddddd",
+      parentVersionId: version.versionId,
+      generatedAtDay: "2026-11-05",
+      lastDay: "2026-11-27",
+      sessions: [
+        ...version.sessions,
+        ...fixture.extraWeek.map((session) => ({
+          day: session.day,
+          kind: session.kind,
+          outcome: session.kind === "rest" ? ("rest" as const) : ("planned" as const),
+          restDay: session.kind === "rest",
+          distanceKm: session.km * 3,
+          hardDay: false,
+          targetRpe: null,
+          summaryText: `${session.kind} ${session.km * 3} km`,
+        })),
+      ],
+    };
+    expect(checkInvariants({ version: extended, openQuestions: [] }, { knowledge, baseVersion: base() }).map((violation) => violation.invariant)).toContain(
+      "weekly-increment-ceiling",
+    );
   });
 });
 

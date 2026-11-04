@@ -26,13 +26,17 @@ const { options, refusals, firstEditableDay } = proposePlanOptions({ plan, today
 If the plan has no target for an option, the option is **refused with a reason** instead of being invented, and a
 plan whose horizon is empty returns only keep-the-plan — which `packages/review` then refuses to open, correctly.
 
-## A finding about `weekly-increment-ceiling`
+## The `weekly-increment-ceiling` finding, and where it was fixed
 
-A reduction of week N lowers the base of week N+1, so the invariant fires on week N+1 (`adds 1.10 km/wk, ceiling
-is 0.54 km`) even though the absolute load there is unchanged. Refusing on that would deadlock the engine: the
-plan-too-big review would never be able to offer the reduction it exists to offer. So attribution is **scoped to
-the days the option changes**, and every option is subtractive so the direction that would matter cannot happen.
-The invariant's semantics are recorded in the backlog (row 29) rather than papered over.
+A reduction of week N lowers the base of week N+1, so the invariant fired on week N+1 (`adds 1.10 km/wk, ceiling
+is 0.54 km`) even though the absolute load there was unchanged. Refusing on that would deadlock the engine: the
+plan-too-big review would never be able to offer the reduction it exists to offer.
+
+The fix is in the invariant, not in this package: `checkInvariants` now takes `baseVersion`, and with it the check
+asks *"does this plan add load relative to the plan the runner was already on?"*. This package passes the base plan
+it is changing, and attribution stays scoped to the days an option changes as a second line of defence. Every
+option here is subtractive, so the direction that would matter (added load) cannot happen; a candidate that
+adds load is still refused, and the planner-core tests prove it.
 
 ## What this package is not
 
