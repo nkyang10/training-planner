@@ -11,6 +11,13 @@ evidence that the gates do something: each scenario is a model answer a fluent m
 | `violationContains` names the rule, not just the failure | a rejection nobody can explain is a rejection nobody can fix |
 | `prompt-injection-in-a-fact-is-still-a-fact` | runner notes are untrusted text; an instruction echoed as evidence is still not a fact the request contained |
 
+## The acceptance harness (P4b)
+
+`apps/api/test/advisor-acceptance.test.ts` sends every scenario through the **whole route**: a real HTTP provider port
+calls a local stub `http.Server`, the route parses the answer, the gates judge it, the audit row records it, and the
+response says what happened. It catches what the unit harness cannot: a route that forgot to pass the runner id, a port
+that mangled the answer, an audit row that was never written.
+
 ## The harness
 
 `packages/advisor/test/scenarios.test.ts` loads `scenarios.json`, builds the request with
