@@ -30,7 +30,8 @@ function weekPlannedKm(plan: PlanVersion, day: string): number {
     .reduce((sum, session) => sum + (session.kind === "rest" ? 0 : (session.distanceKm ?? 0)), 0);
 }
 
-function childVersion(plan: PlanVersion, sessions: Session[], today: string, optionId: string): PlanVersion {
+/** A child version of the plan in force: new identity, same everything else. Exported for the orientation re-plan. */
+export function childPlanVersion(plan: PlanVersion, sessions: Session[], today: string, optionId: string): PlanVersion {
   return {
     ...plan,
     versionId: uuidFrom({ parent: plan.versionId, optionId, today }),
@@ -135,7 +136,7 @@ export function proposePlanOptions(request: ReplanRequest): ReplanResult {
 
   for (const candidateOption of candidates) {
     const sessions = plan.sessions.map((session) => (session.day === candidateOption.session.day ? candidateOption.after : session));
-    const child = childVersion(plan, sessions, today, candidateOption.optionId);
+    const child = childPlanVersion(plan, sessions, today, candidateOption.optionId);
 
     const diff = diffPlans(plan, child, {
       createdAtDay: today,

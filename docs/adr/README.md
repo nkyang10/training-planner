@@ -35,4 +35,5 @@ Revisit when: the concrete trigger that should reopen this
 | [0006](0006-llm-processing-consent-and-data-boundary.md) | LLM processing: consent, data boundary, and residency | proposed |
 | [0007](0007-llm-language-only-with-template-fallback.md) | LLM language-only with a first-class template fallback | accepted |
 | [0008](0008-api-and-client-stack.md) | API behind a repository interface, server-rendered client | proposed |
+| [0010](0010-replan-as-its-own-review-option-kind.md) | A re-plan is its own review option kind, not a two-change edit | accepted |
 | [0009](0009-ai-reviewer-with-central-guidelines-and-user-consent.md) | AI reviewer with central guidelines, a user console, and consent-gated changes | accepted (supersedes 0001 and 0007 for the review path) |
