@@ -101,8 +101,11 @@ export function loadKnowledge(directory: string): KnowledgeBundle {
     hash: hashOf(content),
     files,
     knobs,
+    // `this.knobs`, not the closed-over `knobs`: a bundle is a value, and a copy of a value must read the
+    // copy. The closure version silently ignored a replaced knobs map, which made every "what if this knob
+    // changed" test pass while changing nothing - the mutation test in packages/planner-core caught it.
     knob(anchor) {
-      const found = knobs.get(anchor);
+      const found = this.knobs.get(anchor);
       if (!found) throw new Error(`knowledge knob not found: ${anchor}`);
       return found;
     },

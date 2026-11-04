@@ -9,7 +9,7 @@
     "gen:domain": "node tools/gen-domain-schemas.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:golden": "vitest run packages/planner-core/test/golden.test.ts",
+    "test:golden": "vitest run packages/planner-core/test/golden.test.ts packages/planner-core/test/mutation.test.ts",
     "cli": "tsx packages/cli/src/index.ts"
   },
   "dependencies": {

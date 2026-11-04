@@ -63,6 +63,16 @@ GATES = {
             "UNCOMMITTED CORPUS FILES",
         ],
     },
+    # The test suite is evidence a phase can claim. It runs through vitest's own entry point rather than
+    # through pnpm, because a Windows pnpm is a .cmd shim and a gate that only works in one shell is a gate
+    # that gets skipped on the other machine.
+    "tests": {"script": "node_modules/vitest/vitest.mjs", "interp": "node", "kind": "exit", "args": ["run"]},
+    "golden": {
+        "script": "node_modules/vitest/vitest.mjs",
+        "interp": "node",
+        "kind": "exit",
+        "args": ["run", "packages/planner-core/test/golden.test.ts", "packages/planner-core/test/mutation.test.ts"],
+    },
 }
 
 _cache = {}
@@ -71,6 +81,8 @@ _cache = {}
 def interpreter(name):
     if name == "python":
         return sys.executable
+    if name == "node":
+        return shutil.which("node")
     found = shutil.which("pwsh") or shutil.which("powershell")
     return found
 
@@ -85,11 +97,19 @@ def run_gate(name):
         result = (None, f"{spec['interp']} not found on PATH")
         _cache[name] = result
         return result
+    # A gate whose subject is not installed here is reported as not run, not as failed: the knowledge job
+    # has no node_modules and the app job does, and a claim that cannot be checked in one place must say so
+    # rather than turn a green phase red on a machine that simply lacks the tool.
+    if spec["interp"] in ("node", "python") and not (ROOT / spec["script"]).exists():
+        result = (None, f"{spec['script']} not installed here")
+        _cache[name] = result
+        return result
     cmd = [exe]
     if spec["interp"] == "pwsh":
         cmd += ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", spec["script"]]
     else:
         cmd += [spec["script"]]
+    cmd += spec.get("args", [])
     try:
         completed = subprocess.run(
             cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace"
