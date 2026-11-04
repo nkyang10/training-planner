@@ -13,6 +13,36 @@ export type DayEntryIntent =
   | "as-planned" | "listened-to-body" | "pushed-anyway" | "just-move"
   | "training-for-race" | "just-check-me" | "other";
 
+/**
+ * Tier 2 wellness, as the policy evaluator reads it. The hand-written type lists only what a decision may
+ * read: `musoreSoreness` is in the wire contract (a typo the contract owns) and is deliberately absent here,
+ * because a field nobody decides on should not be in the frozen interface the engine is written against.
+ */
+export interface DayEntryWellness {
+  sleepHours?: number | null;
+  sleepQuality?: number | null;
+  restingHr?: number | null;
+  hrvLnRMSSD?: number | null;
+  stress?: number | null;
+  fatigue?: number | null;
+  /** `below-neck`, `fever`, `chest` and `GI` are hard-stop inputs (safety-hard-stops.yaml). */
+  illnessSymptoms?: Array<"none" | "above-neck" | "below-neck" | "fever" | "GI" | "chest" | "other">;
+  fuelingNote?: string | null;
+}
+
+/** One body-map report. The triage input for injury-risk-and-pain-triage.md. */
+export interface DayEntryPain {
+  site: string;
+  side?: "left" | "right" | "central" | null;
+  intensity: number;
+  duringRun?: boolean;
+  nextMorningWorse?: boolean;
+  affectsGait?: boolean;
+  nightPain?: boolean;
+  duration?: "today" | "few-days" | "1-2-weeks" | "over-2-weeks" | "recurring";
+  knownInjury?: boolean;
+}
+
 export interface DayEntry {
   day: string;
   outcome: DayEntryOutcome;
@@ -25,6 +55,8 @@ export interface DayEntry {
   rpe?: number | null;
   legs?: number | null;
   mood?: number | null;
+  wellness?: DayEntryWellness | null;
+  pain?: DayEntryPain[];
   note?: string | null;
   intent?: DayEntryIntent | null;
   source?: DayEntrySource;

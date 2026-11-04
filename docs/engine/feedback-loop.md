@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 ---
 
 # Daily feedback loop (LOG → COMMENT → micro-adjust)
@@ -113,6 +113,13 @@ tomorrow" is the most trust-destroying bug this product can have.
 
 **Actions are capped**: at most one micro-adjustment and at most one review flag per day. Otherwise
 one entry triggers a cascade and tomorrow's calendar silently becomes unrecognisable.
+
+Implemented in `packages/policy` (`evaluatePolicy`, `checkDecision`): the safety stops, the missed-work
+rules, the day's own readiness subtraction and the `plan-too-big` trigger, in this order, with the caps as
+types rather than discipline. Rules the corpus states but this slice cannot run are listed in
+`packages/policy/src/rules.ts` under `NOT_IMPLEMENTED` with the input each one is missing — an unimplemented
+rule stays visible instead of quietly not existing. The evaluator is pure, so a stored decision can be
+replayed from the entry, the plan and the knowledge hash.
 
 ---
 
