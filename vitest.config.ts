@@ -19,6 +19,7 @@ export default defineConfig({
       { find: "@training-planner/policy", replacement: here("./packages/policy/src/index.ts") },
       { find: "@training-planner/i18n", replacement: here("./packages/i18n/src/index.ts") },
       { find: "@training-planner/narrator", replacement: here("./packages/narrator/src/index.ts") },
+      { find: "@training-planner/entries", replacement: here("./packages/entries/src/index.ts") },
     ],
   },
   test: {

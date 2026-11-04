@@ -10,3 +10,4 @@ export { PLANNER_VERSION } from "./version";
 export { canonicalJson, hashOf } from "@training-planner/knowledge/canonical";
 export * from "./types";
 export * from "./civil";
+export { uuidFrom } from "./uuid";

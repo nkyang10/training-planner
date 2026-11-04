@@ -65,8 +65,10 @@ const policySources = packageSources.filter((file) => rel(file).startsWith("pack
 // The narrator must be deterministic for the same reason: the same fact object has to produce the same
 // comment on the server, in a test and in a replay six months later.
 const narratorSources = packageSources.filter((file) => rel(file).startsWith("packages/narrator/src/"));
+// The write path must be replayable: the same draft must produce the same rows and ids on any machine.
+const entriesSources = packageSources.filter((file) => rel(file).startsWith("packages/entries/src/"));
 
-scan([...plannerSources, ...policySources, ...narratorSources], PURITY, "engine purity (AGENTS rule 1)");
+scan([...plannerSources, ...policySources, ...narratorSources, ...entriesSources], PURITY, "engine purity (AGENTS rule 1)");
 
 const anyRule = [[/\b:\s*any\b/, "`: any`"], [/\bas\s+any\b/, "`as any`"], [/<any>/, "`<any>`"]];
 scan(packageSources, anyRule, "no any in package sources");
