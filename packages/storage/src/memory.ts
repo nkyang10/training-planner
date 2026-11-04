@@ -6,7 +6,7 @@
  * Per-user isolation is structural: every read and write is keyed by `userId` first, so a cross-user read is not
  * a check that can be forgotten, it is a lookup that cannot be expressed.
  */
-import type { DayEntry, PlanVersion, Review, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, PlanDiff, PlanVersion, Review, TrainingEvent } from "@training-planner/domain";
 import {
   DuplicateIdempotencyError,
   type AppendEntryInput,
@@ -18,6 +18,7 @@ interface UserState {
   entries: DayEntry[];
   events: TrainingEvent[];
   plans: Map<string, PlanVersion>;
+  diffs: Map<string, PlanDiff>;
   reviews: Map<string, Review>;
   comments: CommentRecord[];
   idempotencyKeys: Set<string>;
@@ -27,6 +28,7 @@ const emptyUser = (): UserState => ({
   entries: [],
   events: [],
   plans: new Map(),
+  diffs: new Map(),
   reviews: new Map(),
   comments: [],
   idempotencyKeys: new Set(),
@@ -101,6 +103,14 @@ export function createMemoryRepository(): Repository {
         (version) => version.firstDay <= day && day <= version.lastDay,
       );
       return covering.sort((a, b) => (a.generatedAtDay < b.generatedAtDay ? 1 : -1))[0];
+    },
+
+    savePlanDiff(diff: PlanDiff): void {
+      stateOf(diff.userId).diffs.set(diff.diffId, diff);
+    },
+
+    getPlanDiff(userId: string, diffId: string): PlanDiff | undefined {
+      return stateOf(userId).diffs.get(diffId);
     },
 
     saveReview(review: Review): void {
