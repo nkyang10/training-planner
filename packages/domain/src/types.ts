@@ -161,6 +161,32 @@ export interface DiffChange {
   isSafety?: boolean;
 }
 
+/** One row of `ai_review_proposals` (ADR-0009): what the model said, what the gates said, and the hashes that make it auditable. */
+export interface AiReviewProposal {
+  userId: string;
+  id: string;
+  day: string;
+  guidelineVersionHash: string;
+  model: string;
+  promptHash: string;
+  output: unknown;
+  validatorVerdict: "accepted" | "rejected";
+  fallbackUsed: boolean;
+  reviewId: string | null;
+  createdAt: string;
+}
+
+/** The consent switch (ADR-0006): a hosted model may only be called when this says yes. */
+export interface LlmConsent {
+  userId: string;
+  granted: boolean;
+  purpose: "review-decision" | "review-narrative" | "daily-comment";
+  policyVersion: string;
+  grantedAt: string | null;
+  revokedAt: string | null;
+  updatedAt: string;
+}
+
 /** One row of `profile_revisions` (ADR-0009): what changed, who changed it, and why. Append-only. */
 export interface ProfileRevision {
   userId: string;

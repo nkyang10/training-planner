@@ -27,11 +27,22 @@ const USER_D = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
 const USER_E = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const USER_F = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 const USER_G = "90909090-9090-4090-8090-909090909090";
+const USER_H = "12121212-1212-4212-8212-121212121212";
 const NOW = "2026-11-05T22:40:00.000Z";
 const TODAY = "2026-11-05";
 
 const repository: Repository = createMemoryRepository();
-const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "token-c": USER_C, "token-d": USER_D, "token-e": USER_E, "token-f": USER_F, "token-g": USER_G });
+const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "token-c": USER_C, "token-d": USER_D, "token-e": USER_E, "token-f": USER_F, "token-g": USER_G, "token-h": USER_H });
+
+// The model is a port (ADR-0009): the test injects a fake, so no network is involved and the failure modes are testable.
+let nextModelOutput: unknown = null;
+let modelThrows = false;
+const modelPort = {
+  complete: async (): Promise<unknown> => {
+    if (modelThrows) throw new Error("provider down");
+    return nextModelOutput;
+  },
+};
 let server: Server;
 let base = "";
 
@@ -77,7 +88,9 @@ const draft = (overrides: Record<string, unknown> = {}): Record<string, unknown>
 let planVersion: PlanVersion;
 
 beforeAll(async () => {
-  server = createServer(createApi({ repository, sessions, knowledge, now: () => NOW, operatorToken: "operator-token" }));
+  server = createServer(
+    createApi({ repository, sessions, knowledge, now: () => NOW, operatorToken: "operator-token", modelPort, modelId: "fake-model" }),
+  );
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   const port = typeof address === "object" && address !== null ? address.port : 0;
@@ -977,5 +990,130 @@ describe("the orientation re-plan is offered, and accepting it activates the sta
     const refused = await call("/reviews/orientation", { method: "POST", token: "token-a", body: {} });
     expect(refused.status).toBe(400);
     expect((refused.body.error as { code: string }).code).toBe("no-profile");
+  });
+});
+
+
+describe("the advisor loop: consent, gates, audit, and the deterministic fallback (ADR-0009)", () => {
+  const profile = {
+    userId: "12121212-1212-4212-8212-121212121212",
+    revision: 1,
+    age: 36,
+    availability: { days: ["Mon", "Wed", "Fri", "Sun"] },
+    goal: { type: "finish", event: null },
+    preferences: { units: "metric", locale: "en", timezone: "Asia/Taipei" },
+    health: {},
+  };
+  let easyDay = "";
+  let easyKm = 0;
+
+  beforeAll(async () => {
+    const plan = await call("/plan", {
+      token: "token-h",
+      body: {
+        profile: fixture.input.profile,
+        evidence: fixture.input.evidence,
+        state: { planStartDay: "2026-11-02", horizonDays: 21 },
+        seed: "advisor-loop",
+      },
+    });
+    expect(plan.status).toBe(201);
+    await call("/wizard/apply", { method: "POST", token: "token-h", body: { profile } });
+    const version = repository.listPlanVersions(USER_H)[0];
+    const easy = version?.sessions.find((session) => session.kind === "easy" && session.day > "2026-11-07");
+    if (easy === undefined) throw new Error("the generated plan has no easy day after the freeze window");
+    easyDay = easy.day;
+    easyKm = easy.distanceKm ?? 0;
+  });
+
+  it("refuses without consent, before any model call", async () => {
+    const refused = await call("/reviews/advisor", { method: "POST", token: "token-h", body: {} });
+    expect(refused.status).toBe(403);
+    expect((refused.body.error as { code: string }).code).toBe("consent-required");
+  });
+
+  it("audits an accepted proposal and opens a review with an edit option", async () => {
+    repository.saveLlmConsent({
+      userId: USER_H,
+      granted: true,
+      purpose: "review-decision",
+      policyVersion: "v1",
+      grantedAt: NOW,
+      revokedAt: null,
+      updatedAt: NOW,
+    });
+    nextModelOutput = {
+      decision: "propose-change",
+      reasonCode: "load-high",
+      facts: [{ key: "plannedKm", value: easyKm }],
+      proposedChanges: [
+        {
+          day: easyDay,
+          kind: "easy",
+          fromKm: easyKm,
+          toKm: Math.max(0, easyKm - 2),
+          costKey: "quality-becomes-easy",
+          costSlots: { km: 2 },
+        },
+      ],
+      confidence: "medium",
+      needsHuman: false,
+    };
+    const opened = await call("/reviews/advisor", { method: "POST", token: "token-h", body: {} });
+    expect(opened.status).toBe(201);
+    expect(opened.body.status).toBe("opened");
+    const options = opened.body.options as Array<{ optionId: string; kind?: string }>;
+    expect(options).toHaveLength(2);
+    expect(options[1]?.kind).toBe("edit");
+    const review = opened.body.review as { reviewId: string; options: Array<{ kind?: string }> };
+    expect(review.options[1]?.kind).toBe("edit");
+
+    const audits = repository.listAiReviewProposals(USER_H);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]?.validatorVerdict).toBe("accepted");
+    expect(audits[0]?.fallbackUsed).toBe(false);
+    expect(audits[0]?.reviewId).toBe(review.reviewId);
+    expect(audits[0]?.promptHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(audits[0]?.guidelineVersionHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(audits[0]?.model).toBe("fake-model");
+  });
+
+  it("refuses an invalid proposal and records the rejection, then names the fallback", async () => {
+    nextModelOutput = {
+      decision: "propose-change",
+      reasonCode: "load-high",
+      facts: [],
+      proposedChanges: [
+        { day: easyDay, kind: "easy", fromKm: easyKm, toKm: easyKm + 4, costKey: "quality-becomes-easy", costSlots: {} },
+      ],
+      confidence: "medium",
+      needsHuman: false,
+    };
+    const rejected = await call("/reviews/advisor", { method: "POST", token: "token-h", body: {} });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body.status).toBe("rejected");
+    expect(rejected.body.fallback).toBe("deterministic-replan");
+    const audits = repository.listAiReviewProposals(USER_H);
+    expect(audits).toHaveLength(2);
+    expect(audits[1]?.validatorVerdict).toBe("rejected");
+    expect(audits[1]?.fallbackUsed).toBe(true);
+  });
+
+  it("records a no-change decision as a decision, not a failure", async () => {
+    nextModelOutput = { decision: "no-change", reasonCode: "no-action-needed", facts: [], proposedChanges: [], confidence: "high", needsHuman: false };
+    const noChange = await call("/reviews/advisor", { method: "POST", token: "token-h", body: {} });
+    expect(noChange.status).toBe(200);
+    expect(noChange.body.status).toBe("no-change");
+    const audits = repository.listAiReviewProposals(USER_H);
+    expect(audits[2]?.validatorVerdict).toBe("accepted");
+  });
+
+  it("turns a provider outage into the deterministic fallback, not an error page", async () => {
+    modelThrows = true;
+    const failed = await call("/reviews/advisor", { method: "POST", token: "token-h", body: {} });
+    modelThrows = false;
+    expect(failed.status).toBe(200);
+    expect(failed.body.status).toBe("model-failed");
+    expect(failed.body.fallback).toBe("deterministic-replan");
   });
 });

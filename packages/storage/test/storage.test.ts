@@ -405,3 +405,54 @@ describe("a profile write always carries its revision row (ADR-0009)", () => {
     expect(repository.listProfileRevisions(USER_B)).toEqual([]);
   });
 });
+
+
+describe("consent and the AI-review audit trail are stored per user (ADR-0009)", () => {
+  it("keeps consent as a switch, with no row meaning never granted", () => {
+    const repository = createMemoryRepository();
+    expect(repository.getLlmConsent(USER_A)).toBeUndefined();
+    repository.saveLlmConsent({
+      userId: USER_A,
+      granted: true,
+      purpose: "review-decision",
+      policyVersion: "v1",
+      grantedAt: "2026-11-04T00:00:00.000Z",
+      revokedAt: null,
+      updatedAt: "2026-11-04T00:00:00.000Z",
+    });
+    expect(repository.getLlmConsent(USER_A)?.granted).toBe(true);
+    repository.saveLlmConsent({
+      userId: USER_A,
+      granted: false,
+      purpose: "review-decision",
+      policyVersion: "v1",
+      grantedAt: "2026-11-04T00:00:00.000Z",
+      revokedAt: "2026-11-05T00:00:00.000Z",
+      updatedAt: "2026-11-05T00:00:00.000Z",
+    });
+    expect(repository.getLlmConsent(USER_A)?.granted).toBe(false);
+    expect(repository.getLlmConsent(USER_B)).toBeUndefined();
+  });
+
+  it("appends audit rows and keeps each user's trail separate", () => {
+    const repository = createMemoryRepository();
+    const row = {
+      userId: USER_A,
+      id: "aaaa1111-1111-4111-8111-aaaa11111111",
+      day: "2026-11-05",
+      guidelineVersionHash: "sha256:" + "0".repeat(64),
+      model: "fake-model",
+      promptHash: "sha256:" + "1".repeat(64),
+      output: { decision: "no-change" },
+      validatorVerdict: "accepted" as const,
+      fallbackUsed: false,
+      reviewId: null,
+      createdAt: "2026-11-05T00:00:00.000Z",
+    };
+    repository.saveAiReviewProposal(row);
+    repository.saveAiReviewProposal({ ...row, id: "bbbb2222-2222-4222-8222-bbbb22222222", validatorVerdict: "rejected", fallbackUsed: true });
+    expect(repository.listAiReviewProposals(USER_A)).toHaveLength(2);
+    expect(repository.listAiReviewProposals(USER_A)[1]?.validatorVerdict).toBe("rejected");
+    expect(repository.listAiReviewProposals(USER_B)).toEqual([]);
+  });
+});

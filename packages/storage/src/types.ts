@@ -12,7 +12,7 @@
  * - **idempotency is a uniqueness rule**: `appendEntryWithEventAndPointer` refuses a second row for an
  *   idempotency key that already exists. A middleware cannot give that guarantee; a unique index can.
  */
-import type { AthleteProfile, DayEntry, GuidelineContract, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
+import type { AiReviewProposal, AthleteProfile, DayEntry, GuidelineContract, LlmConsent, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
 import type { Locale } from "@training-planner/i18n";
 
 export interface SupersededPointer {
@@ -93,6 +93,15 @@ export interface Repository {
 
   saveComment(comment: CommentRecord): void;
   listComments(userId: string, day?: string): CommentRecord[];
+  /** Append one AI-review audit row: the model's output, the gates' verdict, and the hashes (ADR-0009). */
+  saveAiReviewProposal(record: AiReviewProposal): void;
+  /** Every AI-review audit row for this user, oldest first. */
+  listAiReviewProposals(userId: string): AiReviewProposal[];
+
+  /** The consent switch; undefined means never granted, which is not the same as revoked. */
+  getLlmConsent(userId: string): LlmConsent | undefined;
+  saveLlmConsent(consent: LlmConsent): void;
+
   /** The runner's stored profile, or undefined when they have never saved one. */
   getAthleteProfile(userId: string): AthleteProfile | undefined;
   /**
