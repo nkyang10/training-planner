@@ -124,7 +124,9 @@ describe("the week page is the plan, not a dashboard", () => {
     for (const day of ["2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15"]) {
       expect(response.html).toContain(`/day/${day}`);
     }
-    expect(response.html).toContain("tempo");
+    // The block opens with the neuromuscular session (quality-sequencing.md); tempo arrives at the next
+    // quality slot, which is in week 2 and therefore not on this page.
+    expect(response.html).toContain("strides");
   });
 
   it("marks the day the page is about", async () => {
@@ -352,9 +354,9 @@ describe("the review sheet shows keep-the-plan first, with the cost, and records
     repository.savePlanDiff(diff);
     // The child really changes something: the first hard session of this week becomes an easy one, so the
     // calendar can be checked for the change after acceptance rather than trusting a status field.
-    const hardDay = base.sessions.find((session) => session.day >= TODAY && session.hardDay === true);
+    const qualityDay = base.sessions.find((session) => session.day >= TODAY && (session.hardDay === true || session.kind === "strides"));
     const sessions = base.sessions.map((session) =>
-      session.day === hardDay?.day
+      session.day === qualityDay?.day
         ? { ...session, kind: "easy" as const, hardDay: false, distanceKm: 1, summaryText: "easy 1 km", targetRpe: null }
         : session,
     );
@@ -394,7 +396,7 @@ describe("the review sheet shows keep-the-plan first, with the cost, and records
   it("applies an accepted change to the week the runner sees", async () => {
     const review = openOne();
     const before = await call("/", { cookie: "session=token-a" });
-    expect(before.html).toContain("tempo");
+    expect(before.html).toContain("strides");
     expect(before.html).not.toContain("easy, 1 km");
 
     const accepted = await call(`/review/${review.reviewId}`, {

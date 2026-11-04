@@ -3,7 +3,7 @@
  *
  * That sentence is half of the M1 golden-plans criterion, and it is the half a green suite does not prove:
  * a suite where every fixture passes after every change is a suite that measures nothing. This test mutates
- * one knowledge knob at a time, regenerates all six plans, and asserts the exact set of fixtures that moved.
+ * one knowledge knob at a time, regenerates all eight plans, and asserts the exact set of fixtures that moved.
  *
  * The expectation is derived from the plan structure, not copied from a run: only the marathon fixture runs
  * two hard days a week, so lowering the hard-day cap can only touch it; the conservative increment band
@@ -59,14 +59,14 @@ const cases: { anchor: string; value: number; why: string; breaks: string[] }[] 
   {
     anchor: "intensity-distribution.yaml#hard_days_cap",
     value: 1,
-    why: "only the marathon fixture runs two hard days a week; the other five already run one or none",
+    why: "only the marathon fixture runs two hard days a week; the other seven already run one or none",
     breaks: ["competitive-marathon"],
   },
   {
     anchor: "load-progression.yaml#weekly_increment_pct",
     value: 12,
     why: "the conservative band applies to masters-40 (age 45, unresolved load-sensitive injury) and returning-after-layoff (age 41), so raising the default band cannot touch them",
-    breaks: ["novice-5k", "competitive-marathon", "three-days-a-week", "trail-ultra", "two-phase-10k"],
+    breaks: ["novice-5k", "novice-first-quality-strides", "competitive-marathon", "three-days-a-week", "trail-ultra", "two-phase-10k"],
   },
   {
     anchor: "workout-dosage.yaml#first_week_of_phase_reduction",
@@ -74,6 +74,7 @@ const cases: { anchor: string; value: number; why: string; breaks: string[] }[] 
     why: "every fixture starts its plan on a phase boundary, so turning the intro reduction into a no-op moves every plan; that is what makes the rule load-bearing rather than decorative",
     breaks: [
       "novice-5k",
+      "novice-first-quality-strides",
       "competitive-marathon",
       "masters-40",
       "three-days-a-week",

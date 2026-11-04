@@ -69,6 +69,13 @@ describe.each(files)("%s", (file) => {
     const busiest = Math.max(0, ...perWeek.values());
     expect(busiest).toBeLessThanOrEqual(fixture.expect.hardDaysMaxPerWeek);
 
+    if (fixture.expect.qualityKinds !== undefined) {
+      // Quality includes the cheap neuromuscular kind, which is not a hard day: the ordering rule is about the
+      // sequence of quality exposures, not about the hard-day count.
+      const quality = sessions.filter((session) => isHard(session) || session.kind === "strides").map((session) => session.kind);
+      expect(quality.slice(0, fixture.expect.qualityKinds.length)).toEqual(fixture.expect.qualityKinds);
+    }
+
     for (let index = 1; index < hardDays.length; index += 1) {
       const previous = hardDays[index - 1];
       const current = hardDays[index];

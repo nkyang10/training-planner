@@ -2,7 +2,7 @@ schema_version: 1
 id: session-classes
 status: draft
 owner: plan-agent
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 provenance:
   docs: [knowledge/workout-library/README.md, knowledge/periodization/weekly-templates.md]
   sources: [PLAN-S8, PLAN-S2]
@@ -56,8 +56,16 @@ knobs:
     range: null
     unit: map
     confidence: high
-    rationale: "Novices need density and duration before intensity — the novice golden plan asserts mustNotContain for exactly these kinds."
+    rationale: "Novices need density and duration before intensity. The engine does not apply this list yet, and the golden format had no mustNotContain field, so nothing asserted it - measured 2026-11-04, docs/roadmap/backlog.md row 30. The weaker, implemented rule is first_quality_kind."
     persona_overridable: false
+  first_quality_kind:
+    value: strides
+    range: null
+    unit: kind
+    confidence: medium
+    rationale: "Neuromuscular before threshold: the first quality exposure of a block is fast-but-easy strides, not a sustained threshold block (M1 coach review F5; knowledge/plan-construction/quality-sequencing.md). Applied to every block, because the ordering is a property of adaptation, not of one persona. The novice persona's stronger forbidden list is not implemented - see docs/roadmap/backlog.md row 30."
+    persona_overridable: false
+
   strides_never_hard:
     value: true
     range: null

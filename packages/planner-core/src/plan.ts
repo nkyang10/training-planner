@@ -26,6 +26,8 @@ type DayName = (typeof DAY_NAMES)[number];
 
 /** Quality kinds count toward the hard-day cap; a long run has its own recovery rule. */
 const QUALITY_KINDS: SessionKind[] = ["tempo", "vo2max", "hills", "mp", "test", "race"];
+/** What may open a block: the hard kinds, plus the cheap neuromuscular one that goes first. */
+const FIRST_QUALITY_KINDS: SessionKind[] = ["strides", ...QUALITY_KINDS];
 
 /**
  * Display anchors on the contract's 1-10 RPE scale (schemas/json/plan-version.schema.json,
@@ -355,6 +357,14 @@ function placeSessions(draft: Draft, weeks: WeekPlan[]): void {
   const restDaysMin = number(draft.knowledge, "recovery.yaml#rest_days_per_week_min");
   const gapDays = Math.max(1, Math.ceil(draft.hardGapHours / 24));
   const qualityGapDays = Math.max(1, Math.ceil(draft.qualityGapHours / 24));
+  // Neuromuscular before threshold (knowledge/plan-construction/quality-sequencing.md). The kind is a corpus value,
+  // not a literal: a name the engine does not recognise is a knowledge error, not a default.
+  const firstQualityKind = draft.knowledge.text("session-classes.yaml#first_quality_kind");
+  if (!FIRST_QUALITY_KINDS.includes(firstQualityKind as SessionKind)) {
+    throw new Error(`session-classes.yaml#first_quality_kind is not a quality kind: ${firstQualityKind}`);
+  }
+  // The ordering is positional: the first quality slot of the whole block is neuromuscular, the rest are not.
+  let qualitySeen = false;
 
   // Quality spacing is a property of the calendar, not of the week: a Sunday quality session followed by
   // a Monday one is 24 h apart, and a per-week rule would happily allow it. The cursor below is why the
@@ -436,8 +446,8 @@ function placeSessions(draft: Draft, weeks: WeekPlan[]): void {
         : isLong
           ? "long"
           : qualityIndex === 0
-            ? week.phase === "taper"
-              ? "strides"
+            ? week.phase === "taper" || !qualitySeen
+              ? (firstQualityKind as SessionKind)
               : "tempo"
             : qualityIndex > 0
               ? week.phase === "building" || week.phase === "race-prep"
@@ -447,6 +457,10 @@ function placeSessions(draft: Draft, weeks: WeekPlan[]): void {
       const distanceKm = kind === "rest" ? 0 : distanceByDay.get(slot.day) ?? 0;
       draft.sessions.push(prescribe(draft, slot.day, kind, distanceKm));
     }
+    // Marked after the week is prescribed, not before: the first quality slot of the block has to see the block as
+    // unopened while it is being chosen. Setting it earlier made every plan open with tempo, which is the exact bug
+    // the coach review named.
+    if (qualitySlots.length > 0) qualitySeen = true;
   }
 }
 
