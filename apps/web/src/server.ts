@@ -24,7 +24,7 @@ import { exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
 import { localClockOf } from "./local-clock";
-import { renderCalendar, renderDay, renderLogin, renderReview, renderSeason } from "./pages";
+import { renderCalendar, renderDay, renderLogin, renderPain, renderReview, renderSeason } from "./pages";
 import { STYLES } from "./styles";
 
 export interface WebOptions {
@@ -266,6 +266,12 @@ export function createWeb(options: WebOptions): RequestListener {
           ? undefined
           : seasonSummary({ plan, entries: repository.listEntries(userId), today: state.now.slice(0, 10) });
       sendHtml(response, 200, renderSeason({ locale: state.locale, summary }));
+      return;
+    }
+
+    // The pain history: the rows the entry pipeline writes, in the order the repository keeps them.
+    if (method === "GET" && url.pathname === "/pain") {
+      sendHtml(response, 200, renderPain({ locale: state.locale, reports: repository.listPainReports(userId) }));
       return;
     }
 

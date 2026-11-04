@@ -5,7 +5,7 @@
  * sentence about training. The comment on the day page is the narrator's output, inserted verbatim (escaped),
  * because a page that re-words the coach note would be a second narrator.
  */
-import type { DayEntry, PlanVersion, Review, Session } from "@training-planner/domain";
+import type { DayEntry, PainReport, PlanVersion, Review, Session } from "@training-planner/domain";
 import type { SeasonSummary } from "@training-planner/season";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
@@ -124,7 +124,10 @@ export function renderCalendar(input: CalendarPageInput): string {
       <h2>${escapeHtml(messages.web["web.calendar-title"])}</h2>
       ${intro}
       <ul class="week">${rows.join("\n")}</ul>
-      <p class="muted"><a href="/season">${escapeHtml(messages.web["web.season-link"])}</a></p>
+      <p class="muted">
+        <a href="/season">${escapeHtml(messages.web["web.season-link"])}</a> ·
+        <a href="/pain">${escapeHtml(messages.web["web.pain-link"])}</a>
+      </p>
     </section>`;
   return layout({ locale: input.locale, title: messages.web["web.calendar-title"], body, signedIn: true });
 }
@@ -207,6 +210,45 @@ export function renderSeason(input: SeasonPageInput): string {
       </p>
     </section>`;
   return layout({ locale: input.locale, title: messages.web["web.season-title"], body, signedIn: true });
+}
+
+export interface PainPageInput {
+  locale: Locale;
+  /** Rows from packages/entries' projection, already ordered by day by the repository. */
+  reports: readonly PainReport[];
+}
+
+/**
+ * The pain history: the rows row 19 created, on a page. The triage still reads one entry's array (row 35), so this
+ * page says what happened rather than what it means - a page that interpreted pain would be a second triage.
+ */
+export function renderPain(input: PainPageInput): string {
+  const messages = messagesFor(input.locale);
+  const body =
+    input.reports.length === 0
+      ? `<section class="card"><p>${escapeHtml(messages.web["web.pain-empty"])}</p>
+        <p class="muted"><a href="/">${escapeHtml(messages.web["web.season-back"])}</a></p></section>`
+      : `<section class="card">
+      <h2>${escapeHtml(messages.web["web.pain-title"])}</h2>
+      <ul class="week">${input.reports
+        .map((report) => {
+          const flags: string[] = [];
+          if (report.nightPain) flags.push("night pain");
+          if (report.trendGaitChange) flags.push("gait change");
+          if (report.knownInjury) flags.push("known injury");
+          const flagText = flags.length === 0 ? "" : `<p class="note">${escapeHtml(messages.web["web.pain-flags"])}</p>`;
+          return `<li class="row">
+        <span class="day">${escapeHtml(report.day)}</span>
+        <span class="session">${escapeHtml(
+          format(messages.web["web.pain-row"], { site: report.site, intensity: formatNumber(report.intensity) }),
+        )}</span>
+        ${flagText}
+      </li>`;
+        })
+        .join("\n")}</ul>
+      <p class="muted"><a href="/">${escapeHtml(messages.web["web.season-back"])}</a></p>
+    </section>`;
+  return layout({ locale: input.locale, title: messages.web["web.pain-title"], body, signedIn: true });
 }
 
 export function renderDay(input: DayPageInput): string {
