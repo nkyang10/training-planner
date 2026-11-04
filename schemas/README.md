@@ -16,6 +16,7 @@ schemas/
     review.schema.json             a review, its options, and its outcome
     events.schema.json             envelope for the append-only event log
 prompt-delivery.schema.json    one delivered prompt (the input to the shared prompt budget)
+guideline.schema.json          one version of one central guideline (ADR-0009)
   sql/
     schema.sql                Postgres DDL sketch: tables, RLS, key constraints
   README.md

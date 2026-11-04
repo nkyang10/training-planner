@@ -1,0 +1,12 @@
+{
+  "guidelineId": "progression-ceiling",
+  "version": 2,
+  "tier": "constraint",
+  "scope": "progression",
+  "visibility": "public",
+  "text": "Weekly volume rises by at most 10 percent, and a runner returning from a layoff starts below their last full week.",
+  "rationale": "A ceiling that is stated once is easier to keep than a rule that is re-derived in each review.",
+  "effectiveFrom": "2026-11-04",
+  "createdBy": "operator",
+  "supersedesVersion": 1
+}

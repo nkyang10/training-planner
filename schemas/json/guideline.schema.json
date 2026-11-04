@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://training-planner.local/schemas/json/guideline.schema.json",
+  "title": "Guideline",
+  "description": "One version of one central guideline (ADR-0009). Guidelines are the operator's layer over the AI reviewer: versioned, immutable, and split by visibility - safety and medical guidelines are internal (never returned to a runner's client), style and training guidelines are public. A guideline can only be more conservative than the corpus in knowledge/heuristics, never less; the deterministic safety layer still runs before and after any model call.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["guidelineId", "version", "tier", "scope", "visibility", "text", "rationale", "effectiveFrom", "createdBy"],
+  "properties": {
+    "guidelineId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Stable identity across versions: the same guideline edited is the same id with a higher version, and the audit trail points at the id, not at the text."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic per guidelineId. A new row, never an edit: the table is append-only, so a review that read version 3 can be replayed after version 4 exists."
+    },
+    "tier": {
+      "enum": ["non-negotiable", "constraint", "default"],
+      "description": "How hard the guideline is. Conflict order (ADR-0009): safety/non-negotiable > constraint > a runner's preference; default only fills a gap the runner has not spoken about."
+    },
+    "scope": {
+      "enum": ["safety", "medical", "progression", "tone", "review-cadence"],
+      "description": "What the guideline governs. Safety and medical are the scopes that must stay internal; the others may be shown to the runner."
+    },
+    "visibility": {
+      "enum": ["internal", "public"],
+      "description": "Two-layer visibility from ADR-0009. internal = the operator and the model only; public = the runner may read it in their console. The contract refuses internal safety text becoming public through this field's allOf clause."
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "description": "The guideline itself, in the operator's language. It is not a comment template: the narrator's copy still lives in packages/i18n."
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "description": "Why the guideline exists, required so a future operator inherits the reason rather than the sentence."
+    },
+    "effectiveFrom": {
+      "type": "string",
+      "format": "date",
+      "description": "The training day the version starts to apply. The reviewer resolves the effective version per day; a review opened before this date uses the earlier one."
+    },
+    "createdBy": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "Operator identity recorded with the version. One operator role in P0; the field is what makes a later multi-admin change a data question rather than a schema one."
+    },
+    "supersedesVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The version this one replaces, when the change is a replacement rather than an addition. Absent for a new guideline."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "scope": { "enum": ["safety", "medical"] } }, "required": ["scope"] },
+      "then": { "properties": { "visibility": { "const": "internal" } } }
+    }
+  ]
+}

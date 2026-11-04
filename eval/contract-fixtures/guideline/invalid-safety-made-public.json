@@ -1,0 +1,11 @@
+{
+  "guidelineId": "night-pain-stop",
+  "version": 1,
+  "tier": "non-negotiable",
+  "scope": "safety",
+  "visibility": "public",
+  "text": "Night pain stops training.",
+  "rationale": "The triage treats night pain as decisive.",
+  "effectiveFrom": "2026-11-04",
+  "createdBy": "operator"
+}

@@ -52,6 +52,7 @@ create role app_user nologin noinherit;      -- the API, one transaction per req
 create role worker   nologin noinherit;      -- planner, sync and reminder jobs
 create role analytics_reader nologin noinherit;  -- aggregates only, sees no rows
 create role purger   nologin noinherit;      -- account deletion, and nothing else
+create role operator nologin noinherit;      -- the central guidelines (ADR-0009), and nothing else
 -- No SUPERUSER, CREATEDB, CREATEROLE, REPLICATION or BYPASSRLS anywhere above -- those are the
 -- defaults, and saying so here is cheaper than discovering otherwise in a review.
 -- `nologin` means no connection is made as these roles: the pool authenticates as a login role
@@ -778,8 +779,91 @@ create unique index pace_estimates_no_overlap on pace_estimates (user_id, distan
   where valid_to is null;   -- one authoritative pace per distance
 
 -- =====================================================================================
+-- OPERATOR GUIDELINES AND AI REVIEW (ADR-0009)
+-- =====================================================================================
+-- `guidelines` is the one table in this file that is NOT tenant-scoped: it is the operator's layer over the AI
+-- reviewer, identical for every runner. It is therefore readable only by the operator role, and the runner-facing
+-- API never returns an internal row (ADR-0009's two-layer visibility). Versioned rows, never edits.
+create table guidelines (
+  guideline_id text not null check (guideline_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  version      integer not null check (version > 0),
+  tier         text not null check (tier in ('non-negotiable', 'constraint', 'default')),
+  scope        text not null check (scope in ('safety', 'medical', 'progression', 'tone', 'review-cadence')),
+  visibility   text not null check (visibility in ('internal', 'public')),
+  text         text not null check (length(text) between 1 and 2000),
+  rationale    text not null check (length(rationale) between 1 and 2000),
+  effective_from date not null,
+  created_by   text not null check (length(created_by) between 1 and 120),
+  supersedes_version integer,
+  created_at   timestamptz not null default now(),
+  primary key (guideline_id, version),
+  -- The two-layer visibility rule, in the table rather than in a review checklist: safety and medical guidance
+  -- is internal, and a row that tries to publish it is refused here as well as by guideline.schema.json.
+  constraint safety_guidelines_are_internal check (
+    scope not in ('safety', 'medical') or visibility = 'internal'
+  ),
+  constraint supersedes_an_earlier_version check (
+    supersedes_version is null or supersedes_version < version
+  )
+);
+alter table guidelines enable row level security;
+alter table guidelines force row level security;
+-- Default deny: no policy names app_user or worker, so the runner's connection cannot read the guidelines at all.
+create policy "guidelines_operator_select" on guidelines for select to operator using (true);
+create policy "guidelines_operator_insert" on guidelines for insert to operator with check (true);
+
+-- The onboarding wizard's answers: append-only, one row per step per revision, so a runner can change a choice and
+-- still see what they originally chose (ADR-0009).
+create table wizard_answers (
+  user_id     uuid not null references users(id) on delete cascade,
+  id          bigint generated always as identity,
+  step_id     text not null check (step_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+  answer      jsonb not null,
+  revision    smallint not null default 1 check (revision > 0),
+  source      text not null check (source in ('wizard', 'settings')),
+  occurred_at timestamptz not null default now(),
+  primary key (user_id, id)
+);
+create index wizard_answers_step on wizard_answers (user_id, step_id, revision);
+
+-- What the model proposed, and what the deterministic gates said about it. Immutable: the audit trail of a review
+-- must survive the review being accepted, declined or superseded.
+create table ai_review_proposals (
+  user_id               uuid not null references users(id) on delete cascade,
+  id                    uuid not null default gen_random_uuid(),
+  day                   date not null,
+  guideline_version_hash text not null check (guideline_version_hash ~ '^sha256:[0-9a-f]{64}$'),
+  model                 text not null,
+  prompt_hash           text not null check (prompt_hash ~ '^sha256:[0-9a-f]{64}$'),
+  output                jsonb not null,
+  validator_verdict     text not null check (validator_verdict in ('accepted', 'rejected')),
+  fallback_used         boolean not null default false,
+  review_id             bigint,
+  created_at            timestamptz not null default now(),
+  primary key (user_id, id),
+  foreign key (user_id, review_id) references reviews (user_id, id) on delete set null
+);
+create index ai_review_proposals_review on ai_review_proposals (user_id, review_id);
+
+-- Consent is mutable on purpose: granting and revoking are the point (ADR-0006). Everything else here is
+-- append-only; consent is a switch, not a history, and the history lives in `events`.
+create table llm_consent (
+  user_id        uuid primary key references users(id) on delete cascade,
+  granted        boolean not null default false,
+  purpose        text not null check (purpose in ('review-decision', 'review-narrative', 'daily-comment')),
+  policy_version text not null,
+  granted_at     timestamptz,
+  revoked_at     timestamptz,
+  updated_at     timestamptz not null default now(),
+  constraint consent_has_a_timestamp check (granted = false or granted_at is not null)
+);
+
+-- =====================================================================================
 -- RLS: apply the factory, then the exceptions
 -- =====================================================================================
+select app.enforce_tenant('wizard_answers');
+select app.enforce_tenant('ai_review_proposals');
+select app.enforce_tenant('llm_consent');
 select app.enforce_tenant('athlete_profiles');
 select app.enforce_tenant('profile_revisions');
 select app.enforce_tenant('notification_prefs');
@@ -820,9 +904,20 @@ drop policy "prompt_deliveries_update" on prompt_deliveries;
 drop policy "prompt_deliveries_delete" on prompt_deliveries;
 drop policy "pain_reports_update" on pain_reports;
 drop policy "pain_reports_delete" on pain_reports;
+drop policy "wizard_answers_update" on wizard_answers;
+drop policy "wizard_answers_delete" on wizard_answers;
+drop policy "ai_review_proposals_update" on ai_review_proposals;
+drop policy "ai_review_proposals_delete" on ai_review_proposals;
 create trigger prompt_deliveries_no_mutation before update or delete on prompt_deliveries
   for each row execute function app.refuse_mutation();
 create trigger pain_reports_no_mutation before update or delete on pain_reports
+  for each row execute function app.refuse_mutation();
+create trigger wizard_answers_no_mutation before update or delete on wizard_answers
+  for each row execute function app.refuse_mutation();
+create trigger ai_review_proposals_no_mutation before update or delete on ai_review_proposals
+  for each row execute function app.refuse_mutation();
+-- guidelines are versioned: an edit is a new row, so the trigger covers the table too.
+create trigger guidelines_no_mutation before update or delete on guidelines
   for each row execute function app.refuse_mutation();
 create trigger system_comments_no_mutation before update or delete on system_comments
   for each row execute function app.refuse_mutation();
@@ -852,7 +947,14 @@ grant usage, select on all sequences in schema public to app_user, worker;
 -- set_config('app.user_id', ..., true) per user. Costs a loop; buys the guarantee that no
 -- background job can read across tenants, which is the one place a "convenient" cross-user
 -- query would otherwise appear.
-revoke update, delete, truncate on events, day_entries, system_comments, prompt_deliveries, pain_reports, profile_revisions from app_user, worker;
+revoke update, delete, truncate on events, day_entries, system_comments, prompt_deliveries, pain_reports, profile_revisions, wizard_answers, ai_review_proposals from app_user, worker;
+-- The operator role can read and append guidelines; it cannot rewrite one, and it has no tenant privileges.
+grant usage on schema public to operator;
+grant select, insert on guidelines to operator;
+-- The blanket grant above covers every table in `public`, so the guidelines need their grants taken back: row
+-- security would return zero rows anyway, but a runner connection that cannot even name the table is the honest
+-- version of "hidden" (ADR-0009's internal visibility).
+revoke all on guidelines from app_user, worker;
 -- `users` loses DELETE for a different reason, and only running the deletion path found it: a
 -- runner deleting their own row reaches day_entries through a foreign key, and the append-only
 -- guard refuses -- correctly, because "erase everything I did" and "rewrite what I did" are the
@@ -992,6 +1094,9 @@ $$ begin
   delete from safety_events      where user_id = target;
   delete from system_comments    where user_id = target;
   delete from prompt_deliveries  where user_id = target;
+  delete from wizard_answers     where user_id = target;
+  delete from ai_review_proposals where user_id = target;
+  delete from llm_consent        where user_id = target;
   delete from metrics_daily      where user_id = target;
   delete from signals_current    where user_id = target;
   delete from pace_estimates     where user_id = target;
