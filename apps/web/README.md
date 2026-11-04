@@ -15,6 +15,7 @@ wording including the escalation text: `docs/ux/feedback-microcopy.md`.
 | Route | What it is |
 |---|---|
 | `GET /login`, `POST /login` | a token form that sets an `HttpOnly; SameSite=Lax` session cookie |
+| `GET /pain` | the pain history: the rows `packages/entries` projects from entries, with the flags that matter (night pain, gait change, known injury). It says what happened, not what it means - the triage still reads one entry's array (row 35) |
 | `GET /season` | the plan's weeks, planned against done, with the adherence rate and a way back to the week |
 | `GET /export` | the same document `GET /export` on the API returns, offered as a download (`content-disposition: attachment`) - one definition, two doors |
 | `GET /` | the week, the explanation and the daily prompt chip. Rendering a prompt **records the delivery** (`prompt_deliveries`), so a reload does not repeat it; the policy is `packages/nudges` |

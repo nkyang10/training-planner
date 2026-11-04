@@ -352,6 +352,39 @@ describe("a session with pace evidence says how long it takes", () => {
   });
 });
 
+describe("the pain history page", () => {
+  it("shows the rows the entry pipeline wrote, and links from the week", async () => {
+    const hardDay = planWithPace(USER_C).sessions.find((session) => session.hardDay === true)?.day;
+    expect(hardDay).toBeDefined();
+    const posted = await call(`/day/${hardDay}`, {
+      cookie: "session=token-c",
+      form: {
+        outcome: "completed",
+        completedKm: "6",
+        rpe: "6",
+        legs: "2",
+        note: "",
+        correctionReason: "logged after the run",
+        idempotencyKey: `pain-${hardDay}`,
+      },
+    });
+    expect(posted.status).toBe(200);
+    const page = await call("/pain", { cookie: "session=token-c" });
+    expect(page.status).toBe(200);
+    // The page shows what happened, not what it means: the triage still reads one entry's array (row 35).
+    expect(page.html).toContain("Pain history");
+    expect(page.html).toContain("Back to the week");
+    const week = await call("/", { cookie: "session=token-c" });
+    expect(week.html).toContain('href="/pain"');
+  });
+
+  it("says no pain has been reported rather than showing an empty table", async () => {
+    const page = await call("/pain", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("No pain has been reported yet");
+  });
+});
+
 describe("a substitute says what it gave up", () => {
   it("shows the trade-off line on the day it happened", async () => {
     const hardDay = planWithPace(USER_C).sessions.find((session) => session.hardDay === true)?.day;
