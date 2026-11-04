@@ -71,9 +71,10 @@ const narratorSources = packageSources.filter((file) => rel(file).startsWith("pa
 // The write path must be replayable: the same draft must produce the same rows and ids on any machine.
 const entriesSources = packageSources.filter((file) => rel(file).startsWith("packages/entries/src/"));
 const reviewSources = packageSources.filter((file) => rel(file).startsWith("packages/review/src/"));
+const offlineSources = packageSources.filter((file) => rel(file).startsWith("packages/offline/src/"));
 
 scan(
-  [...plannerSources, ...policySources, ...narratorSources, ...entriesSources, ...reviewSources],
+  [...plannerSources, ...policySources, ...narratorSources, ...entriesSources, ...reviewSources, ...offlineSources],
   PURITY,
   "engine purity (AGENTS rule 1)",
 );

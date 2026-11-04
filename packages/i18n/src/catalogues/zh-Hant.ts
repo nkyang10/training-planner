@@ -73,6 +73,7 @@ export const zhHant: Messages = {
     "web.sign-out": "登出",
     "web.skip-reason": "為什麼沒有跑?",
     "web.skip-reason-none": "未說明",
+    "web.saved-locally": "已存在這部裝置。有網絡時會自動同步。",
   },
   explain: {
     "explain.summary": "{weeks} 週共 {sessions} 次訓練,合計 {km} 公里。",

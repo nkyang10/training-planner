@@ -59,7 +59,8 @@ export type WebTemplate =
   | "web.no-plan"
   | "web.sign-out"
   | "web.skip-reason"
-  | "web.skip-reason-none";
+  | "web.skip-reason-none"
+  | "web.saved-locally";
 
 export interface Messages {
   /** One sentence per comment template. `{slot}` placeholders are filled by packages/i18n's formatter. */
