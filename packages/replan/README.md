@@ -16,6 +16,13 @@ const { options, refusals, firstEditableDay } = proposePlanOptions({ plan, today
 | **planner invariants** | a candidate that introduces a violation **on a day it changes** is refused, not offered with a warning | offering a plan the planner itself would reject |
 | **no added load under safety** | every option is subtractive; a safety-critical trigger gets reductions only | a "review" that adds intensity to an injured runner |
 
+## A re-plan is a second kind (ADR-0010)
+
+`proposeOrientationReplan(input)` builds the candidate for a changed orientation: a fresh plan from the real planner,
+starting on the week boundary at or after the freeze window, with every earlier day kept byte-identical, an honest diff
+(`exceedsReviewChangeLimit` is true when `diffPlans` truncated), `summary.changes` counted over the whole future window,
+and `invariantViolations` surfaced rather than hidden. It proposes; it never opens a review or stores a version.
+
 ## Two options today
 
 | Option | Change | Cost (numbers, not prose) |

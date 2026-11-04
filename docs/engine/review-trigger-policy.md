@@ -33,6 +33,7 @@ intent, which scopes the review — this is where most of the product's practica
 The manual path exists in code: `POST /reviews/manual` opens a review with a manual candidate (`ruleId: null`, so the
 review records `openedBy: user-request`), the same bounded option set the engine may offer, and an `orientation`
 block that records what the runner's un-applied answers would change. A full re-plan from a changed orientation is a
+second option kind ([ADR-0010](../adr/0010-replan-as-its-own-review-option-kind.md)), not a large edit; and it is a
 different proposal shape (a new plan, not at most two edits), and it is tracked separately rather than smuggled in as
 a "change".
 
