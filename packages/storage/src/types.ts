@@ -93,6 +93,8 @@ export interface Repository {
 
   saveComment(comment: CommentRecord): void;
   listComments(userId: string, day?: string): CommentRecord[];
+  /** Every saved plan version for this user, oldest first. The export promises the history, not just the active row. */
+  listPlanVersions(userId: string): PlanVersion[];
 }
 
 /** Who is making the request. The API never trusts a userId from the body (ADR-0002). */

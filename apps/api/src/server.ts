@@ -27,9 +27,10 @@ import { evaluateTriggers } from "@training-planner/triggers";
 import { decideReview, openReview } from "@training-planner/review";
 import type { ProposedOption } from "@training-planner/review";
 import { decideNudge } from "@training-planner/nudges";
+import { seasonSummary } from "@training-planner/season";
 import { proposePlanOptions } from "@training-planner/replan";
 import type { Decision } from "@training-planner/review";
-import { DuplicateIdempotencyError } from "@training-planner/storage";
+import { DuplicateIdempotencyError, exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { localClockOf } from "./local-clock";
 
@@ -322,6 +323,29 @@ export function createApi(options: ApiOptions): RequestListener {
         evidence: decision.evidence,
         budget: decision.budget,
       });
+      return;
+    }
+
+    // GET /season - the plan's weeks, planned against done, from packages/season.
+    if (segments.length === 1 && segments[0] === "season") {
+      if (method !== "GET") return fail(response, 405, "method-not-allowed", "use GET /season");
+      const plan = repository.latestPlanVersionFor(userId, today) ?? null;
+      if (plan === null) {
+        sendJson(response, 200, { status: "no-plan" });
+        return;
+      }
+      sendJson(response, 200, {
+        status: "ok",
+        summary: seasonSummary({ plan, entries: repository.listEntries(userId), today }),
+      });
+      return;
+    }
+
+    // GET /export - the runner's data in one document. The assembly is packages/storage's exportDocument, so the
+    // API and the web page cannot disagree about what "my data" means.
+    if (segments.length === 1 && segments[0] === "export") {
+      if (method !== "GET") return fail(response, 405, "method-not-allowed", "use GET /export");
+      sendJson(response, 200, { status: "ok", export: exportDocument(repository, userId, at) });
       return;
     }
 

@@ -28,6 +28,7 @@ export default defineConfig({
       { find: "@training-planner/replan", replacement: here("./packages/replan/src/index.ts") },
       { find: "@training-planner/worker", replacement: here("./packages/worker/src/index.ts") },
       { find: "@training-planner/nudges", replacement: here("./packages/nudges/src/index.ts") },
+    { find: "@training-planner/season", replacement: here("./packages/season/src/index.ts") },
     ],
   },
   test: {

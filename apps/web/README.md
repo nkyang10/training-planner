@@ -15,6 +15,8 @@ wording including the escalation text: `docs/ux/feedback-microcopy.md`.
 | Route | What it is |
 |---|---|
 | `GET /login`, `POST /login` | a token form that sets an `HttpOnly; SameSite=Lax` session cookie |
+| `GET /season` | the plan's weeks, planned against done, with the adherence rate and a way back to the week |
+| `GET /export` | the same document `GET /export` on the API returns, offered as a download (`content-disposition: attachment`) - one definition, two doors |
 | `GET /` | the week, the explanation and the daily prompt chip. Rendering a prompt **records the delivery** (`prompt_deliveries`), so a reload does not repeat it; the policy is `packages/nudges` |
 | the current Monday–Sunday week: session kind and distance per day, a logged/not-logged chip, the plan's first explanation sentence, and a banner when a review is open |
 | `GET /day/:day`, `POST /day/:day` | the drawer: five outcomes, effort, legs, an optional note, a "why" row for a skipped day, and the coach note after saving |

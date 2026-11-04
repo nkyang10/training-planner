@@ -75,7 +75,23 @@ export type WebTemplate =
   | "web.review-deferred"
   | "web.review-freeze"
   | "web.review-none"
-  | "web.review-cost";
+  | "web.review-cost"
+  | "web.season-link"
+  | "web.season-title"
+  | "web.season-back"
+  | "web.season-week"
+  | "web.season-planned"
+  | "web.season-done"
+  | "web.season-sessions"
+  | "web.season-hard"
+  | "web.season-logged"
+  | "web.season-adherence"
+  | "web.season-adherence-none"
+  | "web.season-empty"
+  | "web.season-future"
+  | "web.season-current"
+  | "web.season-past"
+  | "web.export-link";
 
 export interface Messages {
   /** One sentence per comment template. `{slot}` placeholders are filled by packages/i18n's formatter. */

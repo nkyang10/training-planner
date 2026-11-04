@@ -25,6 +25,8 @@ comment in the runner's language. The client never re-derives a number.
 | `POST /plan` | generate and store a plan version (profile, evidence, state, seed) |
 | `GET /plan/:versionId` | read one version back |
 | `POST /entries` | the daily loop |
+| `GET /season` | the plan's weeks with planned and done kilometres, sessions, hard days, logged days and one adherence rate - computed by `packages/season`, so the page and the JSON cannot disagree |
+| `GET /export` | the runner's data in one document: plan versions, entries, events, reviews, comments, prompt deliveries, and counts that let a client check the file it received |
 | `GET /prompts/next` | the daily prompt policy (`packages/nudges`): returns the sentence when a prompt may arrive, **records the delivery**, and answers `none` with the reason and budget otherwise |
 | `GET /signals` | what the system currently believes about this runner (`packages/signals`), plus the signals it cannot compute and why |
 | `GET /entries/:day` | revisions, the current one, and the comments rendered for that day |
