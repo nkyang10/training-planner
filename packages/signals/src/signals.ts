@@ -9,6 +9,7 @@
 import type { DayEntry, DayEntryOutcome, PlanVersion, Signal, SignalConfidence, SignalDrive, SignalKey } from "@training-planner/domain";
 import { canonicalJson, hashOf } from "@training-planner/knowledge";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
+import { painReportsOf, painTrendOf } from "@training-planner/entries";
 import { addDays, daysBetween, weekStart } from "@training-planner/planner-core";
 import type { DayRollup, SignalInput, SignalOutput, UnavailableSignal } from "./types";
 
@@ -320,12 +321,15 @@ export function computeSignals(input: SignalInput): SignalOutput {
     });
   }
 
-  // ---- pain_trend: the highest reported pain and where it is going --------------------------------
-  const painReports = [...current.values()]
-    .filter((entry) => dayInWindow(entry.day, today, 7))
-    .flatMap((entry) => (entry.pain ?? []).map((pain) => ({ day: entry.day, intensity: pain.intensity })))
-    .sort((a, b) => (a.day < b.day ? -1 : 1));
-  if (painReports.length === 0) {
+  // ---- pain_trend: the trajectory over the reports, from the same two functions the page and the API use ----
+  //
+  // The rows are derived here from the entries rather than read from the repository, because `computeSignals` takes
+  // the log and nothing else; the derivation is `painReportsOf`, which is also what the write path stores, so the
+  // signal and the page cannot disagree about the same report. The direction is `painTrendOf`'s, not a second rule:
+  // one report is a point, and it is emitted as `unknown` rather than as a stable-looking number.
+  const painReports = [...current.values()].flatMap((entry) => painReportsOf({ userId: input.userId, entry }));
+  const trend = painTrendOf({ reports: painReports, today });
+  if (trend.days === 0) {
     emit({
       key: "pain_trend",
       kind: "rolling-days",
@@ -337,20 +341,21 @@ export function computeSignals(input: SignalInput): SignalOutput {
       mayDrive: ["safety", "review"],
     });
   } else {
-    const first = painReports[0]?.intensity ?? 0;
-    const last = painReports[painReports.length - 1]?.intensity ?? 0;
-    const direction: Signal["direction"] = last > first ? "rising" : last < first ? "falling" : "stable";
     emit({
       key: "pain_trend",
       kind: "rolling-days",
       days: 7,
-      value: Math.max(...painReports.map((report) => report.intensity)),
+      value: trend.peak,
       unit: "0-10",
-      confidence: painReports.length >= 2 ? "medium" : "low",
-      confidenceNote: `${painReports.length} report(s) in the window`,
+      // Two days of reports is the first evidence of a direction; one report is not evidence of anything.
+      confidence: trend.note === "compared-first-and-last" ? "medium" : "low",
+      confidenceNote:
+        trend.note === "one-report"
+          ? "1 report is a point, not a trend"
+          : `${trend.days} day(s) with reports in the window`,
       mayDrive: ["safety", "review"],
-      direction,
-      crossedThreshold: Math.max(...painReports.map((report) => report.intensity)) >= 7,
+      direction: trend.direction,
+      crossedThreshold: (trend.peak ?? 0) >= 7,
     });
   }
 

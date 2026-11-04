@@ -258,6 +258,32 @@ describe("pain is reported, never inferred", () => {
     expect(signal?.direction).toBe("rising");
     expect(signal?.crossedThreshold).toBe(true);
   });
+
+  it("calls one report a point, not a trend", () => {
+    const output = computeSignals(
+      input({ entries: [entry("2026-11-08", { pain: [{ site: "knee", intensity: 5 }] })] }),
+    );
+    const signal = signalByKey(output, "pain_trend");
+    // The old rule would have called this "stable": a single number is not a direction.
+    expect(signal?.value).toBe(5);
+    expect(signal?.direction).toBe("unknown");
+    expect(signal?.confidence).toBe("low");
+    expect(signal?.confidenceNote).toContain("point, not a trend");
+  });
+
+  it("ignores a report outside the seven-day window", () => {
+    const output = computeSignals(
+      input({
+        entries: [
+          entry("2026-09-01", { pain: [{ site: "knee", intensity: 9 }] }),
+          entry("2026-11-08", { pain: [{ site: "knee", intensity: 2 }] }),
+        ],
+      }),
+    );
+    const signal = signalByKey(output, "pain_trend");
+    expect(signal?.value).toBe(2);
+    expect(signal?.direction).toBe("unknown");
+  });
 });
 
 describe("what this build cannot see is named, not guessed", () => {

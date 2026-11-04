@@ -19,6 +19,9 @@ re-planned on a signal that was really an absence of data.
 
 ## What is computed today
 
+| Rule | Why |
+|---|---|
+| `pain_trend` uses `painReportsOf` + `painTrendOf` | the rows are derived from the entries with the same projection the write path stores, and the direction is the same function the pain page and `GET /pain` use. One report is emitted as `unknown` with the note "1 report is a point, not a trend"; the old rule would have called a single number "stable" |
 | Signal | Window | What it says |
 |---|---|---|
 | `completion_rate` | `review-triggers.yaml#plan_too_big_thresholds.window_days` (14) | fraction of planned days that happened; `crossedThreshold` against `completion_rate_lt` |
