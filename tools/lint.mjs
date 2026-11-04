@@ -57,6 +57,9 @@ const scan = (files, rules, message) => {
 };
 
 const packageSources = walk(join(root, "packages")).filter((file) => file.endsWith(".ts") && rel(file).includes("/src/"));
+// Apps are not pure - the API reads a socket - but they are held to the same `any` and console rules as packages.
+const appSources = walk(join(root, "apps")).filter((file) => file.endsWith(".ts") && rel(file).includes("/src/"));
+const allSources = [...packageSources, ...appSources];
 const plannerSources = packageSources.filter((file) => rel(file).startsWith("packages/planner-core/src/"));
 // The policy evaluator is pure for the same reason the planner is: a comment printed six months from now
 // has to be reproducible from the entry, the plan and the knowledge hash, and a clock read inside the
@@ -76,11 +79,11 @@ scan(
 );
 
 const anyRule = [[/\b:\s*any\b/, "`: any`"], [/\bas\s+any\b/, "`as any`"], [/<any>/, "`<any>`"]];
-scan(packageSources, anyRule, "no any in package sources");
+scan(allSources, anyRule, "no any in package and app sources");
 
 const consoleRule = [[/\bconsole\.(log|debug|info)\s*\(/, "console output"]];
 scan(
-  packageSources.filter((file) => !rel(file).startsWith("packages/cli/")),
+  allSources.filter((file) => !rel(file).startsWith("packages/cli/") && !rel(file).startsWith("apps/api/src/index.ts")),
   consoleRule,
   "library code must not log",
 );
@@ -102,5 +105,5 @@ if (problems.length > 0) {
   process.exit(1);
 }
 console.log(
-  `LINT: OK - ${packageSources.length} package sources, ${textFiles.length} text files, engine purity holds`,
+  `LINT: OK - ${packageSources.length} package sources, ${appSources.length} app sources, ${textFiles.length} text files, engine purity holds`,
 );
