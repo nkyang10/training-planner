@@ -6,6 +6,7 @@
  * architecture - there is one entry pipeline, not one per client.
  */
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from "node:http";
+import { readFileSync } from "node:fs";
 import type { DayEntry, Session } from "@training-planner/domain";
 import { submitEntry } from "@training-planner/entries";
 import type { EntryDraft } from "@training-planner/entries";
@@ -31,6 +32,10 @@ export interface WebOptions {
 }
 
 const MAX_BODY_BYTES = 200_000;
+/** The offline queue script, read once. It is plain JavaScript on purpose: no build step for a 5 KB file. */
+const QUEUE_JS = readFileSync(new URL("../public/queue.js", import.meta.url), "utf8");
+/** The sources the entry contract allows; the replay sends offline-queue and the form sends nothing (web). */
+const ENTRY_SOURCES = ["web", "mobile", "offline-queue", "import-assistant", "voice"] as const;
 /** day-entry.schema.json s OutcomeDetail enum. A free-text reason is a different field and is not invented here. */
 const SKIP_REASONS = ["illness", "travel", "work", "family", "sleep", "motivation", "pain", "weather", "equipment", "social", "just-didnt", "other"] as const;
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -135,6 +140,12 @@ export function createWeb(options: WebOptions): RequestListener {
       return;
     }
 
+    if (method === "GET" && url.pathname === "/static/queue.js") {
+      response.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=300" });
+      response.end(QUEUE_JS);
+      return;
+    }
+
     if (method === "GET" && url.pathname === "/login") {
       sendHtml(response, 200, renderLogin(state.locale, undefined));
       return;
@@ -230,6 +241,8 @@ export function createWeb(options: WebOptions): RequestListener {
           legs: intInRange(form.get("legs"), 1, 5, 2),
           ...(note.length === 0 ? {} : { note }),
           idempotencyKey: form.get("idempotencyKey") ?? idempotencyKey,
+          // A replay says where it came from; the online form says nothing and is recorded as web.
+          source: oneOf(ENTRY_SOURCES, form.get("source"), "web"),
         };
 
         const log = { entries: repository.listEntriesForDay(userId, day), events: repository.listEvents(userId) };

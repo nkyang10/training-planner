@@ -72,6 +72,7 @@ export const en: Messages = {
     "web.sign-out": "Sign out",
     "web.skip-reason": "Why did it not happen?",
     "web.skip-reason-none": "not said",
+    "web.saved-locally": "Saved on this device. It will sync when you are back online.",
   },
   explain: {
     "explain.summary": "{sessions} sessions over {weeks} weeks, {km} km in total.",

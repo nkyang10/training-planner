@@ -45,6 +45,7 @@ export function layout(input: LayoutInput): string {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(input.title)}</title>
   <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/queue.js" defer></script>
 </head>
 <body>
   ${header}

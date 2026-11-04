@@ -29,7 +29,6 @@ findings that do not make a plan unsafe, which is why M1 closed with them record
 | 10 | Sessions the runner does not control: club night, parkrun, pacing a friend (**F3**) | the group decides Tuesday; the plan has to survive that | S | every club runner's first week is fiction |
 | 11 | Surfaces for what is already posture: season view, heat/altitude cost, travel week shift, export and delete (**F4**–**F6**, **F9**) | a promise with no screen is not a promise | M | trust decays exactly where the runner is most exposed |
 | 12 | Distance-aware long-run band (M1 review F2: an 11.4 km longest run for a 50 km trail race) | one `long_run_share_pct` cannot serve a 5K and a 50K; the corpus needs a band keyed by race distance | M | ultra and marathon plans that cannot possibly prepare the runner |
-| 13 | State the 7-day-normalised rate wherever a week is partial (M1 review F3) | a Thursday start reads as +89% in raw kilometres while the plan is +8%; the plan is right and the presentation is not | S | the runner distrusts a plan that is correct |
 | 14 | Terrain-aware session kinds (M1 review F4: no hills in a trail ultra plan) | `hills` exists as a kind and is never selected from terrain | S | trail plans that train like road plans |
 | 15 | Neuromuscular-before-threshold sequencing rule for novices (M1 review F5) | the first 5K block opens with tempo and never with strides | S | a beginner's first quality session is the hardest kind |
 | 16 | A target-peak notion derived from race distance (M1 review F6: race blocks cannot exceed recent volume) | the curve is purely incremental, so a 7-week race block holds volume instead of building it, and the planner cannot tell "hold" from "fail to build" | L | marathon blocks that never build, with nothing in the plan saying so |
@@ -38,9 +37,17 @@ findings that do not make a plan unsafe, which is why M1 closed with them record
 | 19 | Store pain reports as their own rows with ids, referenced from the entry and the event | ADR-0006 keeps health free text out of the event log, and the pain triage rules need a trajectory across reports, not one array inside an entry | M | pain history is a blob inside entries, and the triage cannot see a trend |
 | 20 | Give `SessionTaken` a partial marker (or a separate completed fraction) | a partly-done day has no honest value to store: `shortened` does not exist in the enum, so the web form has to omit the field entirely. Found when the form tried `shortened` and typecheck refused it | S | every partial day looks the same as a day the runner said nothing about |
 | 21 | Reconcile `day-entry.schema.json`'s `sessionTaken: null` contradiction | the field description says null is how "the runner did not say" is stored, while the `allOf` forbids null when the key is present; `packages/entries` omits the key, which is the only spelling the contract accepts | S | two spellings of "not said", and a validator that disagrees with its own description |
-| 22 | The offline queue: an IndexedDB draft store, a "saved locally" state, and replay with the stored idempotency key | promised by ADR-0008 and by M2's loop; the entry pipeline already accepts `source: "offline-queue"` and requires a key, so the wire is ready and only the client script is missing | M | a runner in a basement gym loses the entry, the exact failure the loop exists to prevent |
 | 23 | The review sheet: an open-review banner and a page that shows "keep the plan" first, with the visible diff and the stated cost | `packages/review` owns the ordering and the freeze window, but no screen renders an open review, so the review is invisible to the person who has to consent to it | M | reviews exist in the engine and never reach a runner |
 | 24 | The Postgres adapter behind `Repository`, with migrations and row-level security | the interface and the in-memory reference adapter exist and are contract-tested; the database adapter is the first place RLS becomes real (ADR-0002), and it cannot be verified without a database | L | the product cannot leave one process, and RLS stays an unproven claim |
+
+### Landed in M2
+
+Rows that were open and are now shipped, kept here so the backlog stays a list of open work only.
+
+| # | Item | Where it landed |
+|---|---|---|
+| 13 | State the 7-day-normalised rate wherever a week is partial | [PR #29](https://github.com/nkyang10/training-planner/pull/29): `summariseWeeks` + `explain.partial`, and the CLI prints `3.9 km over 4 days, which is 6.8 km at a full week's rate` |
+| 22 | The offline queue | [PR #34](https://github.com/nkyang10/training-planner/pull/34): `packages/offline` (rules, 16 tests) + `apps/web/public/queue.js` (IndexedDB, replay with `source=offline-queue`) |
 
 ## Next (M3–M5)
 

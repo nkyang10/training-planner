@@ -39,11 +39,20 @@ same entry pipeline, so there is one write path, not one per client.
 - **A review shows "keep as is" first with a visible diff and a stated cost.** The review sheet is not built
   yet, and when it is, the ordering is a rule of `packages/review`, not a layout choice.
 
+## The offline queue
+
+`public/queue.js` is loaded on every page and intercepts the entry form when `navigator.onLine` is false. The
+draft is stored in IndexedDB under its idempotency key, the page shows the catalogue's "saved on this device"
+copy, and on `online` the script replays each draft with `source=offline-queue`.
+
+The **rules** are not in that script: `packages/offline` owns them (idempotent enqueue, no replay while offline,
+a failure keeps the draft, abandonment is a state not a deletion) and is tested without a browser. The script is
+the plumbing, and it is deliberately thin enough that there is little policy to get wrong. Its DOM and IndexedDB
+behaviour is **not covered by unit tests** — there is no jsdom in the repository — so it is verified by
+inspection and by the wire tests that prove the server accepts and records a replay.
+
 ## What is not built yet
 
-- **The offline queue.** ADR-0008 promises a small client script for IndexedDB and the "saved locally" state;
-  the pages are server-rendered forms today, and the queue is the next slice. The entry pipeline already
-  accepts `source: "offline-queue"` and requires an idempotency key, so the wire is ready.
 - **The calendar month grid, swipe navigation, keyboard shortcuts, the review sheet.** `docs/ux/screens.md` owns
   those; this slice is the loop, not the whole surface.
 - **Real authentication.** `createMemorySessions` maps tokens to users for development and tests.

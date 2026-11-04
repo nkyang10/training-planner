@@ -22,6 +22,7 @@ export default defineConfig({
       { find: "@training-planner/entries", replacement: here("./packages/entries/src/index.ts") },
       { find: "@training-planner/review", replacement: here("./packages/review/src/index.ts") },
       { find: "@training-planner/storage", replacement: here("./packages/storage/src/index.ts") },
+      { find: "@training-planner/offline", replacement: here("./packages/offline/src/index.ts") },
     ],
   },
   test: {

@@ -223,6 +223,48 @@ describe("one runner's page never shows another runner's log", () => {
   });
 });
 
+describe("the offline queue is served and its wire is accepted", () => {
+  it("serves the queue script as JavaScript and the page loads it", async () => {
+    const script = await fetch(`${base}/static/queue.js`);
+    expect(script.status).toBe(200);
+    expect(script.headers.get("content-type")).toContain("application/javascript");
+    const body = await script.text();
+    expect(body).toContain("indexedDB");
+    expect(body).toContain("offline-queue");
+
+    const page = await call("/day/2026-11-09", { cookie: "session=token-a" });
+    expect(page.html).toContain('src="/static/queue.js"');
+  });
+
+  it("marks the entry form for interception and carries the catalogue copy", async () => {
+    const page = await call("/day/2026-11-09", { cookie: "session=token-a" });
+    expect(page.html).toContain("data-offline-queue");
+    expect(page.html).toContain("data-saved-locally=");
+    expect(page.html).toContain("Saved on this device");
+    expect(page.html).toContain("data-offline-status");
+  });
+
+  it("records a replayed entry with its true source", async () => {
+    const response = await call("/day/2026-11-06", {
+      cookie: "session=token-a",
+      form: { outcome: "completed", rpe: "6", legs: "2", idempotencyKey: "offline-key-0001", source: "offline-queue" },
+    });
+    expect(response.status).toBe(200);
+    // The day already has an earlier revision from another test; the replay is the newest one.
+    const stored = repository.listEntriesForDay(USER_A, "2026-11-06").at(-1);
+    expect(stored?.source).toBe("offline-queue");
+  });
+
+  it("refuses a source the contract does not have", async () => {
+    const response = await call("/day/2026-11-05", {
+      cookie: "session=token-a",
+      form: { outcome: "completed", rpe: "6", legs: "2", idempotencyKey: "offline-key-0002", source: "telepathy" },
+    });
+    expect(response.status).toBe(400);
+    expect(repository.listEntriesForDay(USER_A, "2026-11-05")).toHaveLength(0);
+  });
+});
+
 describe("the stylesheet is served, and the pages are not injectable", () => {
   it("serves CSS with the right content type", async () => {
     const response = await fetch(`${base}/static/app.css`);

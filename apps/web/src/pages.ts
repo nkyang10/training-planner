@@ -177,7 +177,7 @@ export function renderDay(input: DayPageInput): string {
       ${saved}
       ${errorBlock}
     </section>
-    <form method="post" action="/day/${escapeHtml(input.day)}" class="card stack">
+    <form method="post" action="/day/${escapeHtml(input.day)}" class="card stack" data-offline-queue data-day="${escapeHtml(input.day)}" data-saved-locally="${escapeHtml(messages.web["web.saved-locally"])}">
       <fieldset>
         <legend>${escapeHtml(messages.web["web.form-legend"])}</legend>
         ${radios}
@@ -191,6 +191,7 @@ export function renderDay(input: DayPageInput): string {
       <textarea id="note" name="note" rows="2">${escapeHtml(input.current?.note ?? "")}</textarea>
       <input type="hidden" name="idempotencyKey" value="${escapeHtml(input.idempotencyKey)}">
       <button type="submit">${escapeHtml(messages.web["web.save"])}</button>
+      <p class="note" data-offline-status role="status"></p>
     </form>
     ${comment}`;
   return layout({ locale: input.locale, title: input.day, body, signedIn: true });

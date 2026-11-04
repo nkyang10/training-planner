@@ -26,7 +26,8 @@
       "@training-planner/narrator": ["packages/narrator/src/index.ts"],
       "@training-planner/entries": ["packages/entries/src/index.ts"],
       "@training-planner/review": ["packages/review/src/index.ts"],
-      "@training-planner/storage": ["packages/storage/src/index.ts"]
+      "@training-planner/storage": ["packages/storage/src/index.ts"],
+      "@training-planner/offline": ["packages/offline/src/index.ts"]
     }
   },
   "include": [
