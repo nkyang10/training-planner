@@ -43,6 +43,13 @@ export const zhHant: Messages = {
     "bone-referral": "請停止跑步,在下一次訓練前讓臨床醫生評估這個疼痛。",
     "pain-hold": "今天請不要帶著這個疼痛跑;下一次訓練前需要醫生的意見。",
   },
+  explain: {
+    "explain.summary": "{weeks} 週共 {sessions} 次訓練,合計 {km} 公里。",
+    "explain.week-one": "{weekday}起的一週:{km} 公里,強度日 {hard} 次。",
+    "explain.week-many": "{weekday}起的一週:{km} 公里,強度日 {hard} 次。",
+    "explain.partial": "第一週是不完整的一週:{days} 天共 {km} 公里,換算成整週是 {rate} 公里。",
+    "explain.peak": "最高量的一週 {km} 公里,最長一次 {long} 公里。",
+  },
   weekday: { Mon: "週一", Tue: "週二", Wed: "週三", Thu: "週四", Fri: "週五", Sat: "週六", Sun: "週日" },
   kind: {
     rest: "休息",

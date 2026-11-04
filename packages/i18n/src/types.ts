@@ -21,6 +21,14 @@ export function isLocale(value: string): value is Locale {
   return value === "en" || value === "zh-Hant";
 }
 
+/** The explanation surface: a plan described in the runner s language, not a dashboard. */
+export type ExplainTemplate =
+  | "explain.summary"
+  | "explain.week-one"
+  | "explain.week-many"
+  | "explain.partial"
+  | "explain.peak";
+
 export interface Messages {
   /** One sentence per comment template. `{slot}` placeholders are filled by packages/i18n's formatter. */
   comment: Record<FactTemplate, string>;
@@ -33,6 +41,8 @@ export interface Messages {
   weekday: Record<DayName, string>;
   /** Session kinds are named, never printed as raw codes: a comment says "tempo", not "tempo" in Chinese. */
   kind: Record<SessionKind, string>;
+  /** One sentence per explanation line. Same formatter, same guardrails as a comment. */
+  explain: Record<ExplainTemplate, string>;
   /** Labels the chip and the nudge carry; not sentences. */
   label: {
     changedBecause: string;

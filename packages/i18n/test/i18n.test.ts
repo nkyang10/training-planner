@@ -14,6 +14,7 @@ import {
   TEMPLATE_LIST_IS_COMPLETE,
 } from "@training-planner/policy";
 import { catalogues, format, formatNumber, placeholdersOf, weekdayName } from "../src/index";
+import type { ExplainTemplate } from "../src/types";
 import { LOCALES } from "../src/types";
 import type { Locale, Messages } from "../src/types";
 
@@ -65,9 +66,39 @@ describe("both catalogues speak the engine's key set", () => {
   }
 });
 
+const EXPLAIN_TEMPLATES: ExplainTemplate[] = [
+  "explain.summary",
+  "explain.week-one",
+  "explain.week-many",
+  "explain.partial",
+  "explain.peak",
+];
+
+const EXPLAIN_SLOTS: Record<ExplainTemplate, Record<string, string | number>> = {
+  "explain.summary": { sessions: 42, weeks: 7, km: 60 },
+  "explain.week-one": { weekday: "Monday", km: 23.6, hard: 1 },
+  "explain.week-many": { weekday: "Monday", km: 44.6, hard: 2 },
+  "explain.partial": { km: 23.6, days: 4, rate: 41.3 },
+  "explain.peak": { km: 52.1, long: 16.7 },
+};
+
+describe("both catalogues explain a plan in both languages", () => {
+  for (const locale of LOCALES) {
+    it(`${locale}: explanation keys are complete and render`, () => {
+      for (const template of EXPLAIN_TEMPLATES) {
+        expect(catalogues[locale].explain[template].length).toBeGreaterThan(0);
+        const text = format(catalogues[locale].explain[template], EXPLAIN_SLOTS[template]);
+        expect(text).not.toMatch(/[{}]/);
+        if (locale === "zh-Hant") expect(text).toMatch(/[\\u4e00-\\u9fff]/);
+      }
+    });
+  }
+});
+
 describe("the copy follows the tone contract", () => {
   const allStrings = (messages: Messages): string[] => [
     ...Object.values(messages.comment),
+    ...Object.values(messages.explain),
     ...Object.values(messages.reason),
     ...Object.values(messages.cost),
     ...Object.values(messages.stop),
