@@ -142,6 +142,63 @@ describe("a review never offers one option, and never offers a free change", () 
     expect(refusal({ options: reordered }).code).toBe("keep-as-is-must-be-first");
   });
 
+  it("assembles a replan option with its staged version and its honest size (ADR-0010)", () => {
+    const replan: ProposedOption = {
+      optionId: "replan",
+      labelKey: "replan-for-orientation",
+      keepAsIs: false,
+      kind: "replan",
+      planVersionId: "99999999-9999-4999-8999-999999999999",
+      changeSummary: { changes: 11, sessionsMoved: 8, kmBefore: 27.2, kmAfter: 48.5, firstChangedDay: "2026-11-16" },
+      diffId: null,
+      costKey: "the-block-is-recut",
+      costSlots: {},
+      loadDeltaPct: 0,
+    };
+    const review = opened({ options: [options[0] as ProposedOption, replan] });
+    const wire = review.options[1];
+    expect(wire?.kind).toBe("replan");
+    expect(wire?.planVersionId).toBe("99999999-9999-4999-8999-999999999999");
+    expect(wire?.changeSummary).toMatchObject({ changes: 11, sessionsMoved: 8 });
+    expect(wire?.diffId).toBeNull();
+    expect(reviewSchema.safeParse(review).success).toBe(true);
+  });
+
+  it("refuses a replan with no staged plan version", () => {
+    const replan: ProposedOption = {
+      optionId: "replan",
+      labelKey: "replan-for-orientation",
+      keepAsIs: false,
+      kind: "replan",
+      changeSummary: { changes: 11, sessionsMoved: 8, kmBefore: 27.2, kmAfter: 48.5 },
+      diffId: null,
+      costKey: "the-block-is-recut",
+      costSlots: {},
+    };
+    expect(refusal({ options: [options[0] as ProposedOption, replan] }).code).toBe("missing-plan-version");
+  });
+
+  it("refuses a replan with no change summary, and a replan that also carries a diff", () => {
+    const noSummary: ProposedOption = {
+      optionId: "replan",
+      labelKey: "replan-for-orientation",
+      keepAsIs: false,
+      kind: "replan",
+      planVersionId: "99999999-9999-4999-8999-999999999999",
+      diffId: null,
+      costKey: "the-block-is-recut",
+      costSlots: {},
+    };
+    expect(refusal({ options: [options[0] as ProposedOption, noSummary] }).code).toBe("missing-change-summary");
+
+    const withDiff: ProposedOption = {
+      ...noSummary,
+      changeSummary: { changes: 11, sessionsMoved: 8, kmBefore: 27.2, kmAfter: 48.5 },
+      diffId: "11111111-1111-4111-8111-111111111111",
+    };
+    expect(refusal({ options: [options[0] as ProposedOption, withDiff] }).code).toBe("replan-with-diff");
+  });
+
   it("refuses a change with no diff", () => {
     expect(refusal({ options: [options[0] as ProposedOption, { ...(options[1] as ProposedOption), diffId: null }] }).code).toBe("missing-diff");
   });

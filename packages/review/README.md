@@ -47,6 +47,13 @@ review that cannot carry its options never exists at all.
 A review whose every option has expired is `expired`, and `expireReviews` marks them in bulk. Expiry exists so
 a plan nobody re-checked since week 6 of 16 can say so.
 
+## Two option kinds (ADR-0010)
+
+An option is an **edit** (a `diffId` with at most two changes) or a **replan** (a staged plan version plus an honest
+`changeSummary`; never a diff). Assembly refuses a replan with no staged version, a replan with no summary, and a
+replan that also carries a diff. The review-level change budget counts edits, not replans - a re-plan is a different
+question, and the wire contract says which kind an option is.
+
 ## What this package does not do
 
 - **It does not generate the options.** Candidate plans and their diffs come from the planner and the review

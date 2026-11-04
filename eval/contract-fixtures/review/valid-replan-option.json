@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "reviewId": "3f2b6c1e-0000-4000-8000-0000000000d1",
+  "userId": "3f2b6c1e-0000-4000-8000-000000000001",
+  "openedAtDay": "2026-11-04",
+  "openedBy": "system-signal",
+  "evidence": {
+    "signalIds": [
+      "rhr_delta_sd:3",
+      "feedback:motivation:low:streak4"
+    ],
+    "ruleIds": [
+      "red-days-3"
+    ],
+    "evidenceGradeMax": "B",
+    "streakDays": 4
+  },
+  "horizonDays": 14,
+  "freezeDays": 2,
+  "options": [
+    {
+      "optionId": "0",
+      "labelKey": "review.keepAsIs",
+      "keepAsIs": true,
+      "diffId": null,
+      "costSummary": "nothing changes",
+      "expiresAfterDay": "2026-11-18"
+    },
+    {
+      "optionId": "replan",
+      "labelKey": "review.replanForOrientation",
+      "keepAsIs": false,
+      "diffId": null,
+      "kind": "replan",
+      "planVersionId": "9a9a9a9a-9999-4999-8999-9a9a9a9a9a9a",
+      "changeSummary": {
+        "changes": 11,
+        "sessionsMoved": 8,
+        "kmBefore": 27.2,
+        "kmAfter": 48.5,
+        "firstChangedDay": "2026-11-16"
+      },
+      "costSummary": "the block is re-cut for the new days; the old block ends here",
+      "expiresAfterDay": "2026-11-18"
+    }
+  ],
+  "status": "open"
+}

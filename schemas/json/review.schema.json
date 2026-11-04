@@ -40,9 +40,37 @@
           "labelKey": { "type": "string", "description": "Message-catalogue key (AGENTS rule 8); the label is translated, not generated." },
           "keepAsIs": { "type": "boolean" },
           "diffId": { "type": ["string", "null"], "format": "uuid", "description": "Null for the keepAsIs option: no diff, no change, no version bump." },
+          "kind": { "enum": ["edit", "replan"], "description": "ADR-0010. edit = the option carries a diff of at most two changes; replan = the option carries a staged plan version and an honest summary, and is not counted as an edit. Absent means edit, so every existing review stays valid." },
+          "planVersionId": { "type": ["string", "null"], "format": "uuid", "description": "replan only: the staged plan version this option would activate on accept. Null for edit options and for keep-as-is." },
+          "changeSummary": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["changes", "sessionsMoved", "kmBefore", "kmAfter"],
+            "description": "replan only: the honest size of the change. changes counts the whole future window, not the truncated diff, so a sheet can say this re-cuts the block instead of implying two edits.",
+            "properties": {
+              "changes": { "type": "integer", "minimum": 0, "description": "Changed days across the whole future window, not the truncated diff (ADR-0010)." },
+              "sessionsMoved": { "type": "integer", "minimum": 0, "description": "Days where a session appears, disappears or moves to another weekday: the part of the change a runner feels most." },
+              "kmBefore": { "type": "number", "minimum": 0, "description": "Future-window kilometres in the plan in force, so the sheet can state the size honestly." },
+              "kmAfter": { "type": "number", "minimum": 0, "description": "Future-window kilometres after the re-plan; with kmBefore it is the stated size of the change." },
+              "firstChangedDay": { "type": ["string", "null"], "format": "date", "description": "The first day the new block differs; never inside the past or the freeze window (ADR-0010)." }
+            }
+          },
           "costSummary": { "type": "string", "maxLength": 200, "description": "Stated cost in the runner's terms, e.g. 'the Tuesday intervals move to Sunday and the long run shortens by 4 km'." },
           "expiresAfterDay": { "type": "string", "format": "date", "description": "An unanswered review expires rather than nagging; expiry is recorded, not deleted." }
-        }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "kind": { "const": "replan" } }, "required": ["kind"] },
+            "then": {
+              "required": ["planVersionId", "changeSummary"],
+              "properties": {
+                "diffId": { "type": "null" },
+                "planVersionId": { "type": "string" },
+                "changeSummary": { "type": "object" }
+              }
+            }
+          }
+        ]
       }
     },
     "status": { "enum": ["open", "accepted", "rejected", "deferred", "expired", "superseded"], "description": "One vocabulary for where a review stands, shared with the store (docs/engineering/contract-vocabulary.md item 4). accepted and rejected are final - the reviews_one_decision trigger refuses a second decision; deferred means the runner asked to be asked again later, expired means an option set aged out unanswered, superseded means a newer review replaced this one without the runner choosing. Measured gap: reviews.status still accepts the default 'suggested' and spells finality 'declined', and its CHECK has no 'superseded' value at all, so a review cannot be recorded as superseded today; closing that is row R4 of the application table on the vocabulary page, not this file." },
