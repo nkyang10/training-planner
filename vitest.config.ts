@@ -21,11 +21,12 @@ export default defineConfig({
       { find: "@training-planner/narrator", replacement: here("./packages/narrator/src/index.ts") },
       { find: "@training-planner/entries", replacement: here("./packages/entries/src/index.ts") },
       { find: "@training-planner/review", replacement: here("./packages/review/src/index.ts") },
+      { find: "@training-planner/storage", replacement: here("./packages/storage/src/index.ts") },
     ],
   },
   test: {
     environment: "node",
-    include: ["packages/*/test/**/*.test.ts"],
+    include: ["packages/*/test/**/*.test.ts", "apps/*/test/**/*.test.ts"],
     passWithNoTests: false,
   },
 });
