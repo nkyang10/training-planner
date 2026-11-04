@@ -14,11 +14,11 @@ import { format, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
 import { loadKnowledge } from "@training-planner/knowledge";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
-import { renderComment, renderPlanExplanation } from "@training-planner/narrator";
+import { renderComment, renderDailyCost, renderPlanExplanation } from "@training-planner/narrator";
 import { decideNudge } from "@training-planner/nudges";
 import { seasonSummary } from "@training-planner/season";
 import { addDays, eachDay, uuidFrom, weekStart } from "@training-planner/planner-core";
-import { evaluatePolicy } from "@training-planner/policy";
+import { dailyCostOf, evaluatePolicy } from "@training-planner/policy";
 import { decideReview, firstEditableDay } from "@training-planner/review";
 import { exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
@@ -197,6 +197,14 @@ export function createWeb(options: WebOptions): RequestListener {
     }
     const userId = state.userId;
 
+    // What a substitute or a cut session gave up, as a sentence: the judgement is packages/policy's, the words are
+    // packages/narrator's, and a day done as prescribed has nothing to say here.
+    const costOf = (locale: Locale, session: Session | undefined, entry: DayEntry | undefined): string | undefined => {
+      if (session === undefined || entry === undefined) return undefined;
+      const cost = dailyCostOf({ session, entry, knowledge });
+      return cost === null ? undefined : renderDailyCost(cost, { locale });
+    };
+
     if (method === "GET" && url.pathname === "/") {
       const today = state.now.slice(0, 10);
       const start = weekStart(today);
@@ -360,6 +368,7 @@ export function createWeb(options: WebOptions): RequestListener {
             error: undefined,
             saved: false,
             adjustment: undefined,
+            cost: costOf(state.locale, session, current),
           }),
         );
         return;
@@ -371,18 +380,30 @@ export function createWeb(options: WebOptions): RequestListener {
         const reason = (form.get("detail") ?? "").trim();
         const outcomeDetail = SKIP_REASONS.find((candidate) => candidate === reason);
         const note = (form.get("note") ?? "").trim();
+        // The backfill window is a pipeline rule (missed-session-rules.yaml#unlogged_backfill_grace_hours); without a
+        // field for the reason, an older day could never be logged from the page at all.
+        const correctionReason = (form.get("correctionReason") ?? "").trim();
         const km = numberInRange(form.get("completedKm"), 0.1, 250);
         const draft: EntryDraft = {
           day,
           outcome,
           tzAtEvent: timezone,
-          ...(outcome === "completed" ? { sessionTaken: "as-prescribed" as const } : {}),
+          ...(outcome === "completed"
+            ? {
+                sessionTaken: oneOf(
+                  ["as-prescribed", "alternate", "extra"] as const,
+                  form.get("sessionTaken"),
+                  "as-prescribed",
+                ),
+              }
+            : {}),
           ...(outcome === "partial" ? { sessionTaken: "partial" as const } : {}),
           ...(outcome === "rest" || outcome === "missed" ? { sessionTaken: "none" as const } : {}),
           // A partial day without an amount is not a fact, so the form asks for one and the pipeline refuses it
           // otherwise. Completed days may carry the real distance too; the contract allows it.
           ...(km === undefined ? {} : { completedKm: km }),
           ...(outcome === "skipped" && outcomeDetail !== undefined ? { outcomeDetail } : {}),
+          ...(correctionReason.length === 0 ? {} : { correctionReason }),
           rpe: intInRange(form.get("rpe"), 1, 10, 6),
           legs: intInRange(form.get("legs"), 1, 5, 2),
           ...(note.length === 0 ? {} : { note }),
@@ -413,6 +434,7 @@ export function createWeb(options: WebOptions): RequestListener {
               error: input.error,
               saved: input.saved,
               adjustment: input.adjustment,
+              cost: costOf(state.locale, session, currentEntry(userId, day) ?? current),
             }),
           );
         };
@@ -485,6 +507,8 @@ export function createWeb(options: WebOptions): RequestListener {
           error: undefined,
           saved: false,
           adjustment: undefined,
+          // A day outside the plan has no prescription, so there is nothing it could have given up.
+          cost: undefined,
         }),
       );
       return;

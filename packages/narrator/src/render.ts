@@ -8,7 +8,7 @@
 import type { SessionKind } from "@training-planner/domain";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
-import type { CommentFacts, FactLine, MicroAdjustment, StopInstructionKey } from "@training-planner/policy";
+import type { CommentFacts, DailyCost, FactLine, MicroAdjustment, StopInstructionKey } from "@training-planner/policy";
 import { assertGrounded, assertNoBannedLanguage, assertScript, assertTone, NarratorError } from "./guardrails";
 
 export interface RenderOptions {
@@ -121,6 +121,22 @@ export function renderAdjustment(adjustment: MicroAdjustment, options: RenderOpt
   assertNoBannedLanguage(chip, locale);
   assertTone(chip, locale);
   return chip;
+}
+
+/**
+ * The daily trade-off line: what a substitute or a cut session gave up. Same formatter and the same guardrails as a
+ * comment, because it is read in the same place; the "trade-off:" label is the catalogue's, so the line never
+ * starts with a scold of its own invention.
+ */
+export function renderDailyCost(cost: DailyCost, options: RenderOptions): string {
+  const { locale } = options;
+  const messages = messagesFor(locale);
+  const sentence = format(messages.dailyCost[cost.key], prepareSlotMap(cost.slots, locale));
+  const numbers = Object.values(cost.slots).filter((value): value is number => typeof value === "number");
+  assertGrounded(sentence, "", numbers);
+  assertNoBannedLanguage(sentence, locale);
+  assertTone(sentence, locale);
+  return sentence;
 }
 
 /** The one-line version a nudge notification shows; the nudge itself is rendered by renderComment. */

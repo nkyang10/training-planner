@@ -19,6 +19,9 @@ package** — AGENTS rule 2 is a dependency graph here, not a promise.
 
 ## What it refuses
 
+| Export | What it does |
+|---|---|
+| `renderDailyCost(cost, { locale })` | fills the `dailyCost` template with the locale's kind name and the fact object's numbers, under the same grounding, banned-language and tone guardrails as a comment |
 | Guardrail | Refusal |
 |---|---|
 | grounding | a number that is not in `commentFacts.allowedNumbers` and not in the template's fixed copy |

@@ -21,6 +21,7 @@ import {
   numbersIn,
   renderAdjustment,
   renderComment,
+  renderDailyCost,
 } from "../src/index";
 import { knowledge, makeEntry, makePlan, weekPlan } from "../../policy/test/helpers";
 
@@ -152,6 +153,26 @@ describe("a decision renders as a comment, not as data", () => {
     const first = renderComment(decision.commentFacts, { locale: "en" });
     const second = renderComment(decision.commentFacts, { locale: "en" });
     expect(first.text).toBe(second.text);
+  });
+});
+
+describe("the daily trade-off line is rendered, not composed", () => {
+  it("fills the template with the locale's kind name and the corpus percentage", () => {
+    const line = renderDailyCost({ key: "alternate-quality", slots: { kind: "tempo", pct: 35 } }, { locale: "en" });
+    expect(line).toContain("tempo");
+    expect(line).toContain("35");
+    expect(line).not.toContain("{");
+  });
+
+  it("says the same thing in Chinese, without the English kind name leaking", () => {
+    const line = renderDailyCost({ key: "alternate-quality", slots: { kind: "tempo", pct: 35 } }, { locale: "zh-Hant" });
+    expect(line).toContain("35");
+    expect(line).not.toContain("tempo");
+  });
+
+  it("keeps a volume cost to the number the fact object carries", () => {
+    const line = renderDailyCost({ key: "alternate-volume", slots: { km: 6 } }, { locale: "en" });
+    expect(line).toContain("6");
   });
 });
 

@@ -9,6 +9,7 @@
 import type {
   AdjustCostKey,
   AdjustReasonKey,
+  DailyCostKey,
   FactTemplate,
   StopInstructionKey,
 } from "@training-planner/policy";
@@ -52,6 +53,11 @@ export type WebTemplate =
   | "web.outcome-rest"
   | "web.outcome-missed"
   | "web.completed-km"
+  | "web.session-taken"
+  | "web.taken-as-prescribed"
+  | "web.taken-alternate"
+  | "web.taken-extra"
+  | "web.correction-reason"
   | "web.rpe"
   | "web.legs"
   | "web.note"
@@ -102,6 +108,8 @@ export interface Messages {
   reason: Record<AdjustReasonKey, string>;
   /** What the runner gives up, as a clause. */
   cost: Record<AdjustCostKey, string>;
+  /** The daily trade-off: what a substitute or a cut session gave up. Same formatter and guardrails as a comment. */
+  dailyCost: Record<DailyCostKey, string>;
   /** The canonical stop sentences (language-guardrails.yaml#escalation-copy-is-fixed). */
   stop: Record<StopInstructionKey, string>;
   weekday: Record<DayName, string>;

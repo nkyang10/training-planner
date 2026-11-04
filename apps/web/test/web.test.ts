@@ -65,7 +65,7 @@ const planWithPace = (userId: string): PlanVersion =>
   generatePlan({
     profile: athleteProfileSchema.parse({ ...fixture.input.profile, userId }),
     evidence: { recentWeeklyKm: [8, 9, 8], baselinePaceSecPerKm: 330, baselineConfidence: "medium" },
-    state: { planStartDay: TODAY, horizonDays: 21 },
+    state: { planStartDay: "2026-10-26", horizonDays: 21 },
     clock: { today: TODAY },
     seed: "web-fixture-pace",
     knowledge,
@@ -349,6 +349,47 @@ describe("a session with pace evidence says how long it takes", () => {
     const response = await call("/", { cookie: "session=token-a" });
     expect(response.status).toBe(200);
     expect(response.html).not.toContain("about");
+  });
+});
+
+describe("a substitute says what it gave up", () => {
+  it("shows the trade-off line on the day it happened", async () => {
+    const hardDay = planWithPace(USER_C).sessions.find((session) => session.hardDay === true)?.day;
+    expect(hardDay, "the fixture plan has no hard day").toBeDefined();
+    const response = await call(`/day/${hardDay}`, {
+      cookie: "session=token-c",
+      form: {
+        outcome: "completed",
+        sessionTaken: "alternate",
+        completedKm: "4",
+        correctionReason: "logged the evening after",
+        rpe: "6",
+        legs: "2",
+        note: "",
+        idempotencyKey: `alt-${hardDay}`,
+      },
+    });
+    expect(response.status).toBe(200);
+    // The judgement is packages/policy's and the number is the corpus knob; the page only places the sentence.
+    expect(response.html).toContain("trade-off:");
+    expect(response.html).toContain("35");
+  });
+
+  it("says nothing after a day done as prescribed", async () => {
+    const response = await call("/day/2026-11-05", {
+      cookie: "session=token-c",
+      form: {
+        outcome: "completed",
+        completedKm: "2",
+        rpe: "4",
+        legs: "2",
+        note: "",
+        correctionReason: "logged the next week",
+        idempotencyKey: "prescribed-11-05",
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(response.html).not.toContain("trade-off:");
   });
 });
 

@@ -19,7 +19,7 @@ wording including the escalation text: `docs/ux/feedback-microcopy.md`.
 | `GET /export` | the same document `GET /export` on the API returns, offered as a download (`content-disposition: attachment`) - one definition, two doors |
 | `GET /` | the week, the explanation and the daily prompt chip. Rendering a prompt **records the delivery** (`prompt_deliveries`), so a reload does not repeat it; the policy is `packages/nudges` |
 | the current Monday–Sunday week: session kind and distance per day, a logged/not-logged chip, the plan's first explanation sentence, and a banner when a review is open |
-| `GET /day/:day`, `POST /day/:day` | the drawer: five outcomes, effort, legs, an optional note, a "why" row for a skipped day, and the coach note after saving |
+| `GET /day/:day`, `POST /day/:day` | the drawer: five outcomes, **what you actually did** (`sessionTaken`: as prescribed, something else, more), effort, legs, a note, a "why" row for a skipped day, the reason a backfill needs after three days, and the coach note plus the **trade-off line** after saving |
 | `GET /review/:reviewId`, `POST /review/:reviewId` | the review sheet: options in the order `packages/review` decided (keep-the-plan first), each with its cost, and three decisions — accept, keep the plan, ask later. Accepting a change **activates the version it offered**, so the week page shows the plan the runner agreed to on the next load |
 
 A form post is the whole interaction. The server builds the **same `EntryDraft` a JSON client would** and runs the

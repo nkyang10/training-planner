@@ -40,6 +40,9 @@ At most one micro-adjustment and at most one review flag per day. Both are singl
 
 ## What is implemented
 
+| Export | What it does |
+|---|---|
+| `dailyCostOf({ session, entry, knowledge })` | the daily trade-off as a fact object: a substitute for a quality session is priced by `session-substitution.yaml#equivalence_max_drop_pct`, an easy alternate costs the kilometres it did not cover, a cut quality session names planned and done. `null` on a good day, on extra work, and on a rest day |
 | Group | Rules |
 |---|---|
 | safety | `chest-cardiac`, `fever-or-below-neck-illness`, `night-pain-or-bone-tenderness`, `pain-escalation`, `safety-text-first` |
