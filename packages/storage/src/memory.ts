@@ -7,7 +7,7 @@
  * a check that can be forgotten, it is a lookup that cannot be expressed.
  */
 import { promptDeliverySchema } from "@training-planner/domain";
-import type { AthleteProfile, DayEntry, GuidelineContract, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
+import type { AiReviewProposal, AthleteProfile, DayEntry, GuidelineContract, LlmConsent, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
 import {
   DuplicateIdempotencyError,
   type AppendEntryInput,
@@ -28,6 +28,8 @@ interface UserState {
   wizardAnswers: WizardAnswerRecord[];
   profile: AthleteProfile | null;
   profileRevisions: ProfileRevision[];
+  aiReviewProposals: AiReviewProposal[];
+  llmConsent: LlmConsent | null;
   reviews: Map<string, Review>;
   comments: CommentRecord[];
   idempotencyKeys: Set<string>;
@@ -45,6 +47,8 @@ const emptyUser = (): UserState => ({
   wizardAnswers: [],
   profile: null,
   profileRevisions: [],
+  aiReviewProposals: [],
+  llmConsent: null,
   reviews: new Map(),
   comments: [],
   idempotencyKeys: new Set(),
@@ -146,6 +150,22 @@ export function createMemoryRepository(): Repository {
       state.proposed.delete(staged.versionId);
       state.activeVersionId = staged.versionId;
       return staged;
+    },
+
+    saveAiReviewProposal(record: AiReviewProposal): void {
+      stateOf(record.userId).aiReviewProposals.push(record);
+    },
+
+    listAiReviewProposals(userId: string): AiReviewProposal[] {
+      return [...stateOf(userId).aiReviewProposals];
+    },
+
+    getLlmConsent(userId: string): LlmConsent | undefined {
+      return stateOf(userId).llmConsent ?? undefined;
+    },
+
+    saveLlmConsent(consent: LlmConsent): void {
+      stateOf(consent.userId).llmConsent = consent;
     },
 
     getAthleteProfile(userId: string): AthleteProfile | undefined {

@@ -11,7 +11,7 @@
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from "node:http";
 import { z } from "zod";
 import { athleteProfileSchema, planVersionSchema } from "@training-planner/domain";
-import type { DayEntry } from "@training-planner/domain";
+import type { DayEntry, PlanDiff, PlanVersion } from "@training-planner/domain";
 import { painReportsOf, painTrendOf, submitEntry } from "@training-planner/entries";
 import type { EntryDraft } from "@training-planner/entries";
 import { format, isLocale, messagesFor, weekdayName } from "@training-planner/i18n";
@@ -21,7 +21,11 @@ import type { KnowledgeBundle } from "@training-planner/knowledge";
 import { renderAdjustment, renderComment } from "@training-planner/narrator";
 import { addDays, daysBetween, generatePlan, uuidFrom } from "@training-planner/planner-core";
 import type { Evidence, PlanState } from "@training-planner/planner-core";
-import { evaluatePolicy } from "@training-planner/policy";
+import { ADJUST_COST_KEYS, evaluatePolicy } from "@training-planner/policy";
+import { ADVISOR_REASON_CODES, buildAdvisorRequest, validateProposal } from "@training-planner/advisor";
+import type { ModelPort } from "@training-planner/advisor";
+import { diffPlans } from "@training-planner/planner-core";
+import { childPlanVersion } from "@training-planner/replan";
 import {
   latestWizardAnswers,
   nextWizardRevision,
@@ -62,6 +66,13 @@ export interface ApiOptions {
    * forgot to configure an operator must not hand guideline-writing to every runner.
    */
   operatorToken?: string;
+  /**
+   * The model port (ADR-0009). Absent means no model is wired: the advisor route answers 503 and the deterministic
+   * path is the only path. P3a injects a fake in tests; P3b injects a provider client behind consent and a budget.
+   */
+  modelPort?: ModelPort;
+  /** What the audit row calls the model. A deployment names the provider; tests name the fake. */
+  modelId?: string;
 }
 
 interface ApiError {
@@ -512,6 +523,194 @@ export function createApi(options: ApiOptions): RequestListener {
         options: proposed,
         refusals: proposal.refusals,
         unevaluable: triggers.unevaluable,
+      });
+      return;
+    }
+
+    // POST /reviews/advisor - the AI reviewer's decision loop (ADR-0009). The model decides whether to propose;
+    // every answer is validated, every answer is audited, and a rejected proposal falls back to the deterministic path.
+    if (segments.length === 2 && segments[0] === "reviews" && segments[1] === "advisor") {
+      if (method !== "POST") return fail(response, 405, "method-not-allowed", "use POST /reviews/advisor");
+      const plan = repository.latestPlanVersionFor(userId, today);
+      if (plan === undefined) return fail(response, 404, "no-plan", "no plan version covers this day yet");
+      const consent = repository.getLlmConsent(userId);
+      if (consent === undefined || consent.granted !== true) {
+        return fail(response, 403, "consent-required", "a hosted model may only be called when the runner has granted consent");
+      }
+      const port = options.modelPort;
+      if (port === undefined) {
+        return fail(response, 503, "no-model", "no model port is configured; the deterministic path is the only path");
+      }
+
+      const stored = repository.getAthleteProfile(userId);
+      const folded = stored === undefined ? undefined : profileFromWizard(stored, repository.listWizardAnswers(userId));
+      const profile = folded !== undefined && folded.ok && folded.profile !== undefined ? folded.profile : stored;
+      const signals = computeSignals({
+        userId,
+        today,
+        entries: repository.listEntries(userId),
+        plan,
+        knowledge,
+        computedAt: at,
+      }).signals;
+
+      const call = buildAdvisorRequest({
+        plan,
+        entries: repository.listEntries(userId),
+        signals,
+        wizardAnswers: repository.listWizardAnswers(userId),
+        settings: {
+          riskAppetite: profile?.goal.riskAppetite ?? null,
+          weeklyHours: null,
+          dislikedKinds: [],
+          preferredLongDay: profile?.availability.preferredLongRunDay ?? null,
+        },
+        ...(profile === undefined ? {} : { profile }),
+        guidelines: repository.listGuidelines(),
+        today,
+        knowledge,
+        allowedCostKeys: [...ADJUST_COST_KEYS],
+        allowedReasonCodes: [...ADVISOR_REASON_CODES],
+      });
+
+      let output: unknown;
+      try {
+        output = await port.complete(call);
+      } catch (error) {
+        // A provider outage must be invisible to the runner: the deterministic path is the fallback, not an error page.
+        const detail = error instanceof Error ? error.message : String(error);
+        sendJson(response, 200, { status: "model-failed", fallback: "deterministic-replan", detail });
+        return;
+      }
+
+      const verdict = validateProposal({ output, request: call.request, plan, today, knowledge });
+      const auditBase = {
+        userId,
+        day: today,
+        guidelineVersionHash: call.hashes.guidelineVersionHash,
+        model: options.modelId ?? "injected-port",
+        promptHash: call.hashes.promptHash,
+        output: output ?? null,
+        validatorVerdict: verdict.accepted ? ("accepted" as const) : ("rejected" as const),
+        fallbackUsed: !verdict.accepted,
+        createdAt: at,
+      };
+      const auditId = uuidFrom({ type: "ai.review.proposal", userId, day: today, promptHash: call.hashes.promptHash });
+
+      if (!verdict.accepted || verdict.proposal === undefined) {
+        repository.saveAiReviewProposal({ ...auditBase, id: auditId, reviewId: null });
+        sendJson(response, 200, { status: "rejected", violations: verdict.violations, fallback: verdict.fallback, audit: { id: auditId } });
+        return;
+      }
+
+      const proposal = verdict.proposal;
+      if (proposal.decision === "no-change") {
+        repository.saveAiReviewProposal({ ...auditBase, id: auditId, reviewId: null });
+        sendJson(response, 200, { status: "no-change", proposal, audit: { id: auditId } });
+        return;
+      }
+
+      // Each proposed change becomes one edit option: one change, one child version, one diff. A change that does not
+      // produce exactly one diff is not offerable - the review would be claiming a change it cannot show.
+      const proposedOptions: ProposedOption[] = [
+        { optionId: "keep", labelKey: "keep-the-plan", keepAsIs: true, diffId: null, costKey: "risk-noted", costSlots: {}, loadDeltaPct: 0 },
+      ];
+      const stagedVersions: PlanVersion[] = [];
+      const stagedDiffs: PlanDiff[] = [];
+      const HARD = ["tempo", "vo2max", "hills", "mp", "test", "race"];
+      for (const [index, change] of proposal.proposedChanges.entries()) {
+        const sessions = plan.sessions.map((session) =>
+          session.day === change.day
+            ? {
+                ...session,
+                kind: change.kind as PlanVersion["sessions"][number]["kind"],
+                hardDay: HARD.includes(change.kind),
+                targetRpe: null,
+                distanceKm: change.toKm,
+                summaryText: `${change.kind} ${change.toKm} km`,
+              }
+            : session,
+        );
+        const child = childPlanVersion(plan, sessions, today, `advisor-${index}`);
+        const diff = diffPlans(plan, child, {
+          createdAtDay: today,
+          knowledgeHash: knowledge.hash,
+          maxChanges: 2,
+          reason: "advisor-proposal",
+          signalIds: [],
+          expectedCost: change.costKey,
+          knobsUsed: [],
+        });
+        if (diff.changes.length !== 1) continue;
+        const loadDeltaPct =
+          change.fromKm === 0 ? 0 : Math.round(((change.toKm - change.fromKm) / change.fromKm) * 1000) / 10;
+        proposedOptions.push({
+          optionId: `advisor-${index}`,
+          labelKey: "advisor-proposal",
+          keepAsIs: false,
+          kind: "edit",
+          diffId: diff.diffId,
+          costKey: change.costKey,
+          costSlots: change.costSlots,
+          loadDeltaPct,
+        });
+        stagedVersions.push(child);
+        stagedDiffs.push(diff);
+      }
+
+      if (proposedOptions.length < 2) {
+        repository.saveAiReviewProposal({ ...auditBase, id: auditId, reviewId: null });
+        sendJson(response, 200, { status: "no-offerable-option", fallback: "deterministic-replan", audit: { id: auditId } });
+        return;
+      }
+
+      const history = repository.listReviews(userId);
+      const weekAgo = addDays(today, -7);
+      const promptsThisWeek = history.filter((review) => review.openedAtDay > weekAgo).length;
+      const accepted = history
+        .filter((review) => review.status === "accepted" && review.decidedAtDay !== null && review.decidedAtDay !== undefined)
+        .sort((a, b) => ((a.decidedAtDay ?? "") < (b.decidedAtDay ?? "") ? 1 : -1))[0];
+
+      const opened = openReview({
+        userId,
+        today,
+        candidate: {
+          kind: "manual",
+          ruleId: null,
+          anchor: null,
+          evidence: { signalIds: [], ruleIds: [], evidenceGradeMax: "C" },
+          presentation: "recorded",
+        },
+        knowledge,
+        options: proposedOptions,
+        renderCost: (option) => `${option.costKey} ${JSON.stringify(option.costSlots)}`,
+        promptsThisWeek,
+        daysSinceAcceptedReview:
+          accepted?.decidedAtDay === undefined || accepted?.decidedAtDay === null ? null : daysBetween(accepted.decidedAtDay, today),
+        daysSinceTrigger: { manual: null },
+      });
+
+      if (opened.status === "suppressed") {
+        repository.saveAiReviewProposal({ ...auditBase, id: auditId, reviewId: null });
+        sendJson(response, 200, { status: "suppressed", reason: opened.reason, detail: opened.detail, audit: { id: auditId } });
+        return;
+      }
+      if (opened.status === "refused") {
+        repository.saveAiReviewProposal({ ...auditBase, id: auditId, reviewId: null });
+        return fail(response, 409, opened.code, opened.detail);
+      }
+
+      repository.saveAiReviewProposal({ ...auditBase, id: auditId, reviewId: opened.review.reviewId });
+      for (const version of stagedVersions) repository.saveProposedPlanVersion(version);
+      for (const diff of stagedDiffs) repository.savePlanDiff(diff);
+      repository.saveReview(opened.review);
+      sendJson(response, 201, {
+        status: "opened",
+        review: opened.review,
+        options: proposedOptions,
+        proposal: { reasonCode: proposal.reasonCode, confidence: proposal.confidence, needsHuman: proposal.needsHuman },
+        audit: { id: auditId, validatorVerdict: "accepted" },
+        note: "the model proposed; the deterministic gates accepted; the runner decides",
       });
       return;
     }
