@@ -37,7 +37,7 @@ policy, canonical-JSON hash); **6 golden plans** spanning novice 5K, competitive
 3-days/week, returning-after-layoff, trail ultra; property tests for invariants (48 h hard-day spacing,
 ≤2 hard days, weekly ramp ceiling, hard days never added by safety, no session beyond knob `range`);
 `PlanDiff` generator; CLI `planner gen|diff|explain` reading a fixture profile.
-**Gate:** 6/6 golden plans pass and a rule change breaks exactly the fixtures it should; a coach reads
+**Gate:** 7/7 golden plans pass and a rule change breaks exactly the fixtures it should; a coach reads
 three generated plans and signs off on structure; two consecutive generations are byte-identical;
 **this is where we stop and re-read the knowledge base** — most of the domain cost is here.
 

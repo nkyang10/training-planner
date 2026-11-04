@@ -27,6 +27,14 @@ export const expectationSchema = z.object({
   minHoursBetweenHardDays: z.number().min(0),
   weeklyIncrementPctMax: z.number().positive(),
   longRunMaxKm: z.number().positive(),
+  /**
+   * Optional: week 1 as a fraction of the runner's recent median volume, both as 7-day-normalised rates.
+   * The first week of a block is reduced (workout-dosage.yaml#first_week_of_phase_reduction), so this is
+   * below 1 for a fixture whose plan starts on a phase boundary. Comparing week 1 to week 2 instead would
+   * measure the calendar: a plan that begins mid-week normalises differently, and two consecutive reduced
+   * weeks can make week 2 look smaller than week 1 while both are reduced.
+   */
+  firstWeekVsRecentMax: z.number().positive().max(1).optional(),
   invariantsHold: z.boolean(),
   /** Null until a coach has read the plan; then it is the frozen hash and a change is a failure. */
   planHash: contentHash.nullable(),
@@ -58,8 +66,8 @@ export const fixtureSchema = z.object({
 export type GoldenExpectation = z.infer<typeof expectationSchema>;
 export type GoldenFixture = z.infer<typeof fixtureSchema>;
 
-/** Read by the runner, so "six fixtures" is a number a test can assert rather than a sentence. */
-export const GOLDEN_FIXTURE_COUNT = 6;
+/** Read by the runner, so "seven fixtures" is a number a test can assert rather than a sentence. */
+export const GOLDEN_FIXTURE_COUNT = 7;
 
 /** Compile-time drift checks against the frozen planner inputs. */
 export const evidenceShape: z.ZodType<Evidence> = fixtureSchema.shape.input.shape.evidence;
