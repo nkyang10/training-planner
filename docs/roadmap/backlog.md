@@ -40,7 +40,7 @@ findings that do not make a plan unsafe, which is why M1 closed with them record
 
 | 29 | Fix `weekly-increment-ceiling`'s attribution: a reduction of week N makes week N+1 look like a jump | the invariant fires on a week whose absolute load did not change. `packages/replan` scopes its own guard to the days an option changes so the review engine is not deadlocked, but the invariant itself should compare against the base plan or ignore ratio artefacts of a reduction | S | a correct invariant teaches the engine to refuse the right change |
 | 27 | Fix `review-triggers.yaml`'s `load-rising-too-fast`: it names `load-progression.weekly_increment_pct_effective`, which is not a knob | the knob is `weekly_increment_pct` (8 %) with `weekly_increment_pct_conservative` (5 %); the code now reads the knob that exists, but the corpus text still names a phantom. Found while implementing the trigger | S | the rule's provenance points at a number nobody can find |
-| 26 | The worker: nightly rollup, signal cache (`signals_current`), and the scheduler that decides when the day closes | `packages/signals` computes on demand; a season's signals should not be recomputed on every request, and the day-close event (row 18) needs a process that writes it | M | signals are recomputed per request, and nothing closes a day |
+| 26 | Wire the sweep to a scheduler and persist its output (`signals_current`, closed days) | `packages/worker` decides the sweep and the CLI runs it once; what is left is a process that runs it on a schedule, a Postgres write for the cache, and the day-close event type (row 18). All three need deployment or a database | M | the sweep exists and nothing runs it on a schedule |
 | 24 | The Postgres adapter behind `Repository`, with migrations and row-level security | the interface and the in-memory reference adapter exist and are contract-tested; the database adapter is the first place RLS becomes real (ADR-0002), and it cannot be verified without a database | L | the product cannot leave one process, and RLS stays an unproven claim |
 
 ### Landed in M2
@@ -54,6 +54,7 @@ Rows that were open and are now shipped, kept here so the backlog stays a list o
 | 23 | The review sheet | [PR #35](https://github.com/nkyang10/training-planner/pull/35): `GET`/`POST /review/:reviewId` plus the week banner; the ordering and freeze window are `packages/review`'s rules, the page only renders them |
 | 25 | The M3 option generator | PR #38: `packages/replan` (bounded one-change options with diffs, costs and invariant guards) plus `POST /reviews/open`, which closes log → signals → triggers → options → open review |
 | 28 | Materialise the child plan version on acceptance | PR #39: staged proposals in `packages/storage` (`saveProposedPlanVersion`, `activatePlanVersionForDiff`) and the accept path in the API and the web sheet; the week page shows the accepted plan on the next load |
+| 26 | The nightly sweep's decisions | PR #40: `packages/worker` (idempotent, plan-bounded, absence-aware, cache snapshot) plus `planner sweep`; what remains is the scheduler and the cache write, recorded in row 26 above |
 
 ## Next (M3–M5)
 

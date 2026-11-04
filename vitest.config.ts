@@ -26,6 +26,7 @@ export default defineConfig({
       { find: "@training-planner/signals", replacement: here("./packages/signals/src/index.ts") },
       { find: "@training-planner/triggers", replacement: here("./packages/triggers/src/index.ts") },
       { find: "@training-planner/replan", replacement: here("./packages/replan/src/index.ts") },
+      { find: "@training-planner/worker", replacement: here("./packages/worker/src/index.ts") },
     ],
   },
   test: {
