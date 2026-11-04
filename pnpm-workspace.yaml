@@ -1,0 +1,9 @@
+packages:
+  - "packages/*"
+
+# esbuild ships a platform binary from a postinstall script. pnpm refuses to run install scripts unless
+# the repository names them, which is the right default: a lockfile cannot make a build script safe.
+# `pnpm approve-builds --all` wrote this entry; the allow-list is one dependency long on purpose, and a
+# second entry should be a reviewed decision rather than a convenience.
+allowBuilds:
+  esbuild: true

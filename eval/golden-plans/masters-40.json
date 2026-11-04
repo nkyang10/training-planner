@@ -1,0 +1,80 @@
+{
+  "id": "masters-40",
+  "description": "Masters runner, 45, unresolved load-sensitive Achilles history, four days a week",
+  "input": {
+    "profile": {
+      "userId": "9a7f0003-1c2b-4d3e-8f90-1234567890ab",
+      "revision": 2,
+      "age": 45,
+      "availability": {
+        "days": [
+          "Mon",
+          "Wed",
+          "Fri",
+          "Sun"
+        ]
+      },
+      "goal": {
+        "type": "finish",
+        "event": {
+          "name": "City Half",
+          "date": "2027-01-03",
+          "distanceKm": 21.0975,
+          "priority": "B",
+          "terrain": "road"
+        },
+        "riskAppetite": "conservative",
+        "planStyle": "structured"
+      },
+      "preferences": {
+        "units": "metric",
+        "locale": "en",
+        "timezone": "Asia/Taipei",
+        "dayStartHour": 5
+      },
+      "health": {
+        "injuryHistory": [
+          {
+            "site": "achilles",
+            "year": 2025,
+            "resolved": false,
+            "loadSensitive": true
+          }
+        ]
+      },
+      "measurement": {
+        "method": "none"
+      }
+    },
+    "evidence": {
+      "recentWeeklyKm": [
+        24,
+        26,
+        25
+      ],
+      "layoffDays": 0,
+      "baselinePaceSecPerKm": 330,
+      "baselineConfidence": "medium"
+    },
+    "state": {
+      "planStartDay": "2026-11-05",
+      "horizonDays": 42
+    },
+    "clock": {
+      "today": "2026-11-04"
+    },
+    "seed": "golden-masters-40"
+  },
+  "expect": {
+    "sessionCount": 42,
+    "firstDay": "2026-11-05",
+    "lastDay": "2026-12-16",
+    "restDaysMin": 3,
+    "hardDaysMaxPerWeek": 2,
+    "minHoursBetweenHardDays": 48,
+    "weeklyIncrementPctMax": 7,
+    "longRunMaxKm": 12,
+    "invariantsHold": true,
+    "planHash": null
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@training-planner/domain": ["packages/domain/src/index.ts"],
+      "@training-planner/knowledge": ["packages/knowledge/src/index.ts"],
+      "@training-planner/knowledge/canonical": ["packages/knowledge/src/canonical.ts"],
+      "@training-planner/golden-fixtures": ["eval/golden-plans/fixture.ts"],
+      "@training-planner/planner-core": ["packages/planner-core/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "eval/**/*.ts",
+    "vitest.config.ts"
+  ]
+}

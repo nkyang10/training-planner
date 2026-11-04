@@ -1,0 +1,65 @@
+{
+  "id": "returning-after-layoff",
+  "description": "Back after three weeks away: volume restarts from a reduced bucket, not from the old peak",
+  "input": {
+    "profile": {
+      "userId": "9a7f0005-1c2b-4d3e-8f90-1234567890ab",
+      "revision": 4,
+      "age": 41,
+      "availability": {
+        "days": [
+          "Mon",
+          "Wed",
+          "Sat",
+          "Sun"
+        ]
+      },
+      "goal": {
+        "type": "return-to-running",
+        "event": null,
+        "riskAppetite": "conservative",
+        "planStyle": "structured"
+      },
+      "preferences": {
+        "units": "metric",
+        "locale": "en",
+        "timezone": "Asia/Taipei",
+        "dayStartHour": 4
+      },
+      "health": {},
+      "measurement": {
+        "method": "none"
+      }
+    },
+    "evidence": {
+      "recentWeeklyKm": [
+        22,
+        20,
+        18
+      ],
+      "layoffDays": 21,
+      "baselinePaceSecPerKm": 350,
+      "baselineConfidence": "low"
+    },
+    "state": {
+      "planStartDay": "2026-11-05",
+      "horizonDays": 42
+    },
+    "clock": {
+      "today": "2026-11-04"
+    },
+    "seed": "golden-returning-after-layoff"
+  },
+  "expect": {
+    "sessionCount": 42,
+    "firstDay": "2026-11-05",
+    "lastDay": "2026-12-16",
+    "restDaysMin": 3,
+    "hardDaysMaxPerWeek": 2,
+    "minHoursBetweenHardDays": 48,
+    "weeklyIncrementPctMax": 10,
+    "longRunMaxKm": 9,
+    "invariantsHold": true,
+    "planHash": null
+  }
+}
