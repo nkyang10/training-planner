@@ -382,6 +382,8 @@ describe("the pain history page", () => {
     const page = await call("/pain", { cookie: "session=token-a" });
     expect(page.status).toBe(200);
     expect(page.html).toContain("No pain has been reported yet");
+    // The window is a fact too: no reports is not the same as no pain.
+    expect(page.html).toContain("No pain reported in the last 7 days");
   });
 });
 

@@ -8,7 +8,7 @@
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
 import type { DayEntry, Session } from "@training-planner/domain";
-import { painReportsOf, submitEntry } from "@training-planner/entries";
+import { PAIN_TREND_WINDOW_DAYS, painReportsOf, painTrendOf, submitEntry } from "@training-planner/entries";
 import type { EntryDraft } from "@training-planner/entries";
 import { format, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
@@ -271,7 +271,13 @@ export function createWeb(options: WebOptions): RequestListener {
 
     // The pain history: the rows the entry pipeline writes, in the order the repository keeps them.
     if (method === "GET" && url.pathname === "/pain") {
-      sendHtml(response, 200, renderPain({ locale: state.locale, reports: repository.listPainReports(userId) }));
+      const reports = repository.listPainReports(userId);
+      const today = state.now.slice(0, 10);
+      sendHtml(
+        response,
+        200,
+        renderPain({ locale: state.locale, reports, trend: painTrendOf({ reports, today }), windowDays: PAIN_TREND_WINDOW_DAYS }),
+      );
       return;
     }
 

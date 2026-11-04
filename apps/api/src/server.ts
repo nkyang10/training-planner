@@ -12,7 +12,7 @@ import { createServer, type IncomingMessage, type RequestListener, type ServerRe
 import { z } from "zod";
 import { athleteProfileSchema, planVersionSchema } from "@training-planner/domain";
 import type { DayEntry } from "@training-planner/domain";
-import { painReportsOf, submitEntry } from "@training-planner/entries";
+import { painReportsOf, painTrendOf, submitEntry } from "@training-planner/entries";
 import type { EntryDraft } from "@training-planner/entries";
 import { format, isLocale, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
@@ -332,7 +332,8 @@ export function createApi(options: ApiOptions): RequestListener {
     // GET /pain - the runner's pain reports as rows, oldest day first.
     if (segments.length === 1 && segments[0] === "pain") {
       if (method !== "GET") return fail(response, 405, "method-not-allowed", "use GET /pain");
-      sendJson(response, 200, { status: "ok", reports: repository.listPainReports(userId) });
+      const reports = repository.listPainReports(userId);
+      sendJson(response, 200, { status: "ok", reports, trend: painTrendOf({ reports, today }) });
       return;
     }
 

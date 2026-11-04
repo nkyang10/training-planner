@@ -6,6 +6,7 @@
  * because a page that re-words the coach note would be a second narrator.
  */
 import type { DayEntry, PainReport, PlanVersion, Review, Session } from "@training-planner/domain";
+import type { PainTrend } from "@training-planner/entries";
 import type { SeasonSummary } from "@training-planner/season";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
@@ -216,6 +217,10 @@ export interface PainPageInput {
   locale: Locale;
   /** Rows from packages/entries' projection, already ordered by day by the repository. */
   reports: readonly PainReport[];
+  /** The trajectory, from packages/entries' painTrendOf - the page places the sentence, it does not compose it. */
+  trend: PainTrend;
+  /** The window the trend used, so the sentence can say "the last N days" without a second number. */
+  windowDays: number;
 }
 
 /**
@@ -224,12 +229,27 @@ export interface PainPageInput {
  */
 export function renderPain(input: PainPageInput): string {
   const messages = messagesFor(input.locale);
+  const trendSentence = (trend: PainTrend): string => {
+    const days = formatNumber(input.windowDays);
+    if (trend.note === "no-reports") return format(messages.web["web.pain-trend-none"], { days });
+    if (trend.note === "one-report") return messages.web["web.pain-trend-unknown"];
+    const peak = formatNumber(trend.peak ?? 0);
+    const template =
+      trend.direction === "rising"
+        ? messages.web["web.pain-trend-rising"]
+        : trend.direction === "falling"
+          ? messages.web["web.pain-trend-falling"]
+          : messages.web["web.pain-trend-stable"];
+    return format(template, { days, peak });
+  };
+
   const body =
     input.reports.length === 0
-      ? `<section class="card"><p>${escapeHtml(messages.web["web.pain-empty"])}</p>
+      ? `<section class="card"><p>${escapeHtml(trendSentence(input.trend))}</p><p>${escapeHtml(messages.web["web.pain-empty"])}</p>
         <p class="muted"><a href="/">${escapeHtml(messages.web["web.season-back"])}</a></p></section>`
       : `<section class="card">
       <h2>${escapeHtml(messages.web["web.pain-title"])}</h2>
+      <p class="muted">${escapeHtml(trendSentence(input.trend))}</p>
       <ul class="week">${input.reports
         .map((report) => {
           const flags: string[] = [];
