@@ -27,6 +27,7 @@ comment in the runner's language. The client never re-derives a number.
 | `POST /entries` | the daily loop |
 | `GET /signals` | what the system currently believes about this runner (`packages/signals`), plus the signals it cannot compute and why |
 | `GET /entries/:day` | revisions, the current one, and the comments rendered for that day |
+| `GET /reviews/candidates` | what the corpus trigger rules say about the current evidence, and which rules could not be evaluated |
 | `POST /reviews/:reviewId/decision` | accept / decline / defer |
 
 ## Rules this layer keeps

@@ -268,6 +268,31 @@ describe("the signals route says what it believes and what it cannot see", () =>
   });
 });
 
+describe("the trigger layer is reachable, and it stops where the evidence ends", () => {
+  it("reports the candidate and what could not be evaluated", async () => {
+    const response = await call("/reviews/candidates");
+    expect(response.status).toBe(200);
+    const unevaluable = response.body["unevaluable"] as Array<{ ruleId: string; missing: string | null; reason: string }>;
+    expect(unevaluable.map((item) => item.ruleId)).toContain("goal-feasibility");
+    expect(unevaluable.map((item) => item.ruleId)).toContain("stale-evidence");
+    for (const item of unevaluable) expect(item.reason.length).toBeGreaterThan(10);
+    // The route never invents an option to make a review look ready.
+    expect(response.body["candidate"] === null || typeof response.body["candidate"] === "object").toBe(true);
+    expect(response.body["signals"]).toBeUndefined();
+  });
+
+  it("opens nothing: no review is stored by asking for candidates", async () => {
+    const before = repository.listReviews(USER_A).length;
+    await call("/reviews/candidates");
+    expect(repository.listReviews(USER_A).length).toBe(before);
+  });
+
+  it("answers 404 when no plan covers the day", async () => {
+    const response = await call("/reviews/candidates", { token: "token-b" });
+    expect(response.status).toBe(404);
+  });
+});
+
 describe("one runner cannot see another runner's log", () => {
   it("returns an empty day for a different user", async () => {
     const mine = await call("/entries/2026-11-05", { token: "token-b" });
