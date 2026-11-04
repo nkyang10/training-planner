@@ -204,6 +204,21 @@ describe("every gate can fail, and names the rule it broke", () => {
     expect(verdict.violations.join(" ")).toContain("freeze window");
   });
 
+  it("accepts a fact whose number is in the request's vocabulary", () => {
+    // The request shows the model `vocabulary.maxChanges: 2`; citing it is grounded, and the gate must say so.
+    const verdict = validate(
+      validProposal({ facts: [{ key: "maxChanges", value: 2 }] }),
+    );
+    expect(verdict.accepted).toBe(true);
+    expect(verdict.violations).toEqual([]);
+  });
+
+  it("still refuses a fact whose number appears nowhere in the request", () => {
+    const verdict = validate(validProposal({ facts: [{ key: "weeklyKm", value: 7.4 }] }));
+    expect(verdict.accepted).toBe(false);
+    expect(verdict.violations.join(" ")).toContain("did not contain");
+  });
+
   it("refuses an invented baseline", () => {
     const verdict = validate(validProposal({ proposedChanges: [{ day: "2026-11-14", kind: "easy", fromKm: 9, toKm: 4, costKey: "quality-becomes-easy", costSlots: {} }] }));
     expect(verdict.accepted).toBe(false);

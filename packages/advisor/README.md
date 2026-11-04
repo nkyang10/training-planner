@@ -25,6 +25,14 @@ everything fails the rejected scenarios, and a gate that rejects everything fail
 - It does not fall back itself. A rejected proposal returns `fallback: "deterministic-replan"` and the caller runs
   `packages/replan` — the deterministic path stays the live path.
 
+## The grounding rule, and the day it was wrong
+
+The grounding gate's rule is "a number the model uses must be one it was shown". It collects **every number anywhere
+in the request** (planned kilometres, entries, signals, settings, vocabulary limits) - a hand-picked subset once
+rejected a fact citing `vocabulary.maxChanges`, which the request did contain. The rule is unchanged; the
+implementation is now true. Two tests pin both directions: a vocabulary-grounded fact is accepted, a number that
+appears nowhere is rejected.
+
 ## Why the gates are here and not in the prompt
 
 A prompt is a request, not an enforcement. The model is treated as a claim, and every claim is re-checked against the

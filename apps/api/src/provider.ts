@@ -53,6 +53,8 @@ const SYSTEM_PROMPT = [
   '"facts" (array of {key, value} pairs, max 20; every number must appear in the request), "proposedChanges" (array, max 2; each item has exactly',
   '"day", "kind", "fromKm", "toKm", "costKey", "costSlots"; fromKm must equal the plan\'s value and costKey must be in allowedCostKeys),',
   '"confidence" ("low", "medium" or "high"), "needsHuman" (boolean).',
+  "facts must describe the runner or the plan (a signal, an entry, a planned distance, a date); do not cite the request\'s vocabulary limits as facts.",
+  'costSlots is always an OBJECT, for example {"days": 2} or {"km": 4}; never an array.',
   "If no change is needed, answer decision no-change with an empty proposedChanges array. You never invent a number, a day, a kind or a reason.",
 ].join(" ");
 
