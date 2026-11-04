@@ -61,6 +61,12 @@
         "minHoursBetweenHardDays": { "type": "number", "minimum": 0 },
         "weeklyIncrementPctMax": { "type": "number", "exclusiveMinimum": 0 },
         "longRunMaxKm": { "type": "number", "exclusiveMinimum": 0 },
+        "firstWeekVsRecentMax": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Optional. Week 1 as a fraction of the runner recent median volume, both as 7-day-normalised rates: the first week of a block is reduced, so this is below 1 when the plan starts on a phase boundary."
+        },
         "invariantsHold": { "type": "boolean" },
         "planHash": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }] }
       }

@@ -1,0 +1,40 @@
+{
+  "id": "two-phase-10k",
+  "description": "10K race eight weeks out, four days a week: the plan crosses adaptation into building, so the first week of each block must be reduced - the reason this fixture exists",
+  "input": {
+    "profile": {
+      "userId": "77777777-7777-4777-8777-777777777777",
+      "revision": 1,
+      "availability": { "days": ["Tue", "Thu", "Sat", "Sun"], "hardDaysAllowed": 2, "preferredLongRunDay": "Sun" },
+      "goal": {
+        "type": "time",
+        "event": { "name": "Autumn 10K", "date": "2026-12-27", "distanceKm": 10, "priority": "A", "terrain": "road" }
+      },
+      "preferences": { "units": "metric", "locale": "en", "timezone": "Asia/Taipei" },
+      "health": {},
+      "age": 33
+    },
+    "evidence": {
+      "recentWeeklyKm": [26, 28, 30],
+      "layoffDays": 0,
+      "baselinePaceSecPerKm": 330,
+      "baselineConfidence": "medium"
+    },
+    "state": { "planStartDay": "2026-11-05", "horizonDays": 56 },
+    "clock": { "today": "2026-11-04" },
+    "seed": "golden-two-phase-10k"
+  },
+  "expect": {
+    "sessionCount": 56,
+    "firstDay": "2026-11-05",
+    "lastDay": "2026-12-30",
+    "restDaysMin": 3,
+    "hardDaysMaxPerWeek": 2,
+    "minHoursBetweenHardDays": 48,
+    "weeklyIncrementPctMax": 10,
+    "longRunMaxKm": 12,
+    "firstWeekVsRecentMax": 0.85,
+    "invariantsHold": true,
+    "planHash": null
+  }
+}

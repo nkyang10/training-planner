@@ -28,7 +28,7 @@ The safety layer runs **after** generation and may only subtract (`docs/engine/s
 `appliedRules[]` records every rule that moved a session, with its anchor, effect and severity, which is
 the M1 branch brief's second definition-of-done item.
 
-Correctness is measured by `eval/golden-plans/` (six fixtures, one per runner archetype) and by
+Correctness is measured by `eval/golden-plans/` (seven fixtures, one per runner archetype) and by
 `checkInvariants`, which returns violations instead of throwing. The invariants are the ones AGENTS
 rules 3–5 and planner-engine §6 name: 48 h between hard days, the hard-day cap, the weekly increment
 ceiling, rest days that are rest, one session per calendar day, and safety that only ever subtracts.

@@ -95,6 +95,25 @@ describe.each(files)("%s", (file) => {
       if (growthPct > 0) expect(growthPct).toBeLessThanOrEqual(fixture.expect.weeklyIncrementPctMax + tolerance);
     }
 
+    // The first week of a block is reduced, and this is the expectation that would fail if the rule
+    // disappeared: a reverted engine puts week 1 at the same rate as week 2, which is a share of ~1.0.
+    if (fixture.expect.firstWeekVsRecentMax !== undefined) {
+      const totals = new Map<string, { km: number; days: number }>();
+      for (const session of sessions) {
+        const key = weekStart(session.day);
+        const current = totals.get(key) ?? { km: 0, days: 0 };
+        totals.set(key, { km: current.km + (session.distanceKm ?? 0), days: current.days + 1 });
+      }
+      const keys = [...totals.keys()].sort();
+      const firstTotal = keys[0] === undefined ? undefined : totals.get(keys[0]);
+      const firstRate = firstTotal === undefined || firstTotal.days === 0 ? 0 : (firstTotal.km * 7) / firstTotal.days;
+      const recent = [...fixture.input.evidence.recentWeeklyKm].sort((a, b) => a - b);
+      const middle = Math.floor(recent.length / 2);
+      const median = recent.length % 2 === 1 ? (recent[middle] ?? 0) : ((recent[middle - 1] ?? 0) + (recent[middle] ?? 0)) / 2;
+      expect(median).toBeGreaterThan(0);
+      expect(firstRate / median).toBeLessThanOrEqual(fixture.expect.firstWeekVsRecentMax);
+    }
+
     const longRuns = sessions.filter((session) => session.kind === "long");
     for (const longRun of longRuns) expect(longRun.distanceKm ?? 0).toBeLessThanOrEqual(fixture.expect.longRunMaxKm);
 

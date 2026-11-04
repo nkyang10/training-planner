@@ -66,7 +66,21 @@ const cases: { anchor: string; value: number; why: string; breaks: string[] }[] 
     anchor: "load-progression.yaml#weekly_increment_pct",
     value: 12,
     why: "the conservative band applies to masters-40 (age 45, unresolved load-sensitive injury) and returning-after-layoff (age 41), so raising the default band cannot touch them",
-    breaks: ["novice-5k", "competitive-marathon", "three-days-a-week", "trail-ultra"],
+    breaks: ["novice-5k", "competitive-marathon", "three-days-a-week", "trail-ultra", "two-phase-10k"],
+  },
+  {
+    anchor: "workout-dosage.yaml#first_week_of_phase_reduction",
+    value: 100,
+    why: "every fixture starts its plan on a phase boundary, so turning the intro reduction into a no-op moves every plan; that is what makes the rule load-bearing rather than decorative",
+    breaks: [
+      "novice-5k",
+      "competitive-marathon",
+      "masters-40",
+      "three-days-a-week",
+      "returning-after-layoff",
+      "trail-ultra",
+      "two-phase-10k",
+    ],
   },
   {
     anchor: "recovery.yaml#rest_days_per_week_min",

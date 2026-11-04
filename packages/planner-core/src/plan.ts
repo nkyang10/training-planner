@@ -238,6 +238,10 @@ function weeklyCurve(draft: Draft): WeekPlan[] {
   const downWeekPct = number(knowledge, "load-progression.yaml#down_week_pct");
   const minWeeksAtLoad = number(knowledge, "load-progression.yaml#min_weeks_at_load_before_step");
   const taperEndPct = number(knowledge, "taper.yaml#taper_volume_end_pct");
+  // workout-dosage.yaml#first_week_of_phase_reduction: the first week of a block is not a full week. The
+  // planner read this knob nowhere until the M1 structural review noticed it - the knowledge said it and
+  // the engine ignored it, which is the exact failure this project exists to remove.
+  const phaseIntroPct = number(knowledge, "workout-dosage.yaml#first_week_of_phase_reduction");
   const restartPct = restartVolumePct(knowledge, evidence.layoffDays ?? 0);
 
   const groups = new Map<string, string[]>();
@@ -265,6 +269,10 @@ function weeklyCurve(draft: Draft): WeekPlan[] {
   const weeks: WeekPlan[] = [];
   let weeksAtLoad = 0;
   let taperIndex = 0;
+  let previousPhase: Phase["name"] | null = null;
+  // One reduction at a time. A phase boundary that lands the week after a down week or another intro week
+  // would otherwise cut the same runner twice in a row: 21 km, 17 km, 18 km is not a plan, it is a hole.
+  let previousReduced = false;
   const taperWeeks = Math.max(
     1,
     groups.size === 0 ? 1 : [...groups.keys()].filter((key) => phaseOf(draft.phases, groups.get(key)?.[0] ?? key) === "taper").length,
@@ -273,6 +281,10 @@ function weeklyCurve(draft: Draft): WeekPlan[] {
   for (const [key, days] of [...groups.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
     const weekAnchor = days[0] ?? key;
     const phase = phaseOf(draft.phases, weekAnchor);
+    const phaseIntro =
+      phase !== previousPhase && phase !== "taper" && phase !== "race" && phase !== "recovery" && !previousReduced;
+    previousPhase = phase;
+    let reducedThisWeek = false;
     let target: number;
     if (phase === "taper") {
       const progress = taperWeeks <= 1 ? 1 : taperIndex / (taperWeeks - 1);
@@ -294,13 +306,26 @@ function weeklyCurve(draft: Draft): WeekPlan[] {
         notes: `down week at ${downWeekPct}% after ${weeksAtLoad} weeks at load`,
       });
       weeksAtLoad = 0;
+      reducedThisWeek = true;
     } else {
       const ceiling = Math.min((previousKm * incrementPct) / 100, incrementKmAbs);
       target = previousKm + ceiling;
       weeksAtLoad += 1;
     }
+    if (phaseIntro) {
+      reducedThisWeek = true;
+      target = target * (phaseIntroPct / 100);
+      draft.appliedRules.push({
+        ruleId: "first-week-of-phase",
+        anchor: "workout-dosage.yaml#first_week_of_phase_reduction",
+        effect: "dosed",
+        daysAffected: days,
+        notes: `first week of the ${phase ?? "unknown"} block at ${phaseIntroPct}%`,
+      });
+    }
     weeks.push({ weekStart: key, days, targetKm: Math.max(0, round1(target)), daysInWeek: days.length, phase });
     previousKm = Math.max(0, round1(target));
+    previousReduced = reducedThisWeek;
   }
   return weeks;
 }

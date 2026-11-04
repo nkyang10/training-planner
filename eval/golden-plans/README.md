@@ -5,8 +5,9 @@ last_reviewed: 2026-11-04
 
 # Golden plans
 
-Six fixtures, one per runner the plan has to be right for: novice 5K, competitive marathon, masters 40+,
-three days a week, returning after a layoff, trail ultra. They are the specification (see
+Seven fixtures, one per runner the plan has to be right for: novice 5K, competitive marathon, masters 40+,
+three days a week, returning after a layoff, trail ultra, and one two-phase 10K whose whole reason for
+existing is the first-week-of-phase reduction. They are the specification (see
 [milestones.md](../../docs/roadmap/milestones.md), M1): the planner is correct when these pass, and a
 rule change is *allowed* to break exactly the fixtures it should break.
 
@@ -48,7 +49,7 @@ the planner is deterministic, which the determinism criterion already proves. `p
 until a coach has read the plan; once signed off it is recorded here and the fixture then fails if the
 plan changes for any reason — including a knowledge edit nobody meant to be behavioural.
 
-## The six, and where each number comes from
+## The seven, and where each number comes from
 
 Every expectation below is derived from the input plus a knowledge knob. None of them was copied from a
 run; that is the difference between a fixture and a regression test of nothing.
@@ -61,6 +62,7 @@ run; that is the difference between a fixture and a regression test of nothing.
 | `three-days-a-week` | 3 fixed days, one hard day allowed | 56 | 4/week | 1 (`hard_days_allowed` 1) | 10% | 10 km |
 | `returning-after-layoff` | 21 days away, restart from a reduced bucket | 42 | 3/week | 2 | 10% (the layoff rule subtracts *starting volume*, not the increment ceiling — see the note below) | 9 km |
 | `trail-ultra` | trail 50 km in 10 weeks, 5 days/week | 70 | 2/week | 2 | 10% | 20 km |
+| `two-phase-10k` | 10K race 8 weeks out, 4 days/week, plan starts on a phase boundary | 56 | 3/week | 2 | 10% | 12 km |
 
 Notes on the two expectations that are easy to get wrong:
 
@@ -73,9 +75,23 @@ Notes on the two expectations that are easy to get wrong:
   there is no post-layoff increment knob in the corpus. The fixture records the ceiling that actually
   applies and the layoff shows up as a lower first week, which is what the invariant is about.
 
+### The two-phase 10K, and the expectation that encodes a rule
+
+`two-phase-10k` exists because of one rule: the first week of a block is reduced
+(`workout-dosage.yaml#first_week_of_phase_reduction`, 75%). A fixture that only asserts invariants cannot
+see that rule, so this one carries `firstWeekVsRecentMax: 0.85`: week 1 must be at most 85% of the runner's
+recent median weekly volume, both measured as 7-day-normalised rates.
+
+Two details are deliberate. It is compared against the **recent median**, not against week 2, because a
+plan that starts mid-week normalises differently and two consecutive reduced weeks can make week 2 look
+smaller than week 1 while both are reduced - the comparison must be to the input, not to the calendar. And
+the engine will not stack reductions: a phase boundary that lands the week after a down week or another
+intro week is skipped, because two 25% cuts in a row is a hole, not a plan. Revert either rule and this
+fixture goes red, which is what "encodes the reason" has to mean.
+
 ## How they are run
 
 `pnpm test:golden` runs `packages/planner-core/test/golden.test.ts`, which loads every fixture, generates
 twice, requires the two runs to be byte-identical, checks the wire contract with `packages/domain`, and
-checks every expectation above. A fixture that cannot be parsed is a failure, not a skip: six fixtures
-means six, and a missing one is a red gate rather than a smaller test run.
+checks every expectation above. A fixture that cannot be parsed is a failure, not a skip: seven fixtures
+means seven, and a missing one is a red gate rather than a smaller test run.

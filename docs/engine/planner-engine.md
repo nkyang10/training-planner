@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 ---
 
 # Planner engine
@@ -104,6 +104,11 @@ recovery week after each race. Secondary races are converted into tune-up races 
 for — this is a *stated trade-off*, not a silent compromise.
 
 ### Pass 2 — Weekly volume curve
+The first week of a block is reduced to `workout-dosage.yaml#first_week_of_phase_reduction` (75%): a
+block change is a change of stress, and a runner does not meet a new block at full volume. The planner
+applies it at the horizon start and at each phase boundary, **but never twice in a row** - a boundary
+that lands the week after a down week or another intro week is skipped, because stacking two 25% cuts
+produces a hole in the calendar that no later week can honestly refill.
 Start from **actual recent sustained volume**, never from stated aspiration. Progression with
 caps (`load-progression.yaml`): step weeks and down weeks, per-week increment ceiling that shrinks
 with distance-from-race and with age/injury history, a long-run ceiling, and a hard "never exceed

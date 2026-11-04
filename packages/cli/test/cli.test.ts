@@ -27,6 +27,7 @@ describe("planner gen", () => {
     "three-days-a-week",
     "returning-after-layoff",
     "trail-ultra",
+    "two-phase-10k",
   ];
   it(`generates a valid, invariant-clean plan for all ${GOLDEN_FIXTURE_COUNT} fixtures`, () => {
     expect(fixtures.length).toBe(GOLDEN_FIXTURE_COUNT);
