@@ -42,6 +42,16 @@ export const expectationSchema = z.object({
    * knowledge/plan-construction/quality-sequencing.md.
    */
   qualityKinds: z.array(z.string()).min(1).optional(),
+  /**
+   * Optional: the wall time the plan prescribes for named days. This is the assertion for
+   * pace-bands.yaml#elapsed_estimate: a duration is distance times a pace the plan already prescribes, never a
+   * second pace invented for the display, and a runner with no pace evidence gets no duration at all. Rest days
+   * are not listed because they have no time.
+   */
+  sessionDurations: z
+    .array(z.object({ day: isoDay, durationMin: z.number().int().positive() }))
+    .min(1)
+    .optional(),
   invariantsHold: z.boolean(),
   /** Null until a coach has read the plan; then it is the frozen hash and a change is a failure. */
   planHash: contentHash.nullable(),
@@ -74,7 +84,7 @@ export type GoldenExpectation = z.infer<typeof expectationSchema>;
 export type GoldenFixture = z.infer<typeof fixtureSchema>;
 
 /** Read by the runner, so "eight fixtures" is a number a test can assert rather than a sentence. */
-export const GOLDEN_FIXTURE_COUNT = 8;
+export const GOLDEN_FIXTURE_COUNT = 9;
 
 /** Compile-time drift checks against the frozen planner inputs. */
 export const evidenceShape: z.ZodType<Evidence> = fixtureSchema.shape.input.shape.evidence;

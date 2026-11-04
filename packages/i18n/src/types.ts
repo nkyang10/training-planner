@@ -41,6 +41,7 @@ export type WebTemplate =
   | "web.day-link"
   | "web.day-title"
   | "web.session"
+  | "web.session-duration"
   | "web.rest-day"
   | "web.logged"
   | "web.not-logged"
@@ -91,7 +92,8 @@ export type WebTemplate =
   | "web.season-future"
   | "web.season-current"
   | "web.season-past"
-  | "web.export-link";
+  | "web.export-link"
+  | "web.duration";
 
 export interface Messages {
   /** One sentence per comment template. `{slot}` placeholders are filled by packages/i18n's formatter. */

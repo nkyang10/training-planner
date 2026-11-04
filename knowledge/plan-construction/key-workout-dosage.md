@@ -5,7 +5,7 @@ status: draft
 confidence: medium
 evidence: [review, meta-analysis, practitioner]
 applies_to: [plan-generator, workout-picker, safety-layer]
-last_reviewed: 2026-11-03
+last_reviewed: 2026-11-04
 owner: unowned
 supersedes: []
 sources: [PLAN-S2, PLAN-S4, PLAN-S8]
@@ -100,6 +100,23 @@ repeats:     4–8 × 200–400 m, recovery 1:2–1:3; ≤ 2 sessions per macroc
 4. Shorten the long run (keep ≥ 60 min if the race is a half or longer).
 5. Never delete strides and never convert a key session to an easy run silently — that substitution
   changes the purpose the user was told about, and the comment generator will then be lying.
+
+## Elapsed time: what a session costs in minutes
+
+**Facts.** A time-poor runner's constraint is minutes, not kilometres, and the contract carries both for that
+reason (`plan-version.schema.json` `durationMin`). A wall time is distance times a pace, so it inherits whatever
+confidence the pace has: with no measured pace there is no honest duration, and the plan prescribes by effort and
+distance only.
+
+**Practice.** Easy and long days use the midpoint of their own prescribed band, so the estimate sits inside the
+range the runner was told to run. Quality days use the slow end of the easy band, because the work between the
+warm-up and the cool-down is effort-led: an estimate at a "tempo pace" would be a second pace prescription that
+the session never gave. The two offsets are
+`knowledge/heuristics/pace-bands.yaml#elapsed_estimate`, and the number is rounded to whole minutes with the word
+"about" in front of it. A decimal would imply a precision the estimate does not have.
+
+**What this is not.** It is not a promise, not a target, and not a reason to cut a warm-up. The session's
+authority is still RPE, and the duration is the same kind of statement as the distance: a plan, not a measurement.
 
 ## Controversies
 

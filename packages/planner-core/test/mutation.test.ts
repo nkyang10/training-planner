@@ -3,7 +3,7 @@
  *
  * That sentence is half of the M1 golden-plans criterion, and it is the half a green suite does not prove:
  * a suite where every fixture passes after every change is a suite that measures nothing. This test mutates
- * one knowledge knob at a time, regenerates all eight plans, and asserts the exact set of fixtures that moved.
+ * one knowledge knob at a time, regenerates all nine plans, and asserts the exact set of fixtures that moved.
  *
  * The expectation is derived from the plan structure, not copied from a run: only the marathon fixture runs
  * two hard days a week, so lowering the hard-day cap can only touch it; the conservative increment band
@@ -59,7 +59,7 @@ const cases: { anchor: string; value: number; why: string; breaks: string[] }[] 
   {
     anchor: "intensity-distribution.yaml#hard_days_cap",
     value: 1,
-    why: "only the marathon fixture runs two hard days a week; the other seven already run one or none",
+    why: "only the marathon fixture runs two hard days a week; the other eight already run one or none",
     breaks: ["competitive-marathon"],
   },
   {
@@ -81,6 +81,7 @@ const cases: { anchor: string; value: number; why: string; breaks: string[] }[] 
       "returning-after-layoff",
       "trail-ultra",
       "two-phase-10k",
+      "elapsed-time-easy",
     ],
   },
   {

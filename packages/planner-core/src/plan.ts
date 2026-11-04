@@ -67,6 +67,9 @@ interface Draft {
   warnings: Note[];
   baselinePaceSecPerKm: number | null;
   bandWidthSecPerKm: number;
+  /** Offsets in band widths from pace-bands.yaml#elapsed_estimate; see elapsedPaceSecPerKm. */
+  elapsedEasyWidths: number;
+  elapsedQualityWidths: number;
   hardGapHours: number;
   qualityGapHours: number;
   hardCap: number;
@@ -75,6 +78,35 @@ interface Draft {
 }
 
 const round1 = (value: number): number => Math.round(value * 10) / 10;
+
+/**
+ * The two elapsed-estimate offsets, in band widths. Validated rather than cast: a knob that is a string would
+ * otherwise become NaN minutes, and a plan that says "about NaN min" is worse than one that says nothing.
+ */
+function elapsedOffsets(knowledge: KnowledgeBundle): { easy: number; quality: number } {
+  const source = record(knowledge, "pace-bands.yaml#elapsed_estimate");
+  const easy = source["easy_band_midpoint_widths"];
+  const quality = source["quality_slow_band_widths"];
+  for (const [name, value] of [["easy_band_midpoint_widths", easy], ["quality_slow_band_widths", quality]] as const) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+      throw new Error(`pace-bands.yaml#elapsed_estimate.${name} is not a non-negative number: ${String(value)}`);
+    }
+  }
+  return { easy: easy as number, quality: quality as number };
+}
+
+/**
+ * The pace a session's wall time is estimated from, or null when there is no pace evidence. Easy and long days use
+ * the midpoint of their own prescribed band; quality days use the slow end of the easy band, because the work
+ * between the warm-up and the cool-down is effort-led and the honest total is an easy-pace estimate
+ * (pace-bands.yaml#elapsed_estimate). Never a second pace invented for the estimate.
+ */
+function elapsedPaceSecPerKm(draft: Draft, kind: SessionKind): number | null {
+  const baseline = draft.baselinePaceSecPerKm;
+  if (baseline === null || kind === "rest") return null;
+  const widths = kind === "easy" || kind === "long" ? draft.elapsedEasyWidths : draft.elapsedQualityWidths;
+  return baseline + draft.bandWidthSecPerKm * widths;
+}
 
 /** Paces in the contract are multiples of 5 s/km; see plan-version.schema.json `multipleOf: 5`. */
 const roundPace = (seconds: number): number => Math.round(seconds / 5) * 5;
@@ -184,6 +216,8 @@ function createDraft(input: PlanInput): Draft {
     warnings: [],
     baselinePaceSecPerKm: baseline,
     bandWidthSecPerKm: number(knowledge, "pace-bands.yaml#band_width_s_per_km"),
+    elapsedEasyWidths: elapsedOffsets(knowledge).easy,
+    elapsedQualityWidths: elapsedOffsets(knowledge).quality,
     hardGapHours: (profile.age ?? 0) >= 40
       ? number(knowledge, "recovery.yaml#masters_hard_day_gap_hours")
       : number(knowledge, "recovery.yaml#hard_day_gap_hours"),
@@ -496,6 +530,12 @@ function prescribe(draft: Draft, day: string, kind: SessionKind, distanceKm: num
     ruleIds: ["pass-3-day-placement"],
     feelCue: feelCue(kind, profile.preferences.locale),
   };
+  const elapsedPace = elapsedPaceSecPerKm(draft, kind);
+  if (elapsedPace !== null) {
+    // Rounded to whole minutes because the contract's consumers show "about N min"; a decimal would imply a
+    // precision the estimate does not have. Minimum 1: a 0-minute session is not a session.
+    session.durationMin = Math.max(1, Math.round((distanceKm * elapsedPace) / 60));
+  }
   if (draft.baselinePaceSecPerKm !== null && (kind === "easy" || kind === "long")) {
     // The contract requires pace targets in multiples of 5 s/km (plan-version.schema.json, multipleOf 5).
     // Rounding is part of the prescription, not a display concern: a target the contract rejects is a plan

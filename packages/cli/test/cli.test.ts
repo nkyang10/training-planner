@@ -29,6 +29,7 @@ describe("planner gen", () => {
     "returning-after-layoff",
     "trail-ultra",
     "two-phase-10k",
+    "elapsed-time-easy",
     "novice-first-quality-strides",
   ];
   it(`generates a valid, invariant-clean plan for all ${GOLDEN_FIXTURE_COUNT} fixtures`, () => {

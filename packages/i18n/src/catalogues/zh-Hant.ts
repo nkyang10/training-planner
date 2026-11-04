@@ -52,6 +52,8 @@ export const zhHant: Messages = {
     "web.day-link": "開啟{weekday}",
     "web.day-title": "{weekday},{day}",
     "web.session": "{kind},{km} 公里",
+    "web.session-duration": "{kind}，{km} 公里，大約 {minutes} 分鐘",
+    "web.duration": "大約 {minutes} 分鐘",
     "web.rest-day": "休息日",
     "web.logged": "已記錄",
     "web.not-logged": "尚未記錄",

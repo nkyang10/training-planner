@@ -5,10 +5,11 @@ last_reviewed: 2026-11-04
 
 # Golden plans
 
-Eight fixtures, one per runner the plan has to be right for: novice 5K, competitive marathon, masters 40+,
+Nine fixtures, one per runner the plan has to be right for: novice 5K, competitive marathon, masters 40+,
 three days a week, returning after a layoff, trail ultra, one two-phase 10K whose whole reason for existing is
-the first-week-of-phase reduction, and one novice three-week block whose whole reason for existing is the
-**order of its quality sessions** (strides before tempo). They are the specification (see
+the first-week-of-phase reduction, one novice three-week block whose whole reason for existing is the
+**order of its quality sessions** (strides before tempo), and one runner with a recent race time whose reason is
+the **elapsed-time estimate** (easy days from their own band, quality days at the slow end of it). They are the specification (see
 [milestones.md](../../docs/roadmap/milestones.md), M1): the planner is correct when these pass, and a
 rule change is *allowed* to break exactly the fixtures it should break.
 
@@ -73,6 +74,7 @@ run; that is the difference between a fixture and a regression test of nothing.
 | `returning-after-layoff` | 21 days away, restart from a reduced bucket | 42 | 3/week | 2 | 10% (the layoff rule subtracts *starting volume*, not the increment ceiling — see the note below) | 9 km |
 | `trail-ultra` | trail 50 km in 10 weeks, 5 days/week | 70 | 2/week | 2 | 10% | 20 km |
 | `two-phase-10k` | 10K race 8 weeks out, 4 days/week, plan starts on a phase boundary | 56 | 3/week | 2 | 10% | 12 km |
+| `elapsed-time-easy` | 45, 4 days/week, recent field test (baseline 5:30/km) | 42 | 3/week | 1 | 10% | 10 km |
 
 Notes on the two expectations that are easy to get wrong:
 
@@ -103,5 +105,5 @@ fixture goes red, which is what "encodes the reason" has to mean.
 
 `pnpm test:golden` runs `packages/planner-core/test/golden.test.ts`, which loads every fixture, generates
 twice, requires the two runs to be byte-identical, checks the wire contract with `packages/domain`, and
-checks every expectation above. A fixture that cannot be parsed is a failure, not a skip: eight fixtures
-means eight, and a missing one is a red gate rather than a smaller test run.
+checks every expectation above. A fixture that cannot be parsed is a failure, not a skip: nine fixtures
+means nine, and a missing one is a red gate rather than a smaller test run.
