@@ -17,7 +17,7 @@ wording including the escalation text: `docs/ux/feedback-microcopy.md`.
 | `GET /login`, `POST /login` | a token form that sets an `HttpOnly; SameSite=Lax` session cookie |
 | `GET /` | the current Monday–Sunday week: session kind and distance per day, a logged/not-logged chip, the plan's first explanation sentence, and a banner when a review is open |
 | `GET /day/:day`, `POST /day/:day` | the drawer: five outcomes, effort, legs, an optional note, a "why" row for a skipped day, and the coach note after saving |
-| `GET /review/:reviewId`, `POST /review/:reviewId` | the review sheet: options in the order `packages/review` decided (keep-the-plan first), each with its cost, and three decisions — accept, keep the plan, ask later |
+| `GET /review/:reviewId`, `POST /review/:reviewId` | the review sheet: options in the order `packages/review` decided (keep-the-plan first), each with its cost, and three decisions — accept, keep the plan, ask later. Accepting a change **activates the version it offered**, so the week page shows the plan the runner agreed to on the next load |
 
 A form post is the whole interaction. The server builds the **same `EntryDraft` a JSON client would** and runs the
 same entry pipeline, so there is one write path, not one per client. A review decision is the same: the page

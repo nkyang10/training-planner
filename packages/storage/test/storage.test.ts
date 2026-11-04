@@ -4,7 +4,7 @@
  * against this adapter are testing the same discipline Postgres must keep.
  */
 import { describe, expect, it } from "vitest";
-import type { DayEntry, PlanVersion, Review, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, PlanDiff, PlanVersion, Review, TrainingEvent } from "@training-planner/domain";
 import { createMemoryRepository, createMemorySessions, DuplicateIdempotencyError } from "../src/index";
 import type { Repository } from "../src/index";
 import { makeEntry, makeEvent } from "./helpers";
@@ -176,6 +176,83 @@ describe("reviews are readable in the order a page needs them", () => {
     expect(mine.map((review) => review.openedAtDay)).toEqual(["2026-11-05", "2026-11-01"]);
     expect(repository.listReviews(USER_B)).toHaveLength(1);
     expect(repository.listReviews("cccccccc-cccc-4ccc-8ccc-cccccccccccc")).toEqual([]);
+  });
+});
+
+describe("a proposed version is staged, and only acceptance makes it active", () => {
+  const base = (userId: string): PlanVersion => ({ ...makePlan(WEEK, "2026-11-01"), userId });
+  const child = (parent: PlanVersion): PlanVersion => ({
+    ...parent,
+    versionId: "dddddddd-4444-4444-8444-444444444444",
+    parentVersionId: parent.versionId,
+    generatedBy: "review-accepted",
+    generatedAtDay: "2026-11-05",
+  });
+  const diffOf = (parent: PlanVersion, toVersionId: string): PlanDiff => ({
+    schemaVersion: 1,
+    diffId: "eeeeeeee-5555-4555-8555-555555555555",
+    userId: parent.userId,
+    fromVersionId: parent.versionId,
+    toVersionId,
+    createdAtDay: "2026-11-05",
+    changes: [],
+    changeCountWithinLimit: true,
+    knowledgeHash: parent.knowledgeHash,
+  });
+
+  it("keeps a staged version out of the active plan and out of day lookups", () => {
+    const repository = createMemoryRepository();
+    const parent = base(USER_A);
+    repository.savePlanVersion(parent);
+    const staged = child(parent);
+    repository.saveProposedPlanVersion(staged);
+
+    expect(repository.getActivePlanVersion(USER_A)?.versionId).toBe(parent.versionId);
+    expect(repository.getProposedPlanVersion(USER_A, staged.versionId)?.versionId).toBe(staged.versionId);
+    expect(repository.getPlanVersion(USER_A, staged.versionId)).toBeUndefined();
+    expect(repository.latestPlanVersionFor(USER_A, "2026-11-05")?.versionId).toBe(parent.versionId);
+  });
+
+  it("activates the staged version that a diff predicts, and only that one", () => {
+    const repository = createMemoryRepository();
+    const parent = base(USER_A);
+    repository.savePlanVersion(parent);
+    const staged = child(parent);
+    repository.saveProposedPlanVersion(staged);
+    repository.savePlanDiff(diffOf(parent, staged.versionId));
+
+    const activated = repository.activatePlanVersionForDiff(USER_A, diffOf(parent, staged.versionId).diffId);
+    expect(activated.versionId).toBe(staged.versionId);
+    expect(repository.getActivePlanVersion(USER_A)?.versionId).toBe(staged.versionId);
+    expect(repository.latestPlanVersionFor(USER_A, "2026-11-05")?.versionId).toBe(staged.versionId);
+    // The parent is history, not garbage: a past plan still has to be explainable.
+    expect(repository.getPlanVersion(USER_A, parent.versionId)?.versionId).toBe(parent.versionId);
+  });
+
+  it("refuses to activate a version that was never proposed", () => {
+    const repository = createMemoryRepository();
+    repository.savePlanVersion(base(USER_A));
+    expect(() => repository.activatePlanVersion(USER_A, "00000000-0000-4000-8000-000000000000")).toThrow(/never proposed/);
+  });
+
+  it("refuses to activate through a diff that is missing or points nowhere", () => {
+    const repository = createMemoryRepository();
+    const parent = base(USER_A);
+    repository.savePlanVersion(parent);
+    expect(() => repository.activatePlanVersionForDiff(USER_A, "00000000-0000-4000-8000-000000000000")).toThrow(/no diff/);
+
+    repository.savePlanDiff(diffOf(parent, "99999999-9999-4999-8999-999999999999"));
+    expect(() => repository.activatePlanVersionForDiff(USER_A, diffOf(parent, "99999999-9999-4999-8999-999999999999").diffId)).toThrow(/never proposed/);
+  });
+
+  it("never activates another user's staged version", () => {
+    const repository = createMemoryRepository();
+    const mine = base(USER_A);
+    repository.savePlanVersion(mine);
+    repository.saveProposedPlanVersion(child(mine));
+    repository.savePlanDiff(diffOf(mine, child(mine).versionId));
+    expect(() => repository.activatePlanVersionForDiff(USER_B, diffOf(mine, child(mine).versionId).diffId)).toThrow();
+    expect(repository.getActivePlanVersion(USER_B)).toBeUndefined();
   });
 });
 

@@ -58,7 +58,22 @@ export interface Repository {
   listEntries(userId: string): DayEntry[];
   listEvents(userId: string): TrainingEvent[];
 
+  /** The plan the runner trains from. Saving one makes it active: there is always one plan in force. */
   savePlanVersion(version: PlanVersion): void;
+  /**
+   * A version a review offered but the runner has not accepted: staged, not active. Staging is separate from
+   * `savePlanVersion` because a proposal is not a plan anyone runs yet.
+   */
+  saveProposedPlanVersion(version: PlanVersion): void;
+  getProposedPlanVersion(userId: string, versionId: string): PlanVersion | undefined;
+  getActivePlanVersion(userId: string): PlanVersion | undefined;
+  /** Make a staged version the active one. Throws when the version was never proposed: a review cannot invent a plan. */
+  activatePlanVersion(userId: string, versionId: string): void;
+  /**
+   * Activate the staged version that a stored diff predicts. The diff is the review s evidence and the version is
+   * the thing the runner agreed to; activating through the diff keeps the two from disagreeing.
+   */
+  activatePlanVersionForDiff(userId: string, diffId: string): PlanVersion;
   getPlanVersion(userId: string, versionId: string): PlanVersion | undefined;
   /** The version whose firstDay..lastDay contains `day`, newest generation first. */
   latestPlanVersionFor(userId: string, day: string): PlanVersion | undefined;

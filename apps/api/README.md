@@ -29,7 +29,7 @@ comment in the runner's language. The client never re-derives a number.
 | `GET /entries/:day` | revisions, the current one, and the comments rendered for that day |
 | `GET /reviews/candidates` | what the corpus trigger rules say about the current evidence, and which rules could not be evaluated |
 | `POST /reviews/open` | the whole chain: signals → triggers → bounded options → an open review (stores the review and its diffs; stores no plan version until the runner accepts) |
-| `POST /reviews/:reviewId/decision` | accept / decline / defer |
+| `POST /reviews/:reviewId/decision` | accept / decline / defer. Accepting a change **activates** the plan version the review offered and returns `appliedVersionId`; keeping the plan activates nothing |
 
 ## Rules this layer keeps
 

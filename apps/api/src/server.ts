@@ -355,7 +355,9 @@ export function createApi(options: ApiOptions): RequestListener {
       }
 
       for (const option of proposal.options) {
+        // The diff is the review s evidence; the version is staged until the runner accepts it. Neither is active.
         if (option.diff !== null) repository.savePlanDiff(option.diff);
+        if (option.version !== null) repository.saveProposedPlanVersion(option.version);
       }
       repository.saveReview(opened.review);
       sendJson(response, 201, {
@@ -418,11 +420,24 @@ export function createApi(options: ApiOptions): RequestListener {
       if (!isObject(body) || !isObject(body.decision)) return fail(response, 400, "invalid-body", "expected { decision: { kind } }");
       const result = decideReview(review, body.decision as unknown as Decision, today, knowledge);
       if (result.status === "refused") return fail(response, 409, result.code, result.detail);
+
+      // An accepted change must become the plan the runner actually runs. Keep-the-plan has no diff, so there is
+      // nothing to apply - and the active version stays exactly where it was.
+      let appliedVersionId: string | null = null;
+      if (result.status === "accepted" && result.resultDiffId !== null) {
+        try {
+          appliedVersionId = repository.activatePlanVersionForDiff(userId, result.resultDiffId).versionId;
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          return fail(response, 409, "missing-proposed-version", detail);
+        }
+      }
+
       repository.saveReview(result.review);
       sendJson(response, 200, {
         status: result.status,
         review: result.review,
-        ...(result.status === "accepted" ? { applyFromDay: result.applyFromDay, resultDiffId: result.resultDiffId } : {}),
+        ...(result.status === "accepted" ? { applyFromDay: result.applyFromDay, resultDiffId: result.resultDiffId, appliedVersionId } : {}),
         ...(result.status === "rejected" ? { reason: result.reason } : {}),
         ...(result.status === "deferred" ? { recheckDay: result.recheckDay } : {}),
       });
