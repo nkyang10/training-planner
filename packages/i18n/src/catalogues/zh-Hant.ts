@@ -111,6 +111,10 @@ export const zhHant: Messages = {
     test: "測試",
     race: "比賽",
   },
+  prompt: {
+    "prompt.log-day": "{weekday} 過得點？兩下就夠。",
+    "prompt.log-gap": "{weekday} 仲未記錄。",
+  },
   label: {
     changedBecause: "改了,因為",
     gaveUp: "代價:",
