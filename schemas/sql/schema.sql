@@ -297,6 +297,11 @@ create table day_entries (
   outcome_detail text check (outcome_detail in
                    ('illness', 'travel', 'work', 'family', 'sleep', 'motivation', 'pain', 'weather',
                     'equipment', 'social', 'just-didnt', 'other')),
+  -- The amount a partial day reports. The wire requires completedKm or durationMin when outcome is
+  -- partial (day-entry.schema.json), so the table has to be able to store either one - otherwise a
+  -- runner's honest answer is unrepresentable, which is the same class of bug as item 20.
+  completed_km numeric(6, 2) check (completed_km between 0 and 250),
+  duration_min smallint check (duration_min between 0 and 1500),
   rpe         smallint check (rpe between 1 and 10),
   legs        smallint check (legs between 1 and 5),      -- the product's five-point scale, not ten
   sleep_h     numeric(4, 2) check (sleep_h between 0 and 24),
