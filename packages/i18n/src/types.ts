@@ -109,7 +109,38 @@ export type WebTemplate =
   | "web.season-current"
   | "web.season-past"
   | "web.export-link"
+  | "web.console-link"
+  | "web.console-title"
+  | "web.console-empty"
+  | "web.console-original"
+  | "web.console-current"
+  | "web.console-guidelines"
+  | "web.console-guidelines-empty"
+  | "web.console-back"
   | "web.duration";
+
+export type WizardTemplate =
+  | "wizard.title"
+  | "wizard.progress"
+  | "wizard.next"
+  | "wizard.finish"
+  | "wizard.saved"
+  | "wizard.done"
+  | "wizard.back"
+  | "wizard.required"
+  | "wizard.goal.question"
+  | "wizard.goal.finish"
+  | "wizard.goal.time"
+  | "wizard.goal.experience"
+  | "wizard.goal.fitness-maintenance"
+  | "wizard.goal.return-to-running"
+  | "wizard.availability.question"
+  | "wizard.risk-appetite.question"
+  | "wizard.risk-appetite.conservative"
+  | "wizard.risk-appetite.moderate"
+  | "wizard.risk-appetite.aggressive"
+  | "wizard.weekly-hours.question"
+  | "wizard.weekly-hours.unit";
 
 export interface Messages {
   /** One sentence per comment template. `{slot}` placeholders are filled by packages/i18n's formatter. */
@@ -131,6 +162,8 @@ export interface Messages {
   web: Record<WebTemplate, string>;
   /** The prompt's copy. packages/nudges decides *when*; the words are here, in both languages. */
   prompt: Record<PromptTemplate, string>;
+  /** The onboarding wizard's questions, option labels and page copy (ADR-0009). */
+  wizard: Record<WizardTemplate, string>;
   /** Labels the chip and the nudge carry; not sentences. */
   label: {
     changedBecause: string;

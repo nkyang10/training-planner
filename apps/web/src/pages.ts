@@ -5,7 +5,18 @@
  * sentence about training. The comment on the day page is the narrator's output, inserted verbatim (escaped),
  * because a page that re-words the coach note would be a second narrator.
  */
-import type { DayEntry, PainReport, PlanVersion, Review, Session } from "@training-planner/domain";
+import type {
+  DayEntry,
+  DayName,
+  GuidelineContract,
+  PainReport,
+  PlanVersion,
+  Review,
+  Session,
+  WizardProgress,
+  WizardStep,
+  WizardStepId,
+} from "@training-planner/domain";
 import type { PainTrend } from "@training-planner/entries";
 import type { SeasonSummary } from "@training-planner/season";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
@@ -127,6 +138,7 @@ export function renderCalendar(input: CalendarPageInput): string {
       <ul class="week">${rows.join("\n")}</ul>
       <p class="muted">
         <a href="/season">${escapeHtml(messages.web["web.season-link"])}</a> ·
+        <a href="/console">${escapeHtml(messages.web["web.console-link"])}</a> ·
         <a href="/pain">${escapeHtml(messages.web["web.pain-link"])}</a>
       </p>
     </section>`;
@@ -431,4 +443,139 @@ export function renderReview(input: ReviewSheetInput): string {
       <button type="submit" name="decision" value="defer" class="quiet">${escapeHtml(web["web.review-defer"])}</button>
     </form>`;
   return layout({ locale: input.locale, title: web["web.review-title"], body, signedIn: true });
+}
+
+const wizardQuestion = (locale: Locale, step: WizardStep): string => {
+  const wizard = messagesFor(locale).wizard;
+  return wizard[`wizard.${step.id}.question` as keyof typeof wizard] ?? step.id;
+};
+
+const wizardOptionLabel = (locale: Locale, stepId: WizardStepId, value: string): string => {
+  const wizard = messagesFor(locale).wizard;
+  if (stepId === "availability") return weekdayName(locale, value as DayName);
+  return wizard[`wizard.${stepId}.${value}` as keyof typeof wizard] ?? value;
+};
+
+/** How one recorded answer reads, in the runner's language. Used by both the wizard and the console. */
+export const answerLabel = (locale: Locale, stepId: WizardStepId, answer: Record<string, unknown> | undefined): string => {
+  const messages = messagesFor(locale);
+  if (answer === undefined) return messages.web["web.console-empty"];
+  if (stepId === "availability") {
+    const values = Array.isArray(answer["values"]) ? (answer["values"] as string[]) : [];
+    return values.map((value) => wizardOptionLabel(locale, stepId, value)).join(", ");
+  }
+  if (stepId === "weekly-hours") {
+    const hours = answer["value"];
+    return typeof hours === "number" ? `${formatNumber(hours)} ${messages.wizard["wizard.weekly-hours.unit"]}` : String(hours ?? "");
+  }
+  const value = answer["value"];
+  return typeof value === "string" ? wizardOptionLabel(locale, stepId, value) : String(value ?? "");
+};
+
+const wizardField = (locale: Locale, step: WizardStep, current: Record<string, unknown> | undefined): string => {
+  const messages = messagesFor(locale);
+  if (step.kind === "choice") {
+    return (step.options ?? [])
+      .map((option) => {
+        const checked = current?.["value"] === option ? " checked" : "";
+        return `<label class="choice"><input type="radio" name="value" value="${escapeHtml(option)}"${checked}> ${escapeHtml(wizardOptionLabel(locale, step.id, option))}</label>`;
+      })
+      .join("\n      ");
+  }
+  if (step.kind === "multi") {
+    const chosen = new Set(Array.isArray(current?.["values"]) ? (current["values"] as string[]) : []);
+    return (step.options ?? [])
+      .map((option) => {
+        const checked = chosen.has(option) ? " checked" : "";
+        return `<label class="choice"><input type="checkbox" name="values" value="${escapeHtml(option)}"${checked}> ${escapeHtml(weekdayName(locale, option as DayName))}</label>`;
+      })
+      .join("\n      ");
+  }
+  const value = typeof current?.["value"] === "number" ? String(current["value"]) : "";
+  return `<label class="field"><input type="number" name="value" min="${step.min ?? 0}" max="${step.max ?? 40}" value="${value}"> ${escapeHtml(messages.wizard["wizard.weekly-hours.unit"])}</label>`;
+};
+
+export interface WizardPageInput {
+  locale: Locale;
+  /** Undefined when every required step has an answer: the wizard is done, not empty. */
+  step: WizardStep | undefined;
+  progress: WizardProgress;
+  current: Partial<Record<WizardStepId, Record<string, unknown>>>;
+  original: Partial<Record<WizardStepId, Record<string, unknown>>>;
+  error: string | undefined;
+}
+
+/** The onboarding wizard, one step at a time (ADR-0009): a runner's own orientation, not the system's default. */
+export function renderWizard(input: WizardPageInput): string {
+  const messages = messagesFor(input.locale);
+  const wizard = messages.wizard;
+  const progressLine = format(wizard["wizard.progress"], {
+    done: formatNumber(input.progress.answered),
+    total: formatNumber(input.progress.total),
+  });
+  if (input.step === undefined) {
+    const done = `<section class="card narrow"><h2>${escapeHtml(wizard["wizard.title"])}</h2>
+      <p>${escapeHtml(wizard["wizard.done"])}</p>
+      <p class="muted"><a href="/console">${escapeHtml(messages.web["web.console-link"])}</a></p></section>`;
+    return layout({ locale: input.locale, title: wizard["wizard.title"], body: done, signedIn: true });
+  }
+  const step = input.step;
+  const current = input.current[step.id];
+  const original = input.original[step.id];
+  const changed = original !== undefined && JSON.stringify(original) !== JSON.stringify(current);
+  const errorHtml =
+    input.error === undefined
+      ? ""
+      : `<p class="error" role="alert">${escapeHtml(format(messages.web["web.error"], { detail: input.error }))}</p>`;
+  const originalHtml = changed
+    ? `<p class="muted">${escapeHtml(messages.web["web.console-original"])}: ${escapeHtml(answerLabel(input.locale, step.id, original))}</p>`
+    : "";
+  const body = `<section class="card narrow"><h2>${escapeHtml(wizard["wizard.title"])}</h2>
+      <p class="muted">${escapeHtml(progressLine)}</p>${errorHtml}
+      <form method="post" action="/wizard" class="stack">
+        <input type="hidden" name="stepId" value="${escapeHtml(step.id)}">
+        <p>${escapeHtml(wizardQuestion(input.locale, step))}</p>
+        ${wizardField(input.locale, step, current)}
+        <button type="submit">${escapeHtml(wizard["wizard.next"])}</button>
+      </form>${originalHtml}
+      <p class="muted"><a href="/console">${escapeHtml(messages.web["web.console-link"])}</a></p></section>`;
+  return layout({ locale: input.locale, title: wizard["wizard.title"], body, signedIn: true });
+}
+
+export interface ConsolePageInput {
+  locale: Locale;
+  steps: readonly WizardStep[];
+  current: Partial<Record<WizardStepId, Record<string, unknown>>>;
+  original: Partial<Record<WizardStepId, Record<string, unknown>>>;
+  /** Public guidelines only: an internal safety guideline never reaches a runner's page (ADR-0009). */
+  guidelines: readonly GuidelineContract[];
+}
+
+/** The personal console: what the runner chose, original next to current, and the guidelines they may read. */
+export function renderConsole(input: ConsolePageInput): string {
+  const messages = messagesFor(input.locale);
+  const web = messages.web;
+  const rows = input.steps
+    .filter((step) => input.current[step.id] !== undefined || input.original[step.id] !== undefined)
+    .map((step) => {
+      const current = input.current[step.id];
+      const original = input.original[step.id];
+      const changed =
+        original !== undefined && current !== undefined && JSON.stringify(original) !== JSON.stringify(current);
+      const originalCell = changed
+        ? `<span class="muted">${escapeHtml(web["web.console-original"])}: ${escapeHtml(answerLabel(input.locale, step.id, original))}</span>`
+        : "";
+      return `<li class="row"><span class="day">${escapeHtml(wizardQuestion(input.locale, step))}</span><span class="session">${escapeHtml(answerLabel(input.locale, step.id, current))}</span>${originalCell}</li>`;
+    });
+  const guidelines =
+    input.guidelines.length === 0
+      ? `<p class="muted">${escapeHtml(web["web.console-guidelines-empty"])}</p>`
+      : `<ul class="week">${input.guidelines.map((guideline) => `<li class="row"><span class="session">${escapeHtml(guideline.text)}</span></li>`).join("\n")}</ul>`;
+  const body = `<section class="card"><h2>${escapeHtml(web["web.console-title"])}</h2>
+      ${rows.length === 0 ? `<p>${escapeHtml(web["web.console-empty"])}</p>` : `<ul class="week">${rows.join("\n")}</ul>`}
+      <p class="muted"><a href="/wizard">${escapeHtml(messages.wizard["wizard.title"])}</a></p>
+      <h2>${escapeHtml(web["web.console-guidelines"])}</h2>
+      ${guidelines}
+      <p class="muted"><a href="/">${escapeHtml(web["web.console-back"])}</a></p></section>`;
+  return layout({ locale: input.locale, title: web["web.console-title"], body, signedIn: true });
 }

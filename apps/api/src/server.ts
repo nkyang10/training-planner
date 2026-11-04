@@ -22,6 +22,15 @@ import { renderAdjustment, renderComment } from "@training-planner/narrator";
 import { addDays, daysBetween, generatePlan, uuidFrom } from "@training-planner/planner-core";
 import type { Evidence, PlanState } from "@training-planner/planner-core";
 import { evaluatePolicy } from "@training-planner/policy";
+import {
+  latestWizardAnswers,
+  nextWizardRevision,
+  originalWizardAnswers,
+  validateWizardAnswer,
+  wizardProgress,
+  WIZARD_STEPS,
+} from "@training-planner/domain";
+import type { WizardStepId } from "@training-planner/domain";
 import { computeSignals } from "@training-planner/signals";
 import { evaluateTriggers } from "@training-planner/triggers";
 import { decideReview, openReview } from "@training-planner/review";
@@ -534,6 +543,69 @@ export function createApi(options: ApiOptions): RequestListener {
         ...(result.status === "accepted" ? { applyFromDay: result.applyFromDay, resultDiffId: result.resultDiffId, appliedVersionId } : {}),
         ...(result.status === "rejected" ? { reason: result.reason } : {}),
         ...(result.status === "deferred" ? { recheckDay: result.recheckDay } : {}),
+      });
+      return;
+    }
+
+    // GET /wizard - the onboarding steps and what the runner has answered (ADR-0009).
+    if (segments.length === 1 && segments[0] === "wizard") {
+      if (method === "GET") {
+        const answers = repository.listWizardAnswers(userId);
+        sendJson(response, 200, {
+          status: "ok",
+          steps: WIZARD_STEPS,
+          answers,
+          current: latestWizardAnswers(answers),
+          original: originalWizardAnswers(answers),
+          progress: wizardProgress(answers),
+        });
+        return;
+      }
+      if (method === "POST") {
+        const body = await readBody(request);
+        if (!isObject(body)) return fail(response, 400, "invalid-body", "expected a JSON object");
+        const stepId = typeof body["stepId"] === "string" ? body["stepId"] : "";
+        const validation = validateWizardAnswer(stepId, body["answer"]);
+        if (!validation.ok || validation.answer === undefined) {
+          return fail(response, 400, "invalid-answer", validation.detail ?? "invalid answer");
+        }
+        const answers = repository.listWizardAnswers(userId);
+        const typedStep = stepId as WizardStepId;
+        const record = {
+          stepId: typedStep,
+          answer: validation.answer,
+          revision: nextWizardRevision(answers, typedStep),
+          source: body["source"] === "settings" ? ("settings" as const) : ("wizard" as const),
+        };
+        repository.saveWizardAnswer(userId, record);
+        const updated = repository.listWizardAnswers(userId);
+        sendJson(response, 201, {
+          status: "ok",
+          answer: record,
+          current: latestWizardAnswers(updated),
+          original: originalWizardAnswers(updated),
+          progress: wizardProgress(updated),
+        });
+        return;
+      }
+      return fail(response, 405, "method-not-allowed", "use GET or POST /wizard");
+    }
+
+    // GET /console - the runner's own choices, original next to current, and the public guidelines only.
+    if (segments.length === 1 && segments[0] === "console" && method === "GET") {
+      const answers = repository.listWizardAnswers(userId);
+      const guidelines = repository
+        .listGuidelines()
+        .filter((guideline) => guideline.visibility === "public")
+        .sort((left, right) =>
+          left.guidelineId < right.guidelineId ? -1 : left.guidelineId > right.guidelineId ? 1 : left.version - right.version,
+        );
+      sendJson(response, 200, {
+        status: "ok",
+        current: latestWizardAnswers(answers),
+        original: originalWizardAnswers(answers),
+        guidelines,
+        progress: wizardProgress(answers),
       });
       return;
     }

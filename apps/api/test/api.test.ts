@@ -649,3 +649,70 @@ describe("a review decision is a state change, not an edit", () => {
     expect(response.status).toBe(404);
   });
 });
+
+
+describe("the onboarding wizard and the personal console (ADR-0009)", () => {
+  it("records answers step by step and keeps the original after a change", async () => {
+    const empty = await call("/wizard", { token: "token-d" });
+    expect(empty.status).toBe(200);
+    expect(empty.body.progress).toEqual({ answered: 0, total: 4, next: "goal" });
+    expect(Array.isArray(empty.body.steps)).toBe(true);
+
+    const saved = await call("/wizard", { method: "POST", token: "token-d", body: { stepId: "goal", answer: { value: "finish" } } });
+    expect(saved.status).toBe(201);
+    expect(saved.body.answer).toMatchObject({ stepId: "goal", revision: 1, source: "wizard" });
+
+    const changed = await call("/wizard", {
+      method: "POST",
+      token: "token-d",
+      body: { stepId: "goal", answer: { value: "time" }, source: "settings" },
+    });
+    expect(changed.status).toBe(201);
+    expect(changed.body.answer).toMatchObject({ revision: 2, source: "settings" });
+    expect(changed.body.original).toEqual({ goal: { value: "finish" } });
+    expect(changed.body.current).toEqual({ goal: { value: "time" } });
+    expect(changed.body.progress).toMatchObject({ answered: 1, next: "availability" });
+  });
+
+  it("refuses an answer that is not one of the step's options", async () => {
+    const refused = await call("/wizard", {
+      method: "POST",
+      token: "token-d",
+      body: { stepId: "risk-appetite", answer: { value: "reckless" } },
+    });
+    expect(refused.status).toBe(400);
+    expect((refused.body.error as { code: string }).code).toBe("invalid-answer");
+    expect(String((refused.body.error as { detail: string }).detail)).toContain("risk-appetite");
+  });
+
+  it("the console returns the public guidelines only", async () => {
+    repository.saveGuideline({
+      guidelineId: "progression-ceiling",
+      version: 1,
+      tier: "constraint",
+      scope: "progression",
+      visibility: "public",
+      text: "Weekly volume rises by at most 10 percent.",
+      rationale: "Stated once.",
+      effectiveFrom: "2026-11-01",
+      createdBy: "operator",
+    });
+    repository.saveGuideline({
+      guidelineId: "night-pain-stop",
+      version: 1,
+      tier: "non-negotiable",
+      scope: "safety",
+      visibility: "internal",
+      text: "Night pain stops training.",
+      rationale: "Triage decisive.",
+      effectiveFrom: "2026-11-01",
+      createdBy: "operator",
+    });
+    const console = await call("/console", { token: "token-d" });
+    expect(console.status).toBe(200);
+    const guidelines = console.body.guidelines as Array<{ guidelineId: string; visibility: string }>;
+    expect(guidelines.map((guideline) => guideline.guidelineId)).toContain("progression-ceiling");
+    expect(guidelines.map((guideline) => guideline.guidelineId)).not.toContain("night-pain-stop");
+    expect(guidelines.every((guideline) => guideline.visibility === "public")).toBe(true);
+  });
+});
