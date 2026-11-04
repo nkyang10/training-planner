@@ -32,7 +32,6 @@ findings that do not make a plan unsafe, which is why M1 closed with them record
 | 14 | Terrain-aware session kinds (M1 review F4: no hills in a trail ultra plan) | `hills` exists as a kind and is never selected from terrain | S | trail plans that train like road plans |
 | 15 | Neuromuscular-before-threshold sequencing rule for novices (M1 review F5) | the first 5K block opens with tempo and never with strides | S | a beginner's first quality session is the hardest kind |
 | 16 | A target-peak notion derived from race distance (M1 review F6: race blocks cannot exceed recent volume) | the curve is purely incremental, so a 7-week race block holds volume instead of building it, and the planner cannot tell "hold" from "fail to build" | L | marathon blocks that never build, with nothing in the plan saying so |
-| 17 | Fix the `musoreSoreness` field name in the day-entry wire contract (it reads as a typo of `muscleSoreness`) | the hand-written type deliberately omits it, so the field is currently storable but unreadable by any decision; a wire rename needs a migration window, not a find-and-replace | S | a contract field nobody can use, and a second reader guessing which spelling is real |
 | 19 | Store pain reports as their own rows with ids, referenced from the entry and the event | ADR-0006 keeps health free text out of the event log, and the pain triage rules need a trajectory across reports, not one array inside an entry | M | pain history is a blob inside entries, and the triage cannot see a trend |
 
 
@@ -56,6 +55,7 @@ Rows that were open and are now shipped, kept here so the backlog stays a list o
 | 20 | `SessionTaken` has a partial marker | PR #42: `partial` in the wire enum, the DDL CHECK and the two-axes CHECK, the domain type, the entry pipeline's coherence rules, and the web form's distance field — a partly-done day is now storable and readable instead of a dead end with a button on it |
 | 21 | The `sessionTaken: null` contradiction | PR #42: the enum loses null, the description says absence is an omitted key, the domain type loses `| null`, and `invalid-session-taken-null.json` keeps it from coming back |
 | 18 | The `day.closed` event type | PR #43: the catalogue row, an `events.schema.json` clause that lets only the system or the worker close a day, `DayCloseStatus`/`DayClosePayload`, `closeEventFor` in `packages/entries`, and the sweep now returns the events a writer should append |
+| 17 | `muscleSoreness` is the one spelling | PR #44: canonical name in the wire and the frozen interface, the legacy spelling kept for a window ending 2027-02-04, a write-path normalisation and a refusal when both are present |
 
 ## Next (M3–M5)
 

@@ -33,7 +33,8 @@ export interface EntryDraft {
   rpe?: number | null;
   legs?: number | null;
   mood?: number | null;
-  wellness?: DayEntryWellness | null;
+  /** The legacy `musoreSoreness` spelling is accepted during the migration window and normalised on write. */
+  wellness?: (DayEntryWellness & { musoreSoreness?: number | null }) | null;
   pain?: DayEntryPain[];
   note?: string | null;
   intent?: DayEntryIntent | null;

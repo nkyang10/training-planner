@@ -49,7 +49,8 @@
         "hrvLnRMSSD": { "type": ["number", "null"], "minimum": 0, "maximum": 12, "description": "ln-transformed; the metric contract expects natural-log RMSSD (metric-definitions.md#hrv_lnrmssd_dev)." },
         "stress": { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
         "fatigue": { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
-        "musoreSoreness": { "type": ["integer", "null"], "minimum": 1, "maximum": 5 },
+        "muscleSoreness": { "type": ["integer", "null"], "minimum": 1, "maximum": 5, "description": "Tier 2 muscle soreness, 1-5. Canonical spelling since 2026-11-04 (docs/roadmap/backlog.md row 17); this is the name every decision reads." },
+        "musoreSoreness": { "type": ["integer", "null"], "minimum": 1, "maximum": 5, "deprecated": true, "description": "Deprecated misspelling of `muscleSoreness`, accepted only for a migration window that ends 2027-02-04. A write that carries it is normalised to `muscleSoreness` before storage, and a write that carries both is refused; new clients must send the canonical name." },
         "illnessSymptoms": { "type": "array", "items": { "enum": ["none", "above-neck", "below-neck", "fever", "GI", "chest", "other"] }, "classification": "health-sensitive", "description": "Drives the safety layer: 'below-neck' or 'fever' is a hard stop, non-overridable (safety-layer.md#1)." },
         "fuelingNote": { "type": ["string", "null"], "maxLength": 280, "classification": "health-sensitive", "description": "Free text only. We never respond with calorie or weight guidance; long-run fueling guidance is generic and product-agnostic." }
       }

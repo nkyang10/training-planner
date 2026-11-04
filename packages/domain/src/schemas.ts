@@ -141,6 +141,7 @@ export const dayEntrySchema = whenThen(whenThen(whenThen(whenThen(whenThen(whenT
     "hrvLnRMSSD": z.number().min(0).max(12).nullable().optional(),
     "stress": z.number().int().min(1).max(5).nullable().optional(),
     "fatigue": z.number().int().min(1).max(5).nullable().optional(),
+    "muscleSoreness": z.number().int().min(1).max(5).nullable().optional(),
     "musoreSoreness": z.number().int().min(1).max(5).nullable().optional(),
     "illnessSymptoms": z.array(z.union([z.literal("none"), z.literal("above-neck"), z.literal("below-neck"), z.literal("fever"), z.literal("GI"), z.literal("chest"), z.literal("other")])).optional(),
     "fuelingNote": z.string().max(280).nullable().optional(),
