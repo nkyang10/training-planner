@@ -105,7 +105,11 @@ try {
       }
     }
     const closed = typeof values.closed === "string" ? values.closed.split(",").map((day) => day.trim()).filter((day) => day.length > 0) : [];
-    for (const line of sweepLines({ version: generated.version, entries: log, today: values.today, closed, knowledge: bundle })) {
+    // The event carries the runner's zone, so the fixture has to say it. A missing zone is an error, not a default.
+    const fixtureProfile = (readJson(values.fixture) as { input?: { profile?: { preferences?: { timezone?: string } } } }).input?.profile;
+    const timezone = fixtureProfile?.preferences?.timezone;
+    if (typeof timezone !== "string") fail("the fixture has no profile.preferences.timezone");
+    for (const line of sweepLines({ version: generated.version, entries: log, today: values.today, closed, timezone, knowledge: bundle })) {
       console.log(line);
     }
   } else if (command === "explain") {

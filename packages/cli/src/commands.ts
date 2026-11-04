@@ -122,6 +122,7 @@ export function sweepLines(input: {
   entries: readonly DayEntry[];
   today: string;
   closed?: readonly string[];
+  timezone: string;
   knowledge: KnowledgeBundle;
 }): string[] {
   const result = runNightlySweep({
@@ -131,6 +132,7 @@ export function sweepLines(input: {
     plan: input.version,
     knowledge: input.knowledge,
     computedAt: `${input.today}T03:00:00.000Z`,
+    timezone: input.timezone,
     closedDays: input.closed ?? [],
   });
 
@@ -139,6 +141,7 @@ export function sweepLines(input: {
   for (const closed of result.newlyClosed) {
     lines.push(`  ${closed.day} ${closed.status} planned=${closed.plannedKm}km done=${closed.completedKm}km`);
   }
+  lines.push(`events: ${result.events.length}`);
   lines.push(`pending: ${result.pending.length === 0 ? "none" : result.pending.join(", ")}`);
   if (result.skipped.length > 0) lines.push(`skipped: ${result.skipped.join(", ")}`);
   lines.push(

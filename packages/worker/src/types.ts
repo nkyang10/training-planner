@@ -5,7 +5,7 @@
  * process around it becomes four lines of wiring: which days closed, which closed with no entry, and what the
  * signal bundle was at the moment it closed. The scheduler is deployment work; this is not.
  */
-import type { DayEntry, PlanVersion, Signal } from "@training-planner/domain";
+import type { DayEntry, PlanVersion, Signal, TrainingEvent } from "@training-planner/domain";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
 import type { DayRollup } from "@training-planner/signals";
 
@@ -18,6 +18,8 @@ export interface NightlyInput {
   knowledge: KnowledgeBundle;
   /** ISO timestamp, injected so the sweep is reproducible. */
   computedAt: string;
+  /** The runner's zone, stored on every day.closed event so a later read cannot re-home the day. */
+  timezone: string;
   /** Days already closed by an earlier sweep: the sweep is idempotent, and this is how it knows. */
   closedDays?: readonly string[];
 }
@@ -54,4 +56,9 @@ export interface NightlyResult {
   signalCache: SignalCacheEntry | null;
   /** Days that were already closed and were therefore skipped. */
   skipped: string[];
+  /**
+   * The `day.closed` events a writer should append for `newlyClosed`, in the same order. Empty on a second sweep.
+   * The sweep still writes nothing: this is the record, and the caller owns persistence.
+   */
+  events: TrainingEvent[];
 }

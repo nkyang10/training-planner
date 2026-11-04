@@ -22,8 +22,9 @@ The scheduler and the writes are deployment work; the rules about a closing day 
 
 ## What the sweep does not do
 
-- **It writes nothing.** `apps/api` (or a future worker process) owns persistence. The event catalogue has no
-  day-close event type yet — that is backlog row 18, and inventing one here would create a second catalogue.
+- **It writes nothing.** `apps/api` (or a future worker process) owns persistence. It *returns* the `day.closed`
+  events a writer should append (`closeEventFor` in `packages/entries`), one per newly closed day, and nothing for a
+  day an earlier sweep already closed.
 - **It does not schedule itself.** Cron, a queue, or a platform scheduler is deployment work (M6); the CLI's
   `planner sweep` runs the same function once, which is how it is verified.
 - **It does not cache into `signals_current`.** It returns the row to write; the Postgres adapter is backlog row 24.

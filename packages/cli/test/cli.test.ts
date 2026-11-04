@@ -93,6 +93,7 @@ describe("planner sweep", () => {
       version: generated.version,
       entries: [makeEntry({ day: firstDay, outcome: "completed" })],
       today: generated.version.sessions[2]?.day ?? firstDay,
+      timezone: "Asia/Taipei",
       knowledge: bundle,
     }).join("\n");
     expect(lines).toContain("closed: ");
@@ -104,11 +105,11 @@ describe("planner sweep", () => {
   it("is idempotent: a sweep with the days already closed reports none", () => {
     const generated = planFromFixture(join(directory, "novice-5k.json"), bundle);
     const today = generated.version.sessions[2]?.day ?? generated.version.firstDay;
-    const first = sweepLines({ version: generated.version, entries: [], today, knowledge: bundle });
+    const first = sweepLines({ version: generated.version, entries: [], today, timezone: "Asia/Taipei", knowledge: bundle });
     const closed = first
       .filter((line) => /^\s{2}\d{4}-\d{2}-\d{2} /.test(line))
       .map((line) => line.trim().split(" ")[0] as string);
-    const second = sweepLines({ version: generated.version, entries: [], today, closed, knowledge: bundle }).join("\n");
+    const second = sweepLines({ version: generated.version, entries: [], today, closed, timezone: "Asia/Taipei", knowledge: bundle }).join("\n");
     expect(second).toContain("closed: none");
     expect(second).toContain("skipped: ");
   });

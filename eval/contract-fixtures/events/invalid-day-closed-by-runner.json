@@ -1,0 +1,18 @@
+{
+  "eventId": "9f1c2d3e-4a5b-4c6d-8e7f-1a2b3c4d5e6f",
+  "userId": "11111111-1111-4111-8111-111111111111",
+  "type": "day.closed",
+  "occurredAt": "2026-11-09T03:00:00.000Z",
+  "actor": "runner",
+  "payloadVersion": 1,
+  "payload": {
+    "status": "logged",
+    "plannedKm": 2.7,
+    "plannedSessions": 1,
+    "completedKm": 2.7,
+    "outcome": "completed"
+  },
+  "trainingDay": "2026-11-05",
+  "timezone": "Asia/Taipei",
+  "idempotencyKey": "runner-closes-their-own-day-0001"
+}

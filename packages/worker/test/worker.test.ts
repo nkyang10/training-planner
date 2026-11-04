@@ -3,7 +3,7 @@
  * with no entry must be named rather than turned into a zero.
  */
 import { describe, expect, it } from "vitest";
-import { signalSchema } from "@training-planner/domain";
+import { eventSchema, signalSchema } from "@training-planner/domain";
 import type { DayEntry, PlanVersion } from "@training-planner/domain";
 import { loadKnowledge } from "@training-planner/knowledge";
 import { runNightlySweep } from "../src/index";
@@ -44,6 +44,7 @@ const input = (overrides: Partial<NightlyInput> = {}): NightlyInput => ({
   plan: plan(),
   knowledge,
   computedAt: COMPUTED_AT,
+  timezone: "Asia/Taipei",
   ...overrides,
 });
 
@@ -120,6 +121,41 @@ describe("a day that closed with no entry is named, never zeroed", () => {
     expect(thursday?.outcome).toBe("completed");
     expect(thursday?.completedKm).toBe(10);
     expect(result.pending).not.toContain("2026-11-04");
+  });
+});
+
+describe("the sweep names each day it closed, in the catalogue's own vocabulary", () => {
+  it("emits one day.closed event per newly closed day, with the status and the amounts", () => {
+    const result = runNightlySweep(input({ entries: [entry("2026-11-02", { outcome: "completed" })] }));
+    expect(result.events).toHaveLength(result.newlyClosed.length);
+    expect(result.events.every((event) => event.type === "day.closed")).toBe(true);
+    expect(result.events.every((event) => event.actor === "worker")).toBe(true);
+    expect(result.events.map((event) => event.trainingDay)).toEqual(result.newlyClosed.map((closed) => closed.day));
+    expect(result.events[0]?.trainingDay).toBe("2026-11-02");
+    expect(result.events[0]?.payload).toMatchObject({ status: "logged", plannedKm: 6, completedKm: 6 });
+    expect(result.events[1]?.payload).toMatchObject({ status: "closed-unlogged", plannedKm: 0, completedKm: 0, outcome: null });
+    expect(result.events[0]?.timezone).toBe("Asia/Taipei");
+  });
+
+  it("emits nothing for days an earlier sweep already closed", () => {
+    const first = runNightlySweep(input());
+    const second = runNightlySweep(input({ closedDays: first.newlyClosed.map((closed) => closed.day) }));
+    expect(first.events.length).toBeGreaterThan(0);
+    expect(second.events).toEqual([]);
+  });
+
+  it("produces events that satisfy the events contract", () => {
+    const result = runNightlySweep(input({ entries: [entry("2026-11-02", { outcome: "completed" })] }));
+    for (const event of result.events) {
+      const parsed = eventSchema.safeParse(event);
+      if (!parsed.success) throw new Error(`${event.type} ${event.trainingDay}: ${JSON.stringify(parsed.error.issues)}`);
+    }
+  });
+
+  it("gives the same day the same event id twice", () => {
+    const first = runNightlySweep(input());
+    const second = runNightlySweep(input());
+    expect(first.events.map((event) => event.eventId)).toEqual(second.events.map((event) => event.eventId));
   });
 });
 

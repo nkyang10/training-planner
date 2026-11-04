@@ -394,7 +394,7 @@ export const signalSchema = z.object({
     "formulaVersion": z.string().optional(),
   }).strict();
 
-export const eventSchema = whenThen(whenThen(z.object({
+export const eventSchema = whenThen(whenThen(whenThen(z.object({
     "eventId": z.string().uuid(),
     "userId": z.string().uuid(),
     "type": z.string().regex(new RegExp("^[a-z][a-zA-Z]*\\.[a-zA-Z][a-zA-Z]*$")),
@@ -414,6 +414,17 @@ export const eventSchema = whenThen(whenThen(z.object({
   }).passthrough(), z.object({
     "idempotencyKey": z.string(),
   }).passthrough(), "A runner action always arrives over a network that retries, so it always carries an idempotency key; a null key on a runner action is a client bug and must fail at write time rather than duplicate a daily entry."), z.object({
+    "type": z.literal("day.closed"),
+  }).passthrough(), z.object({
+    "actor": z.union([z.literal("system"), z.literal("worker")]),
+    "payload": z.object({
+    "status": z.union([z.literal("logged"), z.literal("closed-unlogged")]),
+    "plannedKm": z.number().min(0),
+    "plannedSessions": z.number().int().min(0),
+    "completedKm": z.number().min(0),
+    "outcome": z.string().nullable(),
+  }).passthrough(),
+  }).passthrough(), "A day closes once, and the sweep is the only thing allowed to say so: a runner cannot close their own day, because that would let a tap decide whether the day counts as unlogged. The payload carries both what the plan asked and what was reported, so `closed-unlogged` is a status with a null outcome rather than a zero that looks like a decision."), z.object({
     "type": z.string().regex(new RegExp("^safety\\.")),
   }).passthrough(), z.object({
     "actor": z.union([z.literal("system"), z.literal("worker"), z.literal("support")]).optional(),

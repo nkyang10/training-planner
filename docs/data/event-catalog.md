@@ -49,6 +49,7 @@ run belonged to.
 | `activity.linked` | session ↔ activity; `matchMethod`, `confidence` |
 | `activity.unlinkRequested` | ambiguity surfaced to the runner |
 | `pain.reported` | site, intensity, during/next-morning, gait change |
+| `day.closed` | the sweep's verdict that a training day ended; `status` is `logged` or `closed-unlogged`, `plannedKm`/`plannedSessions` say what the plan asked, `completedKm`/`outcome` say what was reported (null when nothing was). Emitted once per day, by the sweep, never by the runner: a tap must not be able to decide whether a day counts as unlogged. Consumers: nudge scheduler, missed-session rules, rollup cache |
 
 ## Interpretation & review
 | Type | Notes |
