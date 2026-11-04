@@ -30,6 +30,12 @@ intent, which scopes the review — this is where most of the product's practica
 | "Race went badly" | post-race re-baseline + next cycle | — |
 | "Just check me" | read-only review: verdict + narrative, **no diff** | — |
 
+The manual path exists in code: `POST /reviews/manual` opens a review with a manual candidate (`ruleId: null`, so the
+review records `openedBy: user-request`), the same bounded option set the engine may offer, and an `orientation`
+block that records what the runner's un-applied answers would change. A full re-plan from a changed orientation is a
+different proposal shape (a new plan, not at most two edits), and it is tracked separately rather than smuggled in as
+a "change".
+
 A read-only review matters: "show me the plan and tell me if it still makes sense" is the most
 common real coaching request and must not force a change nobody asked for.
 
