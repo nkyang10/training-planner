@@ -44,10 +44,16 @@ export interface DayEntryPain {
 }
 
 export interface DayEntry {
+  /** Writer-assigned (uuidFrom), never client-supplied: a client that could name the row could forge a correction. */
+  entryId?: string;
   day: string;
   outcome: DayEntryOutcome;
   revision: number;
   tzAtEvent: string;
+  /** Set on a correction: which revision of the same day it replaces. */
+  correctedFromRevision?: number | null;
+  /** Set by the writer when a later revision exists; the old row is never deleted (AGENTS rule 4). */
+  supersededBy?: string | null;
   sessionTaken?: SessionTaken | null;
   outcomeDetail?: OutcomeDetail | null;
   completedKm?: number | null;
@@ -148,4 +154,7 @@ export interface TrainingEvent {
   dayStartHour?: number;
   idempotencyKey?: string | null;
   causationId?: string | null;
+  /** For entry.corrected: the event whose meaning this one replaces. */
+  supersedesEventId?: string | null;
+  schemaUrl?: string | null;
 }

@@ -23,7 +23,8 @@
       "@training-planner/planner-core": ["packages/planner-core/src/index.ts"],
       "@training-planner/policy": ["packages/policy/src/index.ts"],
       "@training-planner/i18n": ["packages/i18n/src/index.ts"],
-      "@training-planner/narrator": ["packages/narrator/src/index.ts"]
+      "@training-planner/narrator": ["packages/narrator/src/index.ts"],
+      "@training-planner/entries": ["packages/entries/src/index.ts"]
     }
   },
   "include": [

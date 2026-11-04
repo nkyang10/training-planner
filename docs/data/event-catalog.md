@@ -42,8 +42,8 @@ run belonged to.
 ## Logging & observation
 | Type | Notes |
 |---|---|
-| `entry.submitted` | the daily feedback entry; `status`, `rpe`, `legs`, optional tiers, `note`, `clientId` |
-| `entry.corrected` | backfill/typo fix; references the superseded row + `reason` if > 72 h |
+| `entry.submitted` | the daily feedback entry; `outcome`, `sessionTaken`, `rpe`, `legs`, optional wellness tiers by reference, `note` excluded (health free text, ADR-0006); the client id is the envelope's `idempotencyKey` |
+| `entry.corrected` | backfill/typo fix; `correctedFromRevision`, `reason` (required when the day is older than `missed-session-rules.yaml#unlogged_backfill_grace_hours`), and the envelope's `supersedesEventId` points at the row it replaces |
 | `entry.reminded` | nudge sent (one per day budget) |
 | `activity.observed` | import/manual activity; `provenance`, `rawHash` |
 | `activity.linked` | session ↔ activity; `matchMethod`, `confidence` |

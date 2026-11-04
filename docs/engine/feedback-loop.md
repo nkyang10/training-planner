@@ -60,9 +60,11 @@ decision than a missed session because of boredom, and the same holds for what w
   metric needs the fraction, and a runner who rounds up corrupts their own history.
 - **A missing entry is a signal, never a zero.** `unlogged` ≠ `rest`. Absence after a hard block is
   information (avoidance, chaos, illness); we surface gaps neutrally and never as a broken streak.
-- **Backfill window**: entries for the last 7 days are editable by creating a *correction* record
-  (original stays; derived metrics recompute from the corrected view). Corrections after 7 days
-  require a reason.
+- **Backfill window**: entries for the last 3 days are editable by creating a *correction* record
+  (original stays; derived metrics recompute from the corrected view). Corrections after that window
+  require a reason. The number is `missed-session-rules.yaml#unlogged_backfill_grace_hours` (72 h) and it
+  lives in knowledge: this paragraph used to say 7 days, which contradicted the knob, the day-entry contract
+  and the event catalogue at once.
 - **Offline-first**: the entry is written to IndexedDB first, synced with an idempotency key, and
   shows as "saved locally" — a runner in a basement gym or on a trail with no signal must still be
   able to log.
