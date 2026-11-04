@@ -4,7 +4,7 @@
  * against this adapter are testing the same discipline Postgres must keep.
  */
 import { describe, expect, it } from "vitest";
-import type { DayEntry, PlanVersion, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, PlanVersion, Review, TrainingEvent } from "@training-planner/domain";
 import { createMemoryRepository, createMemorySessions, DuplicateIdempotencyError } from "../src/index";
 import type { Repository } from "../src/index";
 import { makeEntry, makeEvent } from "./helpers";
@@ -131,6 +131,36 @@ describe("plans are found by the day they cover", () => {
     const repository = createMemoryRepository();
     repository.savePlanVersion(planFor(USER_A, "2026-11-01"));
     expect(repository.latestPlanVersionFor(USER_B, "2026-11-05")).toBeUndefined();
+  });
+});
+
+describe("reviews are readable in the order a page needs them", () => {
+  const reviewOf = (reviewId: string, openedAtDay: string, userId: string): Review => ({
+    schemaVersion: 1,
+    reviewId,
+    userId,
+    openedAtDay,
+    openedBy: "system-signal",
+    evidence: { signalIds: ["completion"], ruleIds: ["plan-too-big"], evidenceGradeMax: "B" },
+    horizonDays: 14,
+    freezeDays: 2,
+    options: [
+      { optionId: "keep", labelKey: "keep-as-is", keepAsIs: true, diffId: null, costSummary: "risk noted", expiresAfterDay: "2026-11-24" },
+      { optionId: "reduce", labelKey: "reduce", keepAsIs: false, diffId: "33333333-3333-4333-8333-333333333333", costSummary: "less intensity", expiresAfterDay: "2026-11-24" },
+    ],
+    status: "open",
+  });
+
+  it("lists a user s reviews newest first and never another user s", () => {
+    const repository = createMemoryRepository();
+    repository.saveReview(reviewOf("11111111-1111-4111-8111-111111111111", "2026-11-01", USER_A));
+    repository.saveReview(reviewOf("22222222-2222-4222-8222-222222222222", "2026-11-05", USER_A));
+    repository.saveReview(reviewOf("33333333-3333-4333-8333-333333333333", "2026-11-05", USER_B));
+
+    const mine = repository.listReviews(USER_A);
+    expect(mine.map((review) => review.openedAtDay)).toEqual(["2026-11-05", "2026-11-01"]);
+    expect(repository.listReviews(USER_B)).toHaveLength(1);
+    expect(repository.listReviews("cccccccc-cccc-4ccc-8ccc-cccccccccccc")).toEqual([]);
   });
 });
 

@@ -15,11 +15,13 @@ wording including the escalation text: `docs/ux/feedback-microcopy.md`.
 | Route | What it is |
 |---|---|
 | `GET /login`, `POST /login` | a token form that sets an `HttpOnly; SameSite=Lax` session cookie |
-| `GET /` | the current Monday–Sunday week: session kind and distance per day, a logged/not-logged chip, and the plan's first explanation sentence |
+| `GET /` | the current Monday–Sunday week: session kind and distance per day, a logged/not-logged chip, the plan's first explanation sentence, and a banner when a review is open |
 | `GET /day/:day`, `POST /day/:day` | the drawer: five outcomes, effort, legs, an optional note, a "why" row for a skipped day, and the coach note after saving |
+| `GET /review/:reviewId`, `POST /review/:reviewId` | the review sheet: options in the order `packages/review` decided (keep-the-plan first), each with its cost, and three decisions — accept, keep the plan, ask later |
 
 A form post is the whole interaction. The server builds the **same `EntryDraft` a JSON client would** and runs the
-same entry pipeline, so there is one write path, not one per client.
+same entry pipeline, so there is one write path, not one per client. A review decision is the same: the page
+renders what `decideReview` returned, and never edits a review itself.
 
 ## Rules this client keeps
 
@@ -36,8 +38,9 @@ same entry pipeline, so there is one write path, not one per client.
 - **Escaping is applied at every insertion site** — a note is free text and the comment is generated text, and
   both are rendered back into markup.
 - **No weight, no calorie, no diagnosis, no streak** (AGENTS rule 6; `docs/ux/feedback-microcopy.md`).
-- **A review shows "keep as is" first with a visible diff and a stated cost.** The review sheet is not built
-  yet, and when it is, the ordering is a rule of `packages/review`, not a layout choice.
+- **A review shows "keep the plan" first with a stated cost.** The ordering is a rule of `packages/review`
+  (an option set whose first option is not keep-the-plan is refused before the page exists), and the freeze
+  window — nothing changes before today + `freeze_window_days` — is printed on the sheet, not discovered later.
 
 ## The offline queue
 
@@ -53,6 +56,6 @@ inspection and by the wire tests that prove the server accepts and records a rep
 
 ## What is not built yet
 
-- **The calendar month grid, swipe navigation, keyboard shortcuts, the review sheet.** `docs/ux/screens.md` owns
-  those; this slice is the loop, not the whole surface.
+- **The calendar month grid, swipe navigation, keyboard shortcuts.** `docs/ux/screens.md` owns those; this slice
+  is the loop, not the whole surface.
 - **Real authentication.** `createMemorySessions` maps tokens to users for development and tests.

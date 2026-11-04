@@ -107,6 +107,10 @@ export function createMemoryRepository(): Repository {
       return stateOf(userId).reviews.get(reviewId);
     },
 
+    listReviews(userId: string): Review[] {
+      return [...stateOf(userId).reviews.values()].sort((a, b) => (a.openedAtDay < b.openedAtDay ? 1 : -1));
+    },
+
     saveComment(comment: CommentRecord): void {
       const state = stateOf(comment.userId);
       state.comments = [...state.comments, comment];

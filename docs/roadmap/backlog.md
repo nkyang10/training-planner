@@ -37,7 +37,6 @@ findings that do not make a plan unsafe, which is why M1 closed with them record
 | 19 | Store pain reports as their own rows with ids, referenced from the entry and the event | ADR-0006 keeps health free text out of the event log, and the pain triage rules need a trajectory across reports, not one array inside an entry | M | pain history is a blob inside entries, and the triage cannot see a trend |
 | 20 | Give `SessionTaken` a partial marker (or a separate completed fraction) | a partly-done day has no honest value to store: `shortened` does not exist in the enum, so the web form has to omit the field entirely. Found when the form tried `shortened` and typecheck refused it | S | every partial day looks the same as a day the runner said nothing about |
 | 21 | Reconcile `day-entry.schema.json`'s `sessionTaken: null` contradiction | the field description says null is how "the runner did not say" is stored, while the `allOf` forbids null when the key is present; `packages/entries` omits the key, which is the only spelling the contract accepts | S | two spellings of "not said", and a validator that disagrees with its own description |
-| 23 | The review sheet: an open-review banner and a page that shows "keep the plan" first, with the visible diff and the stated cost | `packages/review` owns the ordering and the freeze window, but no screen renders an open review, so the review is invisible to the person who has to consent to it | M | reviews exist in the engine and never reach a runner |
 | 24 | The Postgres adapter behind `Repository`, with migrations and row-level security | the interface and the in-memory reference adapter exist and are contract-tested; the database adapter is the first place RLS becomes real (ADR-0002), and it cannot be verified without a database | L | the product cannot leave one process, and RLS stays an unproven claim |
 
 ### Landed in M2
@@ -48,6 +47,7 @@ Rows that were open and are now shipped, kept here so the backlog stays a list o
 |---|---|---|
 | 13 | State the 7-day-normalised rate wherever a week is partial | [PR #29](https://github.com/nkyang10/training-planner/pull/29): `summariseWeeks` + `explain.partial`, and the CLI prints `3.9 km over 4 days, which is 6.8 km at a full week's rate` |
 | 22 | The offline queue | [PR #34](https://github.com/nkyang10/training-planner/pull/34): `packages/offline` (rules, 16 tests) + `apps/web/public/queue.js` (IndexedDB, replay with `source=offline-queue`) |
+| 23 | The review sheet | [PR #35](https://github.com/nkyang10/training-planner/pull/35): `GET`/`POST /review/:reviewId` plus the week banner; the ordering and freeze window are `packages/review`'s rules, the page only renders them |
 
 ## Next (M3–M5)
 

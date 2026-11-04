@@ -17,9 +17,10 @@ import type { KnowledgeBundle } from "@training-planner/knowledge";
 import { renderComment, renderPlanExplanation } from "@training-planner/narrator";
 import { addDays, eachDay, uuidFrom, weekStart } from "@training-planner/planner-core";
 import { evaluatePolicy } from "@training-planner/policy";
+import { decideReview, firstEditableDay } from "@training-planner/review";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
-import { renderCalendar, renderDay, renderLogin } from "./pages";
+import { renderCalendar, renderDay, renderLogin, renderReview } from "./pages";
 import { STYLES } from "./styles";
 
 export interface WebOptions {
@@ -180,6 +181,7 @@ export function createWeb(options: WebOptions): RequestListener {
       const days = eachDay(start, addDays(start, 6));
       const plan = repository.latestPlanVersionFor(userId, today);
       const explanation = plan === undefined ? undefined : renderPlanExplanation(plan, { locale: state.locale });
+      const openReview = repository.listReviews(userId).find((review) => review.status === "open");
       sendHtml(
         response,
         200,
@@ -191,9 +193,68 @@ export function createWeb(options: WebOptions): RequestListener {
           currentOf: (day) => currentEntry(userId, day),
           commentOf: (day) => repository.listComments(userId, day)[0],
           intro: explanation?.sentences[0],
+          openReview,
         }),
       );
       return;
+    }
+
+    // The review sheet: the ordering and the freeze window are packages/review s rules, and this page renders
+    // what they decided. A review is never edited here; a decision is a state change.
+    if (segments.length === 2 && segments[0] === "review") {
+      const review = repository.getReview(userId, segments[1] ?? "");
+      if (review === undefined) {
+        const messages = messagesFor(state.locale);
+        sendHtml(
+          response,
+          404,
+          `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>404</title></head><body><p>${escapeHtml(
+            messages.web["web.review-none"],
+          )}</p><p><a href="/">${escapeHtml(messages.web["web.title"])}</a></p></body></html>`,
+        );
+        return;
+      }
+      const today = state.now.slice(0, 10);
+      const first = firstEditableDay(today, knowledge);
+      const sheet = (input: Parameters<typeof renderReview>[0]): void => {
+        sendHtml(response, input.error === undefined ? 200 : 409, renderReview(input));
+      };
+
+      if (method === "GET") {
+        sheet({ locale: state.locale, review, firstEditableDay: first, message: undefined, error: undefined });
+        return;
+      }
+
+      if (method === "POST") {
+        const form = await readForm(request);
+        const decision = oneOf(["accept", "decline", "defer"] as const, form.get("decision"), "accept");
+        const recheckDay = addDays(today, knowledge.number("review-triggers.yaml#dwell_days"));
+        const result =
+          decision === "decline"
+            ? decideReview(review, { kind: "decline", reason: form.get("reason") ?? undefined }, today, knowledge)
+            : decision === "defer"
+              ? decideReview(review, { kind: "defer", untilDay: recheckDay }, today, knowledge)
+              : decideReview(review, { kind: "accept", optionId: form.get("optionId") ?? "" }, today, knowledge);
+
+        if (result.status === "refused") {
+          sheet({ locale: state.locale, review, firstEditableDay: first, message: undefined, error: `${result.code}: ${result.detail}` });
+          return;
+        }
+        repository.saveReview(result.review);
+        sheet({
+          locale: state.locale,
+          review: result.review,
+          firstEditableDay: first,
+          message:
+            result.status === "accepted"
+              ? { kind: "accepted", day: result.applyFromDay }
+              : result.status === "deferred"
+                ? { kind: "deferred", day: result.recheckDay }
+                : { kind: "declined" },
+          error: undefined,
+        });
+        return;
+      }
     }
 
     if (segments.length === 2 && segments[0] === "day" && ISO_DAY.test(segments[1] ?? "")) {
