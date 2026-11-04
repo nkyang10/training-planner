@@ -3,6 +3,8 @@
  * and the same ids, and append-only, so a correction never rewrites a day somebody already learned from.
  */
 export { submitEntry, entriesForDay, resolveCurrent, pendingDays } from "./submit";
+export { closeEventFor, DAY_CLOSED } from "./close";
+export type { CloseEventInput } from "./close";
 export type {
   AcceptedSubmission,
   DuplicateSubmission,

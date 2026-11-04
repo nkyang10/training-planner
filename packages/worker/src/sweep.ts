@@ -13,6 +13,7 @@
  * day-close event type yet, which is backlog row 18 and not something this package may invent.
  */
 import { addDays, daysBetween } from "@training-planner/planner-core";
+import { closeEventFor } from "@training-planner/entries";
 import { computeSignals } from "@training-planner/signals";
 import type { NightlyInput, NightlyResult, ClosedDay } from "./types";
 
@@ -51,10 +52,27 @@ export function runNightlySweep(input: NightlyInput): NightlyResult {
     ? computeSignals({ userId: input.userId, today, entries, plan, knowledge, computedAt })
     : null;
 
+  // One event per day that closed in this sweep: the catalogue now has `day.closed`, so the worker can name the
+  // day instead of leaving the writer to invent a type (backlog row 18). A day already closed gets no second event.
+  const events = newlyClosed.map((closed) =>
+    closeEventFor({
+      userId: input.userId,
+      day: closed.day,
+      status: closed.status,
+      plannedKm: closed.plannedKm,
+      plannedSessions: closed.plannedSessions,
+      completedKm: closed.completedKm,
+      outcome: closed.outcome,
+      occurredAt: computedAt,
+      timezone: input.timezone,
+    }),
+  );
+
   return {
     newlyClosed,
     pending,
     skipped,
+    events,
     signalCache:
       bundle === null
         ? null

@@ -155,6 +155,17 @@ export interface Signal {
 
 export type EventActor = "runner" | "system" | "worker" | "import" | "support";
 
+/** `day.closed`: whether the day ended with an entry or without one. Absence is a status, never a zero. */
+export type DayCloseStatus = "logged" | "closed-unlogged";
+
+export interface DayClosePayload {
+  status: DayCloseStatus;
+  plannedKm: number;
+  plannedSessions: number;
+  completedKm: number;
+  outcome: string | null;
+}
+
 export interface TrainingEvent {
   eventId: string;
   userId: string;

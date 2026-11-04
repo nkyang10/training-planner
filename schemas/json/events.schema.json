@@ -37,6 +37,27 @@
       "description": "A runner action always arrives over a network that retries, so it always carries an idempotency key; a null key on a runner action is a client bug and must fail at write time rather than duplicate a daily entry."
     },
     {
+      "if": { "properties": { "type": { "const": "day.closed" } }, "required": ["type"] },
+      "then": {
+        "properties": {
+          "actor": { "enum": ["system", "worker"] },
+          "payload": {
+            "type": "object",
+            "required": ["status", "plannedKm", "plannedSessions", "completedKm", "outcome"],
+            "properties": {
+              "status": { "enum": ["logged", "closed-unlogged"] },
+              "plannedKm": { "type": "number", "minimum": 0 },
+              "plannedSessions": { "type": "integer", "minimum": 0 },
+              "completedKm": { "type": "number", "minimum": 0 },
+              "outcome": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "required": ["actor", "payload"]
+      },
+      "description": "A day closes once, and the sweep is the only thing allowed to say so: a runner cannot close their own day, because that would let a tap decide whether the day counts as unlogged. The payload carries both what the plan asked and what was reported, so `closed-unlogged` is a status with a null outcome rather than a zero that looks like a decision."
+    },
+    {
       "if": { "properties": { "type": { "pattern": "^safety\\." } }, "required": ["type"] },
       "then": { "properties": { "actor": { "enum": ["system", "worker", "support"] } }, "required": ["causationId"] },
       "description": "Safety events are raised by the system, never by a tap, and an override records which flag it overrode. A safety event without a cause chain is the one audit gap that must never be possible (AGENTS rule 3)."
