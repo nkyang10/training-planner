@@ -22,6 +22,7 @@ import { renderAdjustment, renderComment } from "@training-planner/narrator";
 import { generatePlan, uuidFrom } from "@training-planner/planner-core";
 import type { Evidence, PlanState } from "@training-planner/planner-core";
 import { evaluatePolicy } from "@training-planner/policy";
+import { computeSignals } from "@training-planner/signals";
 import { decideReview } from "@training-planner/review";
 import type { Decision } from "@training-planner/review";
 import { DuplicateIdempotencyError } from "@training-planner/storage";
@@ -262,6 +263,22 @@ export function createApi(options: ApiOptions): RequestListener {
       return;
     }
 
+    // GET /signals - what the system currently believes about this runner, and what it cannot see.
+    if (segments.length === 1 && segments[0] === "signals") {
+      if (method !== "GET") return fail(response, 405, "method-not-allowed", "use GET /signals");
+      const plan = repository.latestPlanVersionFor(userId, today);
+      if (plan === undefined) return fail(response, 404, "no-plan", "no plan version covers this day yet");
+      const output = computeSignals({
+        userId,
+        today,
+        entries: repository.listEntries(userId),
+        plan,
+        knowledge,
+        computedAt: at,
+      });
+      sendJson(response, 200, { asOfDay: today, signals: output.signals, unavailable: output.unavailable });
+      return;
+    }
     // GET /entries/:day
     if (segments.length === 2 && segments[0] === "entries") {
       if (method !== "GET") return fail(response, 405, "method-not-allowed", "use GET /entries/:day");

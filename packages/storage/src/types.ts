@@ -54,6 +54,8 @@ export interface Repository {
   appendEntryWithEventAndPointer(input: AppendEntryInput): void;
   findEntryByIdempotencyKey(userId: string, idempotencyKey: string): DayEntry | undefined;
   listEntriesForDay(userId: string, day: string): DayEntry[];
+  /** Every entry for a user, oldest day first: windowed signals read a season, not a day. */
+  listEntries(userId: string): DayEntry[];
   listEvents(userId: string): TrainingEvent[];
 
   savePlanVersion(version: PlanVersion): void;

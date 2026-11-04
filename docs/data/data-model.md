@@ -60,7 +60,7 @@ DDL is wrong *only if* that page says so — otherwise this page is wrong.
 | Table | Purpose |
 |---|---|
 | `metrics_daily` | per user-day rollups: `load_trimp`, `load_srpe`, `ctl`, `atl`, `tsb`, `acwr`, `wellness_ewma jsonb`, `hr_drift`, `monotony`, `log_quality`, `requires jsonb` |
-| `signals_current` | latest computed signal bundle per user (cache for policy evaluation) |
+| `signals_current` | latest computed signal bundle per user (cache for policy evaluation). Not written yet: `packages/signals` computes the bundle on demand and `GET /signals` serves it, so the cache lands with the worker, not before it |
 | `pace_estimates` | derived paces with `anchor_day`, `method`, `confidence`, `valid_from`, `valid_to` — a claim about a window, not a row that expires |
 | `analytics.*` | de-identified aggregates, separate role, k-anonymity floor, no `user_id` |
 

@@ -110,6 +110,21 @@ describe("the log is append-only and per-user", () => {
   });
 });
 
+describe("a user's whole log is readable in day order", () => {
+  it("returns every entry, oldest first, and never another user's", () => {
+    const repository = createMemoryRepository();
+    for (const day of ["2026-11-07", "2026-11-03", "2026-11-05"]) {
+      const entry = makeEntry({ day, idempotencyKey: `key-${day}` });
+      repository.appendEntryWithEventAndPointer({
+        entry,
+        event: makeEvent({ userId: USER_A, entry, idempotencyKey: `key-${day}` }),
+      });
+    }
+    expect(repository.listEntries(USER_A).map((entry) => entry.day)).toEqual(["2026-11-03", "2026-11-05", "2026-11-07"]);
+    expect(repository.listEntries(USER_B)).toEqual([]);
+  });
+});
+
 describe("plans are found by the day they cover", () => {
   const planFor = (userId: string, generatedAtDay: string): PlanVersion => ({
     ...makePlan(WEEK, generatedAtDay),

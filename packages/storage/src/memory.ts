@@ -79,6 +79,10 @@ export function createMemoryRepository(): Repository {
         .sort((a, b) => a.revision - b.revision);
     },
 
+    listEntries(userId: string): DayEntry[] {
+      return [...stateOf(userId).entries].sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.revision - b.revision));
+    },
+
     listEvents(userId: string): TrainingEvent[] {
       return [...stateOf(userId).events];
     },
