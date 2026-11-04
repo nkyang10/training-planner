@@ -21,11 +21,12 @@ import { createApi } from "../src/server";
 const knowledge = loadKnowledge("knowledge/heuristics");
 const USER_A = "66666666-6666-4666-8666-666666666666";
 const USER_B = "77777777-7777-4777-8777-777777777777";
+const USER_C = "abababab-abab-4bab-8bab-abababababab";
 const NOW = "2026-11-05T22:40:00.000Z";
 const TODAY = "2026-11-05";
 
 const repository: Repository = createMemoryRepository();
-const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B });
+const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "token-c": USER_C });
 let server: Server;
 let base = "";
 
@@ -289,6 +290,84 @@ describe("the trigger layer is reachable, and it stops where the evidence ends",
 
   it("answers 404 when no plan covers the day", async () => {
     const response = await call("/reviews/candidates", { token: "token-b" });
+    expect(response.status).toBe(404);
+  });
+});
+
+describe("POST /reviews/open closes the chain: log, signals, triggers, bounded options, an open review", () => {
+  const C_TODAY = "2026-11-08";
+
+  beforeAll(async () => {
+    // A runner with a plan that started a week ago, so there is history to read and future to change.
+    const created = await call("/plan", {
+      token: "token-c",
+      day: C_TODAY,
+      body: {
+        profile: fixture.input.profile,
+        evidence: fixture.input.evidence,
+        state: { planStartDay: "2026-11-02", horizonDays: 21 },
+        seed: "review-chain",
+      },
+    });
+    expect(created.status).toBe(201);
+    const version = planVersionSchema.parse(created.body["version"]);
+    // Two hard sessions in the past, missed: the trigger layer needs exactly this shape.
+    const hardDays = version.sessions.filter((session) => session.hardDay === true && session.day < C_TODAY).slice(0, 2);
+    for (const session of hardDays) {
+      const posted = await call("/entries", {
+        token: "token-c",
+        day: session.day,
+        body: draft({ day: session.day, outcome: "missed", sessionTaken: "none" }),
+      });
+      expect(posted.status).toBe(201);
+    }
+  });
+
+  it("opens a review with keep first, and stores the diffs it offered", async () => {
+    const response = await call("/reviews/open", { token: "token-c", day: C_TODAY, body: {} });
+    expect(response.status).toBe(201);
+    expect(response.body["status"]).toBe("opened");
+
+    const review = reviewSchema.parse(response.body["review"]);
+    expect(review.status).toBe("open");
+    expect(review.options.length).toBeGreaterThanOrEqual(2);
+    expect(review.options[0]?.keepAsIs).toBe(true);
+    expect(review.openedBy).toBe("system-signal");
+
+    const options = response.body["options"] as Array<{ optionId: string; diffId: string | null }>;
+    const changeOptions = options.filter((option) => option.optionId !== "keep");
+    expect(changeOptions.length).toBeGreaterThanOrEqual(1);
+    for (const option of changeOptions) {
+      expect(option.diffId).not.toBeNull();
+      const stored = repository.getPlanDiff(USER_C, option.diffId as string);
+      expect(stored).toBeDefined();
+      expect(stored?.changes).toHaveLength(1);
+      // The diff's day is after the freeze window, and the child version is proposed, not stored as active.
+      expect((stored?.changes[0]?.day ?? "") > C_TODAY).toBe(true);
+      expect(repository.getPlanVersion(USER_C, stored?.toVersionId ?? "")).toBeUndefined();
+    }
+
+    const unevaluable = response.body["unevaluable"] as Array<{ ruleId: string }>;
+    expect(unevaluable.map((item) => item.ruleId)).toContain("goal-feasibility");
+  });
+
+  it("refuses a second review in the same week, through packages/review's budget guard", async () => {
+    const response = await call("/reviews/open", { token: "token-c", day: C_TODAY, body: {} });
+    expect(response.status).toBe(200);
+    expect(response.body["status"]).toBe("suppressed");
+    expect(response.body["reason"]).toBe("budget");
+  });
+
+  it("answers none when the evidence does not fire a rule", async () => {
+    const response = await call("/reviews/open", { body: {} });
+    expect(response.status).toBe(200);
+    expect(response.body["status"]).toBe("none");
+    const unevaluable = response.body["unevaluable"] as Array<{ ruleId: string }>;
+    expect(unevaluable.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("answers 404 when no plan covers the day", async () => {
+    const response = await call("/reviews/open", { token: "token-b", body: {} });
     expect(response.status).toBe(404);
   });
 });

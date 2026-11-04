@@ -12,7 +12,7 @@
  * - **idempotency is a uniqueness rule**: `appendEntryWithEventAndPointer` refuses a second row for an
  *   idempotency key that already exists. A middleware cannot give that guarantee; a unique index can.
  */
-import type { DayEntry, PlanVersion, Review, TrainingEvent } from "@training-planner/domain";
+import type { DayEntry, PlanDiff, PlanVersion, Review, TrainingEvent } from "@training-planner/domain";
 import type { Locale } from "@training-planner/i18n";
 
 export interface SupersededPointer {
@@ -62,6 +62,10 @@ export interface Repository {
   getPlanVersion(userId: string, versionId: string): PlanVersion | undefined;
   /** The version whose firstDay..lastDay contains `day`, newest generation first. */
   latestPlanVersionFor(userId: string, day: string): PlanVersion | undefined;
+
+  /** A proposed diff is evidence, stored when it is offered; a review points at it by id. */
+  savePlanDiff(diff: PlanDiff): void;
+  getPlanDiff(userId: string, diffId: string): PlanDiff | undefined;
 
   saveReview(review: Review): void;
   getReview(userId: string, reviewId: string): Review | undefined;

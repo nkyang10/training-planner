@@ -28,6 +28,7 @@ comment in the runner's language. The client never re-derives a number.
 | `GET /signals` | what the system currently believes about this runner (`packages/signals`), plus the signals it cannot compute and why |
 | `GET /entries/:day` | revisions, the current one, and the comments rendered for that day |
 | `GET /reviews/candidates` | what the corpus trigger rules say about the current evidence, and which rules could not be evaluated |
+| `POST /reviews/open` | the whole chain: signals → triggers → bounded options → an open review (stores the review and its diffs; stores no plan version until the runner accepts) |
 | `POST /reviews/:reviewId/decision` | accept / decline / defer |
 
 ## Rules this layer keeps

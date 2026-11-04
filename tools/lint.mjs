@@ -74,9 +74,10 @@ const reviewSources = packageSources.filter((file) => rel(file).startsWith("pack
 const offlineSources = packageSources.filter((file) => rel(file).startsWith("packages/offline/src/"));
 const signalsSources = packageSources.filter((file) => rel(file).startsWith("packages/signals/src/"));
 const triggersSources = packageSources.filter((file) => rel(file).startsWith("packages/triggers/src/"));
+const replanSources = packageSources.filter((file) => rel(file).startsWith("packages/replan/src/"));
 
 scan(
-  [...plannerSources, ...policySources, ...narratorSources, ...entriesSources, ...reviewSources, ...offlineSources, ...signalsSources, ...triggersSources],
+  [...plannerSources, ...policySources, ...narratorSources, ...entriesSources, ...reviewSources, ...offlineSources, ...signalsSources, ...triggersSources, ...replanSources],
   PURITY,
   "engine purity (AGENTS rule 1)",
 );

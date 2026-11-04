@@ -29,7 +29,8 @@
       "@training-planner/storage": ["packages/storage/src/index.ts"],
       "@training-planner/offline": ["packages/offline/src/index.ts"],
       "@training-planner/signals": ["packages/signals/src/index.ts"],
-      "@training-planner/triggers": ["packages/triggers/src/index.ts"]
+      "@training-planner/triggers": ["packages/triggers/src/index.ts"],
+      "@training-planner/replan": ["packages/replan/src/index.ts"]
     }
   },
   "include": [

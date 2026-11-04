@@ -19,12 +19,14 @@ import type { Locale } from "@training-planner/i18n";
 import { loadKnowledge } from "@training-planner/knowledge";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
 import { renderAdjustment, renderComment } from "@training-planner/narrator";
-import { generatePlan, uuidFrom } from "@training-planner/planner-core";
+import { addDays, daysBetween, generatePlan, uuidFrom } from "@training-planner/planner-core";
 import type { Evidence, PlanState } from "@training-planner/planner-core";
 import { evaluatePolicy } from "@training-planner/policy";
 import { computeSignals } from "@training-planner/signals";
 import { evaluateTriggers } from "@training-planner/triggers";
-import { decideReview } from "@training-planner/review";
+import { decideReview, openReview } from "@training-planner/review";
+import type { ProposedOption } from "@training-planner/review";
+import { proposePlanOptions } from "@training-planner/replan";
 import type { Decision } from "@training-planner/review";
 import { DuplicateIdempotencyError } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
@@ -280,6 +282,92 @@ export function createApi(options: ApiOptions): RequestListener {
       sendJson(response, 200, { asOfDay: today, signals: output.signals, unavailable: output.unavailable });
       return;
     }
+    // POST /reviews/open - the full chain: log -> signals -> triggers -> bounded options -> an open review.
+    //
+    // It stores the review and the diffs it offered, and it stores no plan version: a proposed version becomes real
+    // only when the runner accepts, which is the next slice. Opening is still refused by packages/review's guards
+    // (budget, dwell, cooldown), because that is the one place allowed to decide whether a review may exist.
+    if (segments.length === 2 && segments[0] === "reviews" && segments[1] === "open") {
+      if (method !== "POST") return fail(response, 405, "method-not-allowed", "use POST /reviews/open");
+      const plan = repository.latestPlanVersionFor(userId, today);
+      if (plan === undefined) return fail(response, 404, "no-plan", "no plan version covers this day yet");
+
+      const signals = computeSignals({
+        userId,
+        today,
+        entries: repository.listEntries(userId),
+        plan,
+        knowledge,
+        computedAt: at,
+      });
+      const triggers = evaluateTriggers({ userId, today, signals, knowledge });
+      if (triggers.candidate === undefined) {
+        sendJson(response, 200, { status: "none", fired: [], unevaluable: triggers.unevaluable });
+        return;
+      }
+
+      const proposal = proposePlanOptions({ plan, today, candidate: triggers.candidate, knowledge });
+      if (proposal.options.length < 2) {
+        sendJson(response, 200, { status: "no-option", refusals: proposal.refusals });
+        return;
+      }
+
+      const history = repository.listReviews(userId);
+      const weekAgo = addDays(today, -7);
+      const promptsThisWeek = history.filter((review) => review.openedAtDay > weekAgo).length;
+      const accepted = history
+        .filter((review) => review.status === "accepted" && review.decidedAtDay !== null && review.decidedAtDay !== undefined)
+        .sort((a, b) => ((a.decidedAtDay ?? "") < (b.decidedAtDay ?? "") ? 1 : -1))[0];
+      const sameKind = history
+        .filter((review) => review.evidence.ruleIds.includes(triggers.candidate?.ruleId ?? ""))
+        .sort((a, b) => (a.openedAtDay < b.openedAtDay ? 1 : -1))[0];
+
+      const proposed: ProposedOption[] = proposal.options.map((option) => ({
+        optionId: option.optionId,
+        labelKey: option.labelKey,
+        keepAsIs: option.keepAsIs,
+        diffId: option.diffId,
+        costKey: option.costKey,
+        costSlots: option.costSlots,
+        loadDeltaPct: option.loadDeltaPct,
+      }));
+
+      const opened = openReview({
+        userId,
+        today,
+        candidate: triggers.candidate,
+        knowledge,
+        options: proposed,
+        // The narrator renders the cost for the wire; until it is wired here, the key and slots are the record.
+        renderCost: (option) => `${option.costKey} ${JSON.stringify(option.costSlots)}`,
+        promptsThisWeek,
+        daysSinceAcceptedReview:
+          accepted?.decidedAtDay === undefined || accepted?.decidedAtDay === null ? null : daysBetween(accepted.decidedAtDay, today),
+        daysSinceTrigger: { [triggers.candidate.kind]: sameKind === undefined ? null : daysBetween(sameKind.openedAtDay, today) },
+      });
+
+      if (opened.status === "suppressed") {
+        sendJson(response, 200, { status: "suppressed", reason: opened.reason, detail: opened.detail, ruleId: opened.ruleId });
+        return;
+      }
+      if (opened.status === "refused") {
+        return fail(response, 409, opened.code, opened.detail);
+      }
+
+      for (const option of proposal.options) {
+        if (option.diff !== null) repository.savePlanDiff(option.diff);
+      }
+      repository.saveReview(opened.review);
+      sendJson(response, 201, {
+        status: "opened",
+        review: opened.review,
+        options: proposed,
+        refusals: proposal.refusals,
+        unevaluable: triggers.unevaluable,
+      });
+      return;
+    }
+
     // GET /reviews/candidates - what the corpus rules would say, without opening anything.
     //
     // Opening needs candidate options with diffs and costs, and the engine that produces those is M3's re-planning
