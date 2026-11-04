@@ -67,8 +67,13 @@ const policySources = packageSources.filter((file) => rel(file).startsWith("pack
 const narratorSources = packageSources.filter((file) => rel(file).startsWith("packages/narrator/src/"));
 // The write path must be replayable: the same draft must produce the same rows and ids on any machine.
 const entriesSources = packageSources.filter((file) => rel(file).startsWith("packages/entries/src/"));
+const reviewSources = packageSources.filter((file) => rel(file).startsWith("packages/review/src/"));
 
-scan([...plannerSources, ...policySources, ...narratorSources, ...entriesSources], PURITY, "engine purity (AGENTS rule 1)");
+scan(
+  [...plannerSources, ...policySources, ...narratorSources, ...entriesSources, ...reviewSources],
+  PURITY,
+  "engine purity (AGENTS rule 1)",
+);
 
 const anyRule = [[/\b:\s*any\b/, "`: any`"], [/\bas\s+any\b/, "`as any`"], [/<any>/, "`<any>`"]];
 scan(packageSources, anyRule, "no any in package sources");
