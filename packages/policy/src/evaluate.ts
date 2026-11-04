@@ -37,6 +37,16 @@ function numberAt(knowledge: KnowledgeBundle, anchor: string): number {
   return knowledge.number(anchor);
 }
 
+/** The pain scale is fixed by daily-feedback-rules.yaml#rpe_scale as the string "0-10"; its upper bound is 10. */
+function painScaleMax(knowledge: KnowledgeBundle): number {
+  const value = knowledge.knob("daily-feedback-rules.yaml#rpe_scale").value;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return 10;
+  const pain = (value as Record<string, unknown>)["pain"];
+  if (typeof pain !== "string") return 10;
+  const match = /(\\d+)\\s*$/.exec(pain);
+  return match?.[1] === undefined ? 10 : Number(match[1]);
+}
+
 function recordAt(knowledge: KnowledgeBundle, anchor: string): Record<string, number> {
   const value = knowledge.knob(anchor).value;
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -62,6 +72,18 @@ const RULE_TEXT_NUMBERS = {
   /** missed-session-rules.yaml#missed-quality-swap-if-legal: "not adjacent_to_long_run". */
   longRunAdjacencyHours: 24,
 } as const;
+
+/** The slots an acknowledge sentence needs. A template that needs {km} must be given one, always. */
+function acknowledgeSlots(entry: DayEntry, session: Session | undefined): Record<string, string | number> {
+  switch (acknowledgeTemplate(entry)) {
+    case "acknowledge.completed":
+      return { km: entry.completedKm ?? session?.distanceKm ?? 0 };
+    case "acknowledge.skipped":
+      return { kind: session?.kind ?? "easy" };
+    default:
+      return {};
+  }
+}
 
 /** The acknowledge sentence is about what happened, so it follows the outcome rather than the rule that fired. */
 function acknowledgeTemplate(entry: DayEntry): FactTemplate {
@@ -144,7 +166,15 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
   let flagReview: ReviewFlag | undefined;
   let nudgeFact: FactLine | undefined;
 
-  const downgrade = (day: string, session: Session | undefined, ruleId: string, reason: string, cost: string, isSafety: boolean): void => {
+  const downgrade = (
+    day: string,
+    session: Session | undefined,
+    ruleId: string,
+    reasonKey: MicroAdjustment["reasonKey"],
+    reasonSlots: Record<string, string | number>,
+    costKey: MicroAdjustment["costKey"],
+    isSafety: boolean,
+  ): void => {
     if (session === undefined || adjustTomorrow !== undefined) return;
     const before = weekKm(plan, day);
     const factor = 1 - numberAt(knowledge, "wellness.yaml#downgrade_magnitude_pct") / 100;
@@ -152,12 +182,14 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
     adjustTomorrow = {
       day,
       kind: "downgrade",
-      beforeSummary: `${session.kind} ${session.distanceKm ?? 0} km`,
-      afterSummary: `${session.kind === "rest" ? "rest" : "easy"} ${Math.round((session.distanceKm ?? 0) * factor * 10) / 10} km`,
-      reason,
+      before: { kind: session.kind, km: session.distanceKm ?? 0 },
+      after: { kind: "easy", km: Math.round((session.distanceKm ?? 0) * factor * 10) / 10 },
+      reasonKey,
+      reasonSlots,
+      costKey,
+      costSlots: {},
       ruleId,
       anchor: ruleOf(ruleId).anchor,
-      expectedCost: cost,
       isSafety,
       beforeKm: before,
       afterKm: after,
@@ -174,7 +206,7 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
       ruleId: "chest-cardiac",
       anchor: ruleOf("chest-cardiac").anchor,
       scope: "all-future-sessions-in-phase",
-      instruction: "Stop training and seek urgent medical assessment for chest symptoms.",
+      instructionKey: "chest-urgent",
       referral: "urgent",
       suppressCoaching: true,
     };
@@ -186,13 +218,13 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
       ruleId: "fever-or-below-neck-illness",
       anchor: ruleOf("fever-or-below-neck-illness").anchor,
       scope: "today",
-      instruction: "No training today. Rest until you have been symptom-free for 48 hours, then start easy.",
+      instructionKey: "illness-hold",
       referral: null,
       suppressCoaching: true,
     };
     const nextQuality = firstSessionAfter(plan, today, isQuality);
     if (nextQuality && gapHours(today, nextQuality.day) <= RULE_TEXT_NUMBERS.illnessDowngradeHours) {
-      downgrade(nextQuality.day, nextQuality, "fever-or-below-neck-illness", "you are ill", "the quality session moves to easy", true);
+      downgrade(nextQuality.day, nextQuality, "fever-or-below-neck-illness", "illness-hold", {}, "quality-becomes-easy", true);
     }
   }
 
@@ -206,7 +238,7 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
       ruleId: "night-pain-or-bone-tenderness",
       anchor: ruleOf("night-pain-or-bone-tenderness").anchor,
       scope: "all-sessions",
-      instruction: "Stop running and get this pain assessed by a clinician before the next session.",
+      instructionKey: "bone-referral",
       referral: "routine-urgent",
       suppressCoaching: true,
     };
@@ -218,13 +250,13 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
       ruleId: "pain-escalation",
       anchor: ruleOf("pain-escalation").anchor,
       scope: "today",
-      instruction: "Do not run through this pain today; it needs a clinician's opinion before the next session.",
+      instructionKey: "pain-hold",
       referral: "routine-urgent",
       suppressCoaching: true,
     };
     const nextQuality = firstSessionAfter(plan, today, isQuality);
     if (nextQuality && gapHours(today, nextQuality.day) <= RULE_TEXT_NUMBERS.painConstrainHours) {
-      downgrade(nextQuality.day, nextQuality, "pain-escalation", "pain is escalating", "no intensity for the next week", true);
+      downgrade(nextQuality.day, nextQuality, "pain-escalation", "pain-hold", {}, "no-intensity-this-week", true);
     }
   }
 
@@ -232,9 +264,8 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
     apply(hardStop.ruleId, "informed", hardStop.scope);
     apply("safety-text-first", "dosed", "sentence one is the instruction; praise and coaching suppressed");
     suppressed.push("praise", "coaching");
-    fact(acknowledge, acknowledgeTemplate(entry), "safety-text-first");
-    fact(redirect, "redirect.safety-instruction", "safety-text-first", { scope: hardStop.scope });
-    if (hardStop.referral !== null) fact(interpret, "interpret.pain-reported", "safety-text-first");
+    fact(acknowledge, acknowledgeTemplate(entry), "safety-text-first", acknowledgeSlots(entry, entrySession));
+    fact(redirect, "redirect.safety-instruction", "safety-text-first", { instruction: hardStop.instructionKey });
     return finish({
       entry,
       plan,
@@ -319,12 +350,14 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
         adjustTomorrow = {
           day: slot,
           kind: "swap",
-          beforeSummary: `${entrySession?.kind ?? "quality"} ${entrySession?.distanceKm ?? 0} km missed`,
-          afterSummary: `${entrySession?.kind ?? "quality"} ${entrySession?.distanceKm ?? 0} km on ${slot}`,
-          reason: "the quality session moved to the nearest legal slot",
+          before: { kind: entrySession?.kind ?? "tempo", km: entrySession?.distanceKm ?? 0 },
+          after: { kind: entrySession?.kind ?? "tempo", km: entrySession?.distanceKm ?? 0 },
+          reasonKey: "missed-quality-moved",
+          reasonSlots: { day: slot },
+          costKey: "easy-day-becomes-quality",
+          costSlots: {},
           ruleId: "missed-quality-swap-if-legal",
           anchor: ruleOf("missed-quality-swap-if-legal").anchor,
-          expectedCost: "the week's easy day becomes the quality day",
           isSafety: false,
           beforeKm: before,
           afterKm: before,
@@ -359,7 +392,7 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
     const guardHours = numberAt(knowledge, "missed-session-rules.yaml#extra_activity_stack_guard_h");
     const nextQuality = firstSessionAfter(plan, today, isQuality);
     if (nextQuality && gapHours(today, nextQuality.day) <= guardHours) {
-      downgrade(nextQuality.day, nextQuality, "extra-activity-subtracts", "you did extra work close to a quality day", "the quality session becomes easy", false);
+      downgrade(nextQuality.day, nextQuality, "extra-activity-subtracts", "extra-activity-guard", {}, "quality-becomes-easy", false);
     }
   }
 
@@ -390,7 +423,11 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
   }
   if (pain.length > 0) {
     const worst = pain.reduce((max, report) => (report.intensity > max.intensity ? report : max));
-    fact(interpret, "interpret.pain-reported", "readiness-subtracts-only", { intensity: worst.intensity, site: worst.site });
+    fact(interpret, "interpret.pain-reported", "readiness-subtracts-only", {
+      intensity: worst.intensity,
+      site: worst.site,
+      scale: painScaleMax(knowledge),
+    });
     openQuestions.push("pain-trajectory");
   }
 
@@ -411,8 +448,9 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
       tomorrow,
       tomorrowSession,
       "readiness-subtracts-only",
-      abnormal.length > 0 ? `you reported ${abnormal.join(" and ")}` : "you reported pain",
-      "the quality session becomes easy this week",
+      "readiness-downgrade",
+      abnormal.length > 0 ? { signals: abnormal.join("+") } : { signals: "pain" },
+      "quality-becomes-easy",
       false,
     );
     fact(redirect, "redirect.tomorrow-downgraded", "readiness-subtracts-only", { day: tomorrow });
@@ -423,7 +461,7 @@ export function evaluatePolicy(input: PolicyInput): PolicyDecision {
 
   if (acknowledge.length === 0) {
     applyOnce("comment-contract", "informed", "the sentence comes from the comment contract");
-    fact(acknowledge, acknowledgeTemplate(entry), "comment-contract");
+    fact(acknowledge, acknowledgeTemplate(entry), "comment-contract", acknowledgeSlots(entry, entrySession));
   }
 
   // ---------------------------------------------------------------------------------------------
