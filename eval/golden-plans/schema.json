@@ -5,70 +5,193 @@
   "description": "One runner archetype: the frozen planner inputs plus the invariants a correct plan must satisfy. The TypeScript source of truth is fixture.ts; this file exists so the format is readable and checkable without running TypeScript.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "description", "input", "expect"],
+  "required": [
+    "id",
+    "description",
+    "input",
+    "expect"
+  ],
   "properties": {
-    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
-    "description": { "type": "string", "minLength": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
     "input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["profile", "evidence", "state", "clock", "seed"],
+      "required": [
+        "profile",
+        "evidence",
+        "state",
+        "clock",
+        "seed"
+      ],
       "properties": {
-        "profile": { "type": "object", "description": "Validated with schemas/json/athlete-profile.schema.json by the runner." },
+        "profile": {
+          "type": "object",
+          "description": "Validated with schemas/json/athlete-profile.schema.json by the runner."
+        },
         "evidence": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["recentWeeklyKm"],
+          "required": [
+            "recentWeeklyKm"
+          ],
           "properties": {
-            "recentWeeklyKm": { "type": "array", "minItems": 1, "items": { "type": "number", "minimum": 0 } },
-            "layoffDays": { "type": "integer", "minimum": 0 },
-            "baselinePaceSecPerKm": { "type": ["number", "null"], "exclusiveMinimum": 0 },
-            "baselineConfidence": { "enum": ["low", "medium", "high"] }
+            "recentWeeklyKm": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "layoffDays": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "baselinePaceSecPerKm": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            },
+            "baselineConfidence": {
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ]
+            }
           }
         },
         "state": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["planStartDay", "horizonDays"],
+          "required": [
+            "planStartDay",
+            "horizonDays"
+          ],
           "properties": {
-            "planStartDay": { "type": "string", "format": "date" },
-            "horizonDays": { "type": "integer", "minimum": 1, "maximum": 740 },
-            "completedDays": { "type": "array", "items": { "type": "string", "format": "date" } }
+            "planStartDay": {
+              "type": "string",
+              "format": "date"
+            },
+            "horizonDays": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 740
+            },
+            "completedDays": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "date"
+              }
+            }
           }
         },
         "clock": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["today"],
-          "properties": { "today": { "type": "string", "format": "date" } }
+          "required": [
+            "today"
+          ],
+          "properties": {
+            "today": {
+              "type": "string",
+              "format": "date"
+            }
+          }
         },
-        "seed": { "type": "string", "minLength": 1 }
+        "seed": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "expect": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "sessionCount", "firstDay", "lastDay", "restDaysMin", "hardDaysMaxPerWeek",
-        "minHoursBetweenHardDays", "weeklyIncrementPctMax", "longRunMaxKm", "invariantsHold", "planHash"
+        "sessionCount",
+        "firstDay",
+        "lastDay",
+        "restDaysMin",
+        "hardDaysMaxPerWeek",
+        "minHoursBetweenHardDays",
+        "weeklyIncrementPctMax",
+        "longRunMaxKm",
+        "invariantsHold",
+        "planHash"
       ],
       "properties": {
-        "sessionCount": { "type": "integer", "minimum": 1 },
-        "firstDay": { "type": "string", "format": "date" },
-        "lastDay": { "type": "string", "format": "date" },
-        "restDaysMin": { "type": "integer", "minimum": 0 },
-        "hardDaysMaxPerWeek": { "type": "integer", "minimum": 0, "maximum": 3 },
-        "minHoursBetweenHardDays": { "type": "number", "minimum": 0 },
-        "weeklyIncrementPctMax": { "type": "number", "exclusiveMinimum": 0 },
-        "longRunMaxKm": { "type": "number", "exclusiveMinimum": 0 },
+        "sessionCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "firstDay": {
+          "type": "string",
+          "format": "date"
+        },
+        "lastDay": {
+          "type": "string",
+          "format": "date"
+        },
+        "restDaysMin": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hardDaysMaxPerWeek": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "minHoursBetweenHardDays": {
+          "type": "number",
+          "minimum": 0
+        },
+        "weeklyIncrementPctMax": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "longRunMaxKm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "firstWeekVsRecentMax": {
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 1,
           "description": "Optional. Week 1 as a fraction of the runner recent median volume, both as 7-day-normalised rates: the first week of a block is reduced, so this is below 1 when the plan starts on a phase boundary."
         },
-        "invariantsHold": { "type": "boolean" },
-        "planHash": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }] }
+        "invariantsHold": {
+          "type": "boolean"
+        },
+        "planHash": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "qualityKinds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional. The first quality kinds in the order the plan prescribes them: the first quality session of a block is neuromuscular (knowledge/plan-construction/quality-sequencing.md)."
+        }
       }
     }
   }

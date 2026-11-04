@@ -35,6 +35,13 @@ export const expectationSchema = z.object({
    * weeks can make week 2 look smaller than week 1 while both are reduced.
    */
   firstWeekVsRecentMax: z.number().positive().max(1).optional(),
+  /**
+   * Optional: the first quality kinds in the order the plan prescribes them. This is the assertion the corpus
+   * claimed existed ("the novice golden plan asserts mustNotContain") and did not: the format had no way to say it,
+   * so the novice's forbidden kinds were prose. It encodes the sequencing rule of
+   * knowledge/plan-construction/quality-sequencing.md.
+   */
+  qualityKinds: z.array(z.string()).min(1).optional(),
   invariantsHold: z.boolean(),
   /** Null until a coach has read the plan; then it is the frozen hash and a change is a failure. */
   planHash: contentHash.nullable(),
@@ -66,8 +73,8 @@ export const fixtureSchema = z.object({
 export type GoldenExpectation = z.infer<typeof expectationSchema>;
 export type GoldenFixture = z.infer<typeof fixtureSchema>;
 
-/** Read by the runner, so "seven fixtures" is a number a test can assert rather than a sentence. */
-export const GOLDEN_FIXTURE_COUNT = 7;
+/** Read by the runner, so "eight fixtures" is a number a test can assert rather than a sentence. */
+export const GOLDEN_FIXTURE_COUNT = 8;
 
 /** Compile-time drift checks against the frozen planner inputs. */
 export const evidenceShape: z.ZodType<Evidence> = fixtureSchema.shape.input.shape.evidence;

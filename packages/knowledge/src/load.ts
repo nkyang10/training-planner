@@ -40,6 +40,8 @@ export interface KnowledgeBundle {
   knob(anchor: string): Knob;
   /** The numeric knob value, with the range checked at load time. */
   number(anchor: string): number;
+  /** The string knob value, for a knob whose value is a name rather than a number (a session kind, a tier). */
+  text(anchor: string): string;
 }
 
 const CONFIDENCE = new Set(["low", "medium", "high"]);
@@ -112,6 +114,11 @@ export function loadKnowledge(directory: string): KnowledgeBundle {
     number(anchor) {
       const found = this.knob(anchor);
       if (typeof found.value !== "number") throw new Error(`knowledge knob ${anchor} is not a number`);
+      return found.value;
+    },
+    text(anchor) {
+      const found = this.knob(anchor);
+      if (typeof found.value !== "string") throw new Error(`knowledge knob ${anchor} is not a string`);
       return found.value;
     },
   };

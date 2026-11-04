@@ -5,9 +5,10 @@ last_reviewed: 2026-11-04
 
 # Golden plans
 
-Seven fixtures, one per runner the plan has to be right for: novice 5K, competitive marathon, masters 40+,
-three days a week, returning after a layoff, trail ultra, and one two-phase 10K whose whole reason for
-existing is the first-week-of-phase reduction. They are the specification (see
+Eight fixtures, one per runner the plan has to be right for: novice 5K, competitive marathon, masters 40+,
+three days a week, returning after a layoff, trail ultra, one two-phase 10K whose whole reason for existing is
+the first-week-of-phase reduction, and one novice three-week block whose whole reason for existing is the
+**order of its quality sessions** (strides before tempo). They are the specification (see
 [milestones.md](../../docs/roadmap/milestones.md), M1): the planner is correct when these pass, and a
 rule change is *allowed* to break exactly the fixtures it should break.
 
@@ -46,6 +47,7 @@ loads from `knowledge/heuristics/` — a fixture must never pin a knowledge vers
     "minHoursBetweenHardDays": 48,
     "weeklyIncrementPctMax": 10,
     "longRunMaxKm": 8,
+    "qualityKinds": ["strides", "tempo"],
     "invariantsHold": true,
     "planHash": null
   }
@@ -101,5 +103,5 @@ fixture goes red, which is what "encodes the reason" has to mean.
 
 `pnpm test:golden` runs `packages/planner-core/test/golden.test.ts`, which loads every fixture, generates
 twice, requires the two runs to be byte-identical, checks the wire contract with `packages/domain`, and
-checks every expectation above. A fixture that cannot be parsed is a failure, not a skip: seven fixtures
-means seven, and a missing one is a red gate rather than a smaller test run.
+checks every expectation above. A fixture that cannot be parsed is a failure, not a skip: eight fixtures
+means eight, and a missing one is a red gate rather than a smaller test run.

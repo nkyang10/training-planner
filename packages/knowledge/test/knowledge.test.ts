@@ -13,6 +13,11 @@ afterAll(() => {
 const bundle = loadKnowledge(knowledgeDir);
 
 describe("the knowledge bundle", () => {
+  it("reads a string knob by name, and refuses a number as a string", () => {
+    expect(bundle.text("session-classes.yaml#first_quality_kind")).toBe("strides");
+    expect(() => bundle.text("load-progression.yaml#weekly_increment_pct")).toThrow(/is not a string/);
+  });
+
   it("loads every heuristic file in the corpus", () => {
     expect(bundle.files.length).toBeGreaterThanOrEqual(34);
     expect(bundle.files.every((name) => name.endsWith(".yaml"))).toBe(true);
