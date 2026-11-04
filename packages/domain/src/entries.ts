@@ -130,6 +130,8 @@ export interface Signal {
   value: number | boolean | string | Record<string, unknown> | unknown[] | null;
   unit?: string | null;
   confidence: SignalConfidence;
+  /** Why the confidence is what it is; the difference between "low" and "we could not see it". */
+  confidenceNote?: string | null;
   mayDrive: SignalDrive[];
   computedAt: string;
   inputsHash: string;
@@ -137,6 +139,17 @@ export interface Signal {
   direction?: "stable" | "rising" | "falling" | "volatile" | "unknown";
   consecutiveDays?: number | null;
   crossedThreshold?: boolean | null;
+  baselineValue?: number | null;
+  deviationPct?: number | null;
+  formulaVersion?: string | null;
+  /** What the signal could and could not see: the difference between "no data" and "nothing wrong". */
+  dataQuality?: {
+    expectedDays?: number | null;
+    presentDays?: number | null;
+    coveragePct?: number | null;
+    source?: string | null;
+    exclusions?: string[] | null;
+  } | null;
 }
 
 export type EventActor = "runner" | "system" | "worker" | "import" | "support";

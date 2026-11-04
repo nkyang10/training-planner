@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { dayEntrySchema, planVersionSchema, reviewSchema } from "@training-planner/domain";
+import { dayEntrySchema, planVersionSchema, reviewSchema, signalSchema } from "@training-planner/domain";
 import type { PlanVersion, Review } from "@training-planner/domain";
 import { fixtureSchema } from "@training-planner/golden-fixtures";
 import { messagesFor } from "@training-planner/i18n";
@@ -227,6 +227,44 @@ describe("the daily loop closes: entry in, comment out", () => {
     const revisions = listed.body["revisions"] as Array<{ revision: number; supersededBy: string | null }>;
     expect(revisions).toHaveLength(2);
     expect(revisions[0]?.supersededBy).toBe((entry as unknown as { entryId: string }).entryId ?? revisions[0]?.supersededBy);
+  });
+});
+
+describe("the signals route says what it believes and what it cannot see", () => {
+  it("returns contract-valid signals for a runner with a plan", async () => {
+    const response = await call("/signals");
+    expect(response.status).toBe(200);
+    const signals = response.body["signals"] as unknown[];
+    expect(signals.length).toBeGreaterThanOrEqual(7);
+    for (const signal of signals) {
+      const parsed = signalSchema.safeParse(signal);
+      if (!parsed.success) throw new Error(JSON.stringify(parsed.error.issues));
+    }
+    const keys = (signals as Array<{ key: string }>).map((signal) => signal.key);
+    expect(keys).toContain("completion_rate");
+    expect(keys).toContain("weekly_load");
+    const unavailable = response.body["unavailable"] as Array<{ key: string; reason: string }>;
+    expect(unavailable.map((item) => item.key)).toContain("hrv_lnrmssd_dev");
+    expect(unavailable.every((item) => item.reason.length > 10)).toBe(true);
+  });
+
+  it("refuses a continuity claim from a plan that is one day old", async () => {
+    const response = await call("/signals");
+    expect(response.status).toBe(200);
+    const continuity = (response.body["signals"] as Array<{ key: string; value: unknown; confidence: string; confidenceNote?: string }>).find(
+      (signal) => signal.key === "log_continuity",
+    );
+    // The fixture plan starts today, so there is no fourteen-day history to be continuous about. Saying so is the
+    // honest answer; a rate computed from one day would be a fabricated one.
+    expect(continuity?.value).toBeNull();
+    expect(continuity?.confidence).toBe("insufficient");
+    expect(continuity?.confidenceNote).toContain("at least 3");
+  });
+
+  it("answers 404 when no plan covers the day", async () => {
+    const response = await call("/signals", { token: "token-b" });
+    expect(response.status).toBe(404);
+    expect((response.body["error"] as { code: string }).code).toBe("no-plan");
   });
 });
 

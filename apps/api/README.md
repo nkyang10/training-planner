@@ -25,6 +25,7 @@ comment in the runner's language. The client never re-derives a number.
 | `POST /plan` | generate and store a plan version (profile, evidence, state, seed) |
 | `GET /plan/:versionId` | read one version back |
 | `POST /entries` | the daily loop |
+| `GET /signals` | what the system currently believes about this runner (`packages/signals`), plus the signals it cannot compute and why |
 | `GET /entries/:day` | revisions, the current one, and the comments rendered for that day |
 | `POST /reviews/:reviewId/decision` | accept / decline / defer |
 
