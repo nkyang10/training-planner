@@ -51,6 +51,8 @@ export const en: Messages = {
     "web.day-link": "Open {weekday}",
     "web.day-title": "{weekday}, {day}",
     "web.session": "{kind}, {km} km",
+    "web.session-duration": "{kind}, {km} km, about {minutes} min",
+    "web.duration": "about {minutes} min",
     "web.rest-day": "Rest day",
     "web.logged": "Logged",
     "web.not-logged": "Not logged yet",

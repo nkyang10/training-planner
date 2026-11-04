@@ -1,0 +1,79 @@
+{
+  "id": "elapsed-time-easy",
+  "description": "A 45-year-old runner with a recent race time, so the plan can say how long a session takes: easy days from the midpoint of their own prescribed band, quality days at the slow end of the easy band",
+  "input": {
+    "profile": {
+      "userId": "9a7f0009-1c2b-4d3e-8f90-1234567890ab",
+      "revision": 1,
+      "age": 45,
+      "availability": {
+        "days": [
+          "Mon",
+          "Wed",
+          "Fri",
+          "Sun"
+        ]
+      },
+      "goal": {
+        "type": "finish",
+        "event": null,
+        "riskAppetite": "conservative",
+        "planStyle": "structured"
+      },
+      "preferences": {
+        "units": "metric",
+        "locale": "en",
+        "timezone": "Asia/Taipei",
+        "dayStartHour": 4
+      },
+      "health": {},
+      "measurement": {
+        "method": "field-test"
+      }
+    },
+    "evidence": {
+      "recentWeeklyKm": [
+        30,
+        32,
+        31
+      ],
+      "layoffDays": 0,
+      "baselinePaceSecPerKm": 330,
+      "baselineConfidence": "medium"
+    },
+    "state": {
+      "planStartDay": "2026-11-05",
+      "horizonDays": 42
+    },
+    "clock": {
+      "today": "2026-11-04"
+    },
+    "seed": "golden-elapsed-time"
+  },
+  "expect": {
+    "sessionCount": 42,
+    "firstDay": "2026-11-05",
+    "lastDay": "2026-12-16",
+    "restDaysMin": 12,
+    "hardDaysMaxPerWeek": 1,
+    "minHoursBetweenHardDays": 48,
+    "weeklyIncrementPctMax": 10,
+    "longRunMaxKm": 10,
+    "sessionDurations": [
+      {
+        "day": "2026-11-09",
+        "durationMin": 32
+      },
+      {
+        "day": "2026-11-11",
+        "durationMin": 32
+      },
+      {
+        "day": "2026-11-15",
+        "durationMin": 44
+      }
+    ],
+    "invariantsHold": true,
+    "planHash": null
+  }
+}

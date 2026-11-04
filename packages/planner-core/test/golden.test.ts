@@ -76,6 +76,17 @@ describe.each(files)("%s", (file) => {
       expect(quality.slice(0, fixture.expect.qualityKinds.length)).toEqual(fixture.expect.qualityKinds);
     }
 
+    if (fixture.expect.sessionDurations !== undefined) {
+      // Elapsed time is an estimate from a pace the plan already prescribes (pace-bands.yaml#elapsed_estimate),
+      // so it is asserted per day rather than summed: a plan that moved a day but kept the total is a different plan.
+      const byDay = new Map(sessions.map((session) => [session.day, session]));
+      for (const expectation of fixture.expect.sessionDurations) {
+        const session = byDay.get(expectation.day);
+        expect(session, `no session on ${expectation.day}`).toBeDefined();
+        expect(session?.durationMin, `duration on ${expectation.day}`).toBe(expectation.durationMin);
+      }
+    }
+
     for (let index = 1; index < hardDays.length; index += 1) {
       const previous = hardDays[index - 1];
       const current = hardDays[index];

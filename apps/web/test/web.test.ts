@@ -22,11 +22,12 @@ import { createWeb } from "../src/server";
 const knowledge = loadKnowledge("knowledge/heuristics");
 const USER_A = "88888888-8888-4888-8888-888888888888";
 const USER_B = "99999999-9999-4999-8999-999999999999";
+const USER_C = "c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1";
 const NOW = "2026-11-09T22:40:00.000Z";
 const TODAY = "2026-11-09";
 
 const repository: Repository = createMemoryRepository();
-const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B });
+const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "token-c": USER_C });
 let server: Server;
 let base = "";
 
@@ -59,6 +60,17 @@ const fixture = fixtureSchema.parse(
   JSON.parse(readFileSync(join(process.cwd(), "eval", "golden-plans", "novice-5k.json"), "utf8")),
 );
 
+/** The same runner, but with a recent field test: this plan can say how long a session takes. */
+const planWithPace = (userId: string): PlanVersion =>
+  generatePlan({
+    profile: athleteProfileSchema.parse({ ...fixture.input.profile, userId }),
+    evidence: { recentWeeklyKm: [8, 9, 8], baselinePaceSecPerKm: 330, baselineConfidence: "medium" },
+    state: { planStartDay: TODAY, horizonDays: 21 },
+    clock: { today: TODAY },
+    seed: "web-fixture-pace",
+    knowledge,
+  }).version;
+
 const planFor = (userId: string): PlanVersion =>
   generatePlan({
     // The fixture s profile is the canonical valid one; only the owner changes, so the page test and the
@@ -73,6 +85,7 @@ const planFor = (userId: string): PlanVersion =>
 
 beforeAll(async () => {
   repository.savePlanVersion(planFor(USER_A));
+  repository.savePlanVersion(planWithPace(USER_C));
   server = createServer(createWeb({ repository, sessions, knowledge, now: () => NOW }));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
@@ -314,6 +327,28 @@ describe("the stylesheet is served, and the pages are not injectable", () => {
     const page = await call("/day/2026-11-07", { cookie: "session=token-a" });
     expect(page.html).not.toContain("<script>alert");
     expect(page.html).toContain("&lt;script&gt;");
+  });
+});
+
+describe("a session with pace evidence says how long it takes", () => {
+  it("shows the estimate on the week page, with the word that makes it an estimate", async () => {
+    const response = await call("/", { cookie: "session=token-c" });
+    expect(response.status).toBe(200);
+    // The plan is prescribed by distance and the duration is an estimate from the prescribed band, so the label
+    // says "about" - a promise of an exact time would be a number the engine did not produce.
+    expect(response.html).toMatch(/about \d+ min/);
+  });
+
+  it("shows it on the day page too, from the same label", async () => {
+    const response = await call("/day/2026-11-10", { cookie: "session=token-c" });
+    expect(response.status).toBe(200);
+    expect(response.html).toMatch(/about \d+ min/);
+  });
+
+  it("leaves a plan with no pace evidence as a distance, with no invented time", async () => {
+    const response = await call("/", { cookie: "session=token-a" });
+    expect(response.status).toBe(200);
+    expect(response.html).not.toContain("about");
   });
 });
 

@@ -42,10 +42,17 @@ export interface DayPageInput {
 const sessionLabel = (locale: Locale, session: Session): string => {
   const messages = messagesFor(locale);
   if (session.kind === "rest") return messages.web["web.rest-day"];
-  return format(messages.web["web.session"], {
+  const slots = {
     kind: messages.kind[session.kind],
     km: formatNumber(session.distanceKm ?? 0),
-  });
+  };
+  // Elapsed time is an estimate (pace-bands.yaml#elapsed_estimate); the word "about" is the estimate's own honesty,
+  // not a decoration. A plan with no pace evidence has null here and the label stays a distance.
+  const minutes = session.durationMin;
+  if (typeof minutes === "number" && minutes > 0) {
+    return format(messages.web["web.session-duration"], { ...slots, minutes: formatNumber(minutes) });
+  }
+  return format(messages.web["web.session"], slots);
 };
 
 export function renderLogin(locale: Locale, error: string | undefined): string {

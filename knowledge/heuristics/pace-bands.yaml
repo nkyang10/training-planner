@@ -36,6 +36,20 @@ knobs:
     confidence: medium
     rationale: "Each band names its own evidence anchor, so the plan can state where a pace came from (explainMustReference)."
     persona_overridable: false
+  elapsed_estimate:
+    value:
+      easy_band_midpoint_widths: 1.5
+      quality_slow_band_widths: 2
+    range: null
+    unit: map
+    confidence: low
+    rationale: >
+      A session's wall time is its distance times a pace the plan already prescribes, never a second pace invented
+      for the estimate: easy and long days use the midpoint of their own prescribed band, and quality days use the
+      slow end of the easy band because the work between the warm-up and the cool-down is effort-led, so the honest
+      total is an easy-pace estimate. Low confidence is deliberate - this is a planning aid, not a promise - and a
+      runner with no pace evidence gets no duration at all, exactly as they get no pace target.
+    persona_overridable: false
   band_width_s_per_km:
     value: 6
     range: [3, 12]
