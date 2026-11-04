@@ -37,6 +37,11 @@ export const zhHant: Messages = {
     "quality-becomes-easy": "這週的強度課改成輕鬆跑",
     "no-intensity-this-week": "接下來一週不跑強度",
   },
+  dailyCost: {
+    "alternate-quality": "今個星期嘅 {kind} 刺激，替代只做到最多少 {pct}%",
+    "alternate-volume": "計劃嘅輕鬆里數有 {km} 公里冇跑到",
+    "partial-quality": "{planned} 公里入面做咗 {done} 公里，{kind} 嘅部分被縮短咗",
+  },
   stop: {
     "chest-urgent": "請停止訓練,胸部症狀需要立即就醫評估。",
     "illness-hold": "今天請先不要訓練。症狀消失且不用藥後再等 48 小時,再由輕鬆跑開始。",
@@ -64,6 +69,11 @@ export const zhHant: Messages = {
     "web.outcome-rest": "休息日",
     "web.outcome-missed": "沒跑",
     "web.completed-km": "實際距離（公里；如與計劃不同）",
+    "web.session-taken": "你實際做咗啲乜？",
+    "web.taken-as-prescribed": "照住做",
+    "web.taken-alternate": "做咗其他嘢（替代）",
+    "web.taken-extra": "做多咗",
+    "web.correction-reason": "補記舊日子？講句原因（超過三日 pipeline 會要求）",
     "web.rpe": "費力程度",
     "web.legs": "腿的狀態",
     "web.note": "有什麼想記下來的?",

@@ -4,7 +4,7 @@
  * No LLM is reachable from here on purpose. When one is added it rewrites the template text under the same
  * guardrails and falls back to these sentences on any failure; the deterministic path stays the baseline.
  */
-export { renderComment, renderAdjustment, nudgeLabel } from "./render";
+export { renderComment, renderAdjustment, renderDailyCost, nudgeLabel } from "./render";
 export { renderPlanExplanation, summariseWeeks } from "./explain";
 export type { ExplainOptions, PlanExplanation, WeekSummary } from "./explain";
 export type { RenderOptions, RenderedComment } from "./render";

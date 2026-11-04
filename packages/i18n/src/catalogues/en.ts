@@ -35,6 +35,11 @@ export const en: Messages = {
     "quality-becomes-easy": "the quality session becomes easy this week",
     "no-intensity-this-week": "no intensity for the next week",
   },
+  dailyCost: {
+    "alternate-quality": "a substitute delivers up to {pct}% less of the {kind} stimulus this week",
+    "alternate-volume": "{km} km of planned easy volume did not happen",
+    "partial-quality": "{done} of {planned} km, so the {kind} block was cut short",
+  },
   stop: {
     "chest-urgent": "Stop training and seek urgent medical assessment for chest symptoms.",
     "illness-hold":
@@ -63,6 +68,11 @@ export const en: Messages = {
     "web.outcome-rest": "Rest day",
     "web.outcome-missed": "Missed",
     "web.completed-km": "Distance run (km, if it was not as planned)",
+    "web.session-taken": "What did you do?",
+    "web.taken-as-prescribed": "As prescribed",
+    "web.taken-alternate": "Something else (an alternate)",
+    "web.taken-extra": "More than prescribed",
+    "web.correction-reason": "Logging an older day? Say why (the pipeline needs it after three days)",
     "web.rpe": "Effort",
     "web.legs": "Legs",
     "web.note": "Anything worth remembering?",

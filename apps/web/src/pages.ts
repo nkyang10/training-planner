@@ -37,6 +37,8 @@ export interface DayPageInput {
   error: string | undefined;
   saved: boolean;
   adjustment: { day: string; beforeKm: number; afterKm: number } | undefined;
+  /** The daily trade-off sentence, when packages/policy found one to state. */
+  cost: string | undefined;
 }
 
 const sessionLabel = (locale: Locale, session: Session): string => {
@@ -231,6 +233,11 @@ export function renderDay(input: DayPageInput): string {
           ${input.comment.text.length === 0 ? "" : `<p class="note">${escapeHtml(input.comment.text)}</p>`}
           ${input.comment.nudge === undefined ? "" : `<p class="note">${escapeHtml(input.comment.nudge)}</p>`}
           ${adjustment}
+          ${
+            input.cost === undefined
+              ? ""
+              : `<p class="chip quiet">${escapeHtml(`${messages.label.gaveUp} ${input.cost}`)}</p>`
+          }
         </section>`;
 
   const saved = input.saved ? `<p class="chip done" role="status">${escapeHtml(messages.web["web.saved"])}</p>` : "";
@@ -253,6 +260,16 @@ export function renderDay(input: DayPageInput): string {
           ${reasons.join("")}
         </select>`;
 
+  // The form can say "I did something else": an alternate is a legal fact in the contract, and without a control
+  // for it the only path to one is the API - which would make the daily trade-off invisible on the surface that
+  // shows the trade-off. Partial and rest/missed are derived from the outcome, so the select is not shown for them.
+  const takenRow = `<label for="sessionTaken">${escapeHtml(messages.web["web.session-taken"])}</label>
+        <select id="sessionTaken" name="sessionTaken">
+          <option value="as-prescribed">${escapeHtml(messages.web["web.taken-as-prescribed"])}</option>
+          <option value="alternate">${escapeHtml(messages.web["web.taken-alternate"])}</option>
+          <option value="extra">${escapeHtml(messages.web["web.taken-extra"])}</option>
+        </select>`;
+
   const body = `
     <section class="card">
       <h2>${escapeHtml(format(messages.web["web.day-title"], { weekday: weekdayName(input.locale, input.day), day: input.day }))}</h2>
@@ -266,12 +283,15 @@ export function renderDay(input: DayPageInput): string {
         ${radios}
         ${reasonRow}
       </fieldset>
+      ${takenRow}
       <label for="completedKm">${escapeHtml(messages.web["web.completed-km"])}</label>
       <input id="completedKm" name="completedKm" type="number" min="0" max="250" step="0.1" inputmode="decimal" value="${input.current?.completedKm ?? ""}">
       <label for="rpe">${escapeHtml(messages.web["web.rpe"])}</label>
       <input id="rpe" name="rpe" type="range" min="1" max="10" step="1" value="${input.current?.rpe ?? 6}">
       <label for="legs">${escapeHtml(messages.web["web.legs"])}</label>
       <input id="legs" name="legs" type="range" min="1" max="5" step="1" value="${input.current?.legs ?? 2}">
+      <label for="correctionReason">${escapeHtml(messages.web["web.correction-reason"])}</label>
+      <input id="correctionReason" name="correctionReason" type="text" maxlength="280" value="">
       <label for="note">${escapeHtml(messages.web["web.note"])}</label>
       <textarea id="note" name="note" rows="2">${escapeHtml(input.current?.note ?? "")}</textarea>
       <input type="hidden" name="idempotencyKey" value="${escapeHtml(input.idempotencyKey)}">
