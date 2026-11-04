@@ -179,6 +179,23 @@ describe("reviews are readable in the order a page needs them", () => {
   });
 });
 
+describe("prompt deliveries are a log, not a flag", () => {
+  it("keeps every delivery for a user, in order", () => {
+    const repository = createMemoryRepository();
+    repository.savePromptDelivery({ userId: USER_A, kind: "nudge", day: "2026-11-05", forDay: "2026-11-05", atMinute: 19 * 60 });
+    repository.savePromptDelivery({ userId: USER_A, kind: "review", day: "2026-11-06", forDay: "2026-11-06", atMinute: 9 * 60 });
+    const deliveries = repository.listPromptDeliveries(USER_A);
+    expect(deliveries.map((delivery) => delivery.kind)).toEqual(["nudge", "review"]);
+    expect(deliveries[0]?.atMinute).toBe(19 * 60);
+  });
+
+  it("never shows one user's prompts to another", () => {
+    const repository = createMemoryRepository();
+    repository.savePromptDelivery({ userId: USER_A, kind: "nudge", day: "2026-11-05", forDay: "2026-11-05", atMinute: 19 * 60 });
+    expect(repository.listPromptDeliveries(USER_B)).toEqual([]);
+  });
+});
+
 describe("a proposed version is staged, and only acceptance makes it active", () => {
   const base = (userId: string): PlanVersion => ({ ...makePlan(WEEK, "2026-11-01"), userId });
   const child = (parent: PlanVersion): PlanVersion => ({

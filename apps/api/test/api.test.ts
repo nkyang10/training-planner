@@ -23,11 +23,12 @@ const knowledge = loadKnowledge("knowledge/heuristics");
 const USER_A = "66666666-6666-4666-8666-666666666666";
 const USER_B = "77777777-7777-4777-8777-777777777777";
 const USER_C = "abababab-abab-4bab-8bab-abababababab";
+const USER_D = "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd";
 const NOW = "2026-11-05T22:40:00.000Z";
 const TODAY = "2026-11-05";
 
 const repository: Repository = createMemoryRepository();
-const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "token-c": USER_C });
+const sessions = createMemorySessions({ "token-a": USER_A, "token-b": USER_B, "token-c": USER_C, "token-d": USER_D });
 let server: Server;
 let base = "";
 
@@ -370,6 +371,52 @@ describe("POST /reviews/open closes the chain: log, signals, triggers, bounded o
   it("answers 404 when no plan covers the day", async () => {
     const response = await call("/reviews/open", { token: "token-b", body: {} });
     expect(response.status).toBe(404);
+  });
+});
+
+describe("GET /prompts/next applies the prompt policy and records the delivery", () => {
+  const D_TODAY = "2026-11-05";
+
+  beforeAll(async () => {
+    const created = await call("/plan", {
+      token: "token-d",
+      day: D_TODAY,
+      body: {
+        profile: fixture.input.profile,
+        evidence: fixture.input.evidence,
+        state: { planStartDay: D_TODAY, horizonDays: 21 },
+        seed: "prompt-chain",
+      },
+    });
+    expect(created.status).toBe(201);
+  });
+
+  it("hands out a prompt for an unlogged day and records it", async () => {
+    const response = await call("/prompts/next", { token: "token-d", day: D_TODAY });
+    expect(response.status).toBe(201);
+    expect(response.body["status"]).toBe("prompt");
+    const prompt = response.body["prompt"] as { kind: string; text: string; forDay: string; atMinute: number };
+    expect(prompt.kind).toBe("nudge");
+    expect(prompt.forDay).toBe(D_TODAY);
+    expect(prompt.text).toContain("Two taps is enough");
+    expect(prompt.atMinute % 60).toBe(0);
+    const recorded = repository.listPromptDeliveries(USER_D);
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]).toMatchObject({ kind: "nudge", day: D_TODAY, forDay: D_TODAY });
+  });
+
+  it("refuses the second prompt for the same day, through the delivery log", async () => {
+    const response = await call("/prompts/next", { token: "token-d", day: D_TODAY });
+    expect(response.status).toBe(200);
+    expect(response.body["status"]).toBe("none");
+    expect(response.body["reason"]).toBe("delivered");
+    expect(repository.listPromptDeliveries(USER_D)).toHaveLength(1);
+  });
+
+  it("answers no-plan when no plan covers the day", async () => {
+    const response = await call("/prompts/next", { token: "token-b" });
+    expect(response.status).toBe(200);
+    expect(response.body["reason"]).toBe("no-plan");
   });
 });
 

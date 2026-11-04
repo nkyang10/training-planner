@@ -158,6 +158,21 @@ export interface Signal {
 
 export type EventActor = "runner" | "system" | "worker" | "import" | "support";
 
+/** Every prompt kind shares one budget (feedback-prompts.yaml#one-budget-for-all-prompts). */
+export type PromptKind = "nudge" | "review" | "weekly-summary";
+
+/** One prompt that was actually delivered. The policy reads these; the API and the page write them. */
+export interface PromptDelivery {
+  userId: string;
+  kind: PromptKind;
+  /** The training day the prompt was delivered on: what the shared budget counts. */
+  day: string;
+  /** The day the prompt asked about; equal to `day` for a same-day nudge. */
+  forDay: string;
+  /** Local minute-of-day it was scheduled for, kept so a delivery can be explained later. */
+  atMinute: number;
+}
+
 /** `day.closed`: whether the day ended with an entry or without one. Absence is a status, never a zero. */
 export type DayCloseStatus = "logged" | "closed-unlogged";
 

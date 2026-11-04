@@ -127,6 +127,16 @@ describe("the week page is the plan, not a dashboard", () => {
     // The block opens with the neuromuscular session (quality-sequencing.md); tempo arrives at the next
     // quality slot, which is in week 2 and therefore not on this page.
     expect(response.html).toContain("strides");
+    // The daily prompt: packages/nudges said yes, and rendering it recorded the delivery.
+    expect(response.html).toContain("Two taps is enough");
+  });
+
+  it("does not repeat a prompt it already delivered", async () => {
+    // The page above recorded the impression, so the policy now refuses with `delivered`: a prompt that repeats on
+    // every reload is not a reminder, it is the reason a runner turns notifications off.
+    const again = await call("/", { cookie: "session=token-a" });
+    expect(again.status).toBe(200);
+    expect(again.html).not.toContain("Two taps is enough");
   });
 
   it("marks the day the page is about", async () => {

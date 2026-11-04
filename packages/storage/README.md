@@ -18,6 +18,7 @@ repository.appendEntryWithEventAndPointer({ entry, event, superseded? });
 
 | Call | Meaning |
 |---|---|
+| `savePromptDelivery(delivery)` / `listPromptDeliveries(userId)` | the prompt log: append-only, per user, and the only place `packages/nudges` reads delivery history from |
 | `savePlanVersion(version)` | the plan the runner trains from — saving one makes it **active** |
 | `saveProposedPlanVersion(version)` | a review's offer: staged, not active, invisible to day lookups |
 | `activatePlanVersionForDiff(userId, diffId)` | activate the staged version the stored diff predicts |

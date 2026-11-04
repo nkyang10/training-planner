@@ -25,6 +25,7 @@ comment in the runner's language. The client never re-derives a number.
 | `POST /plan` | generate and store a plan version (profile, evidence, state, seed) |
 | `GET /plan/:versionId` | read one version back |
 | `POST /entries` | the daily loop |
+| `GET /prompts/next` | the daily prompt policy (`packages/nudges`): returns the sentence when a prompt may arrive, **records the delivery**, and answers `none` with the reason and budget otherwise |
 | `GET /signals` | what the system currently believes about this runner (`packages/signals`), plus the signals it cannot compute and why |
 | `GET /entries/:day` | revisions, the current one, and the comments rendered for that day |
 | `GET /reviews/candidates` | what the corpus trigger rules say about the current evidence, and which rules could not be evaluated |

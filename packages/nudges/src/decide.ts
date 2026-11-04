@@ -100,8 +100,9 @@ function nudgeHourOf(input: NudgeInput): { hour: number; source: "behaviour" | "
   const minimum = input.knowledge.number("feedback-prompts.yaml#nudge_hour_min_samples");
   const since = addDays(input.today, -lookback);
   const hours = input.entries
-    .filter((entry) => entry.day >= since && entry.day <= input.today)
-    .map((entry) => input.loggingHours[input.entries.indexOf(entry)])
+    .map((entry, index) => ({ entry, hour: input.loggingHours[index] }))
+    .filter((pair) => pair.entry.day >= since && pair.entry.day <= input.today)
+    .map((pair) => pair.hour)
     .filter((hour): hour is number => typeof hour === "number" && hour >= 0 && hour <= 23)
     .sort((a, b) => a - b);
   if (hours.length < minimum) return { hour: fallback, source: "default", samples: hours.length };

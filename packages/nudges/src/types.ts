@@ -5,11 +5,11 @@
  * owns *when* a prompt may be delivered, never what it says: copy lives in the message catalogue, the narrator owns
  * the sentence, and the caller owns delivery.
  */
-import type { DayEntry, PlanVersion } from "@training-planner/domain";
+import type { DayEntry, PlanVersion, PromptKind } from "@training-planner/domain";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
 
 /** Every prompt kind shares one budget: a review prompt that does not count is a prompt on top of the nudge. */
-export type PromptKind = "nudge" | "review" | "weekly-summary";
+export type { PromptKind } from "@training-planner/domain";
 
 /** One prompt that was actually delivered. The caller records these; the module never invents history. */
 export interface DeliveredPrompt {
@@ -28,11 +28,11 @@ export interface NudgeInput {
   plan: PlanVersion | null;
   delivered: readonly DeliveredPrompt[];
   /**
-   * Local hour-of-day (0..23) of each day the runner actually logged, computed by the caller from the entry and
-   * its zone. Local, not UTC: a 19:00 habit in Taipei is 11:00 UTC, and a median of UTC hours would be a median of
+   * Local hour-of-day (0..23) for each entry, **aligned with `entries` by index**, or null when the entry has no
+   * timestamp. Local, not UTC: a 19:00 habit in Taipei is 11:00 UTC, and a median of UTC hours would be a median of
    * the wrong clock.
    */
-  loggingHours: readonly number[];
+  loggingHours: readonly (number | null)[];
   knowledge: KnowledgeBundle;
 }
 
