@@ -50,6 +50,27 @@ adapter adds row-level security on top).
 pointer. That is why the API's end-to-end tests can run against it and still prove the discipline that Postgres
 must keep.
 
+## The SQLite adapter (a local database, not a tenancy boundary)
+
+`createSqliteRepository({ filename })` implements the same `Repository` over Node's built-in `node:sqlite`
+(`DatabaseSync`), so the API and the tests can run on a real database file with no service to start:
+
+```ts
+import { createSqliteRepository } from "@training-planner/storage";
+const repository = createSqliteRepository({ filename: ":memory:" }); // or a file path
+repository.close(); // file-backed databases hold the file open until this is called
+```
+
+It carries the rules it can carry: every tenant statement is keyed by `user_id`; the append-only tables refuse
+UPDATE/DELETE through triggers; one entry per `(user_id, idempotency_key)`; a correction appends and points the previous
+row forward; a duplicate guideline `(id, version)` is refused; consent is a switch, not a log.
+
+**It is deliberately not a production tenancy boundary.** SQLite has no row-level security, no roles, no
+`app.tenant_id()` predicate and no ordered purge path. The adapter's own header lists exactly what it does not
+enforce, and the same list appears in [docs/engineering/sqlite-adapter.md](../../docs/engineering/sqlite-adapter.md).
+Postgres remains the tenancy boundary: `schemas/sql/schema.sql` and its RLS policies are still the thing that makes
+cross-user reads impossible rather than merely absent from the code.
+
 ## What is not here
 
 - **No SQL.** The Postgres adapter lands behind this interface with RLS (ADR-0002), and it is the only place

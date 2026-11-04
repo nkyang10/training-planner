@@ -5,6 +5,8 @@
 export { exportDocument } from "./export";
 export type { ExportCounts, ExportDocument } from "./export";
 export { createMemoryRepository } from "./memory";
+export { createSqliteRepository } from "./sqlite";
+export type { SqliteRepository } from "./sqlite";
 export { createMemorySessions, DuplicateIdempotencyError } from "./types";
 export type {
   AppendEntryInput,
