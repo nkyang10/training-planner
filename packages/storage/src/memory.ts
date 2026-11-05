@@ -7,7 +7,7 @@
  * a check that can be forgotten, it is a lookup that cannot be expressed.
  */
 import { promptDeliverySchema } from "@training-planner/domain";
-import type { AiReviewProposal, AthleteProfile, DayEntry, GuidelineContract, LlmConsent, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
+import type { AiReviewProposal, AthleteProfile, Connection, DayEntry, GuidelineContract, LlmConsent, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, SyncPreference, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
 import {
   DuplicateIdempotencyError,
   type AppendEntryInput,
@@ -30,6 +30,8 @@ interface UserState {
   profileRevisions: ProfileRevision[];
   aiReviewProposals: AiReviewProposal[];
   llmConsent: LlmConsent | null;
+  connections: Map<string, Connection>;
+  syncPreference: SyncPreference | null;
   reviews: Map<string, Review>;
   comments: CommentRecord[];
   idempotencyKeys: Set<string>;
@@ -49,6 +51,8 @@ const emptyUser = (): UserState => ({
   profileRevisions: [],
   aiReviewProposals: [],
   llmConsent: null,
+  connections: new Map(),
+  syncPreference: null,
   reviews: new Map(),
   comments: [],
   idempotencyKeys: new Set(),
@@ -162,6 +166,26 @@ export function createMemoryRepository(): Repository {
 
     getLlmConsent(userId: string): LlmConsent | undefined {
       return stateOf(userId).llmConsent ?? undefined;
+    },
+
+    getConnection(userId: string, provider: Connection["provider"]): Connection | undefined {
+      return stateOf(userId).connections.get(provider);
+    },
+
+    listConnections(userId: string): Connection[] {
+      return [...stateOf(userId).connections.values()];
+    },
+
+    saveConnection(connection: Connection): void {
+      stateOf(connection.userId).connections.set(connection.provider, connection);
+    },
+
+    getSyncPreference(userId: string): SyncPreference | undefined {
+      return stateOf(userId).syncPreference ?? undefined;
+    },
+
+    saveSyncPreference(preference: SyncPreference): void {
+      stateOf(preference.userId).syncPreference = preference;
     },
 
     saveLlmConsent(consent: LlmConsent): void {

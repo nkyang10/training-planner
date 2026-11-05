@@ -45,6 +45,7 @@ import type { DatabaseSync as DatabaseSyncType } from "node:sqlite";
 import type {
   AiReviewProposal,
   AthleteProfile,
+  Connection,
   DayEntry,
   GuidelineContract,
   LlmConsent,
@@ -54,6 +55,7 @@ import type {
   ProfileRevision,
   PromptDelivery,
   Review,
+  SyncPreference,
   TrainingEvent,
   WizardAnswerRecord,
 } from "@training-planner/domain";
@@ -490,6 +492,41 @@ export function createSqliteRepository(options: SqliteRepositoryOptions): Sqlite
     getLlmConsent(userId: string): LlmConsent | undefined {
       const row = database.prepare("SELECT payload FROM llm_consent WHERE user_id = ?").get(userId);
       return row === undefined ? undefined : decode<LlmConsent>(text(row, "payload"));
+    },
+
+    getConnection(userId: string, provider: Connection["provider"]): Connection | undefined {
+      const row = database.prepare("SELECT payload FROM connections WHERE user_id = ? AND provider = ?").get(userId, provider);
+      return row === undefined ? undefined : decode<Connection>(text(row, "payload"));
+    },
+
+    listConnections(userId: string): Connection[] {
+      return database
+        .prepare("SELECT payload FROM connections WHERE user_id = ? ORDER BY provider ASC")
+        .all(userId)
+        .map((row) => decode<Connection>(text(row, "payload")));
+    },
+
+    saveConnection(connection: Connection): void {
+      database
+        .prepare(
+          `INSERT INTO connections (user_id, provider, payload) VALUES (?, ?, ?)
+           ON CONFLICT (user_id, provider) DO UPDATE SET payload = excluded.payload`,
+        )
+        .run(connection.userId, connection.provider, encode(connection));
+    },
+
+    getSyncPreference(userId: string): SyncPreference | undefined {
+      const row = database.prepare("SELECT payload FROM sync_preferences WHERE user_id = ?").get(userId);
+      return row === undefined ? undefined : decode<SyncPreference>(text(row, "payload"));
+    },
+
+    saveSyncPreference(preference: SyncPreference): void {
+      database
+        .prepare(
+          `INSERT INTO sync_preferences (user_id, payload) VALUES (?, ?)
+           ON CONFLICT (user_id) DO UPDATE SET payload = excluded.payload`,
+        )
+        .run(preference.userId, encode(preference));
     },
 
     saveLlmConsent(consent: LlmConsent): void {

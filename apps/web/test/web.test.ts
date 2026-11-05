@@ -903,3 +903,32 @@ describe("mobile navigation and the month/week lookback", () => {
     expect(page.html).toContain("Note: Knee felt odd");
   });
 });
+
+
+describe("connections page", () => {
+  it("lists both providers and says Strava is not configured", async () => {
+    const page = await call("/connections", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Connected apps");
+    expect(page.html).toContain("Strava");
+    expect(page.html).toContain("Garmin");
+    expect(page.html).toContain("not connected");
+    expect(page.html).toContain("registered app");
+  });
+
+  it("saves the runner's sync choice from the form", async () => {
+    const response = await fetch(`${base}/connections/sync-preference`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", cookie: "session=token-a" },
+      body: "source=garmin",
+      redirect: "manual",
+    });
+    expect(response.status).toBe(303);
+    expect(repository.getSyncPreference(USER_A)?.source).toBe("garmin");
+  });
+
+  it("puts Connections in the shell navigation", async () => {
+    const page = await call("/", { cookie: "session=token-a" });
+    expect(page.html).toContain('href="/connections"');
+  });
+});

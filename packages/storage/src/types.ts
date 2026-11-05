@@ -12,7 +12,7 @@
  * - **idempotency is a uniqueness rule**: `appendEntryWithEventAndPointer` refuses a second row for an
  *   idempotency key that already exists. A middleware cannot give that guarantee; a unique index can.
  */
-import type { AiReviewProposal, AthleteProfile, DayEntry, GuidelineContract, LlmConsent, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
+import type { AiReviewProposal, AthleteProfile, Connection, ConnectionProvider, DayEntry, GuidelineContract, LlmConsent, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, SyncPreference, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
 import type { Locale } from "@training-planner/i18n";
 
 export interface SupersededPointer {
@@ -97,6 +97,15 @@ export interface Repository {
   saveAiReviewProposal(record: AiReviewProposal): void;
   /** Every AI-review audit row for this user, oldest first. */
   listAiReviewProposals(userId: string): AiReviewProposal[];
+
+  /** One external-account connection, per provider. The record never holds the secret itself. */
+  getConnection(userId: string, provider: ConnectionProvider): Connection | undefined;
+  listConnections(userId: string): Connection[];
+  saveConnection(connection: Connection): void;
+
+  /** The runner's chosen sync source; undefined means never chosen (manual by default). */
+  getSyncPreference(userId: string): SyncPreference | undefined;
+  saveSyncPreference(preference: SyncPreference): void;
 
   /** The consent switch; undefined means never granted, which is not the same as revoked. */
   getLlmConsent(userId: string): LlmConsent | undefined;

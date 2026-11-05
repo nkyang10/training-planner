@@ -134,6 +134,16 @@ CREATE TABLE IF NOT EXISTS ai_review_proposals (
 CREATE INDEX IF NOT EXISTS ai_review_proposals_user_order ON ai_review_proposals (user_id, seq);
 
 -- The consent switch: no row means never granted, which is not the same as a revoked row.
+CREATE TABLE IF NOT EXISTS connections (
+  user_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  PRIMARY KEY (user_id, provider)
+);
+CREATE TABLE IF NOT EXISTS sync_preferences (
+  user_id TEXT PRIMARY KEY,
+  payload TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS llm_consent (
   user_id TEXT PRIMARY KEY,
   payload TEXT NOT NULL

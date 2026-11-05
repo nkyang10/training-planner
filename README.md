@@ -102,10 +102,12 @@ look at, and the UI/UX gaps the first real pass found and fixed.
 
 ## Integrations
 
-Garmin and Strava were researched from their official developer pages on 2026-11-05; the documented shapes, the
-deauthorization change (Strava revoke endpoint, 2026-06-01) and what each integration would need are in
-[docs/integrations/garmin-strava.md](docs/integrations/garmin-strava.md). No OAuth credentials exist in this repository,
-so nothing is wired.
+Garmin and Strava were researched from their official developer pages on 2026-11-05. The web app now has a
+**Connections** page: Garmin can be linked with a **Personal API key** and synced (completed runs become day entries);
+Strava linking is stated honestly as needing a registered app. Details: [docs/integrations/garmin-strava.md](docs/integrations/garmin-strava.md),
+[docs/integrations/garmin-personal-api.md](docs/integrations/garmin-personal-api.md) and
+[docs/integrations/strava-app-setup.md](docs/integrations/strava-app-setup.md). No OAuth client secret is in this
+repository.
 
 ## Status
 

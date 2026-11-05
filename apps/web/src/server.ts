@@ -7,8 +7,8 @@
  */
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
-import type { DayEntry, Session, WizardStepId } from "@training-planner/domain";
-import { guidelineSchema } from "@training-planner/domain";
+import type { Connection, DayEntry, Session, SyncPreference, WizardStepId } from "@training-planner/domain";
+import { CONNECTION_PROVIDERS, guidelineSchema, isSyncSource } from "@training-planner/domain";
 import {
   latestWizardAnswers,
   nextWizardRevision,
@@ -33,7 +33,7 @@ import { exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
 import { localClockOf } from "./local-clock";
-import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderConsole, renderDay, renderLogin, renderMonth, renderPain, renderReview, renderSeason, renderWeek, renderWizard } from "./pages";
+import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderConnections, renderConsole, renderDay, renderLogin, renderMonth, renderPain, renderReview, renderSeason, renderWeek, renderWizard } from "./pages";
 import { STYLES } from "./styles";
 
 export interface WebOptions {
@@ -48,6 +48,10 @@ export interface WebOptions {
    * configure an operator must not hand guideline-writing to every runner.
    */
   operatorToken?: string;
+  /** The API base URL for provider actions the web process does not own (Garmin token exchange, Strava start). */
+  apiBaseUrl?: string;
+  /** Injected for tests: the web process proxies provider actions to the API. */
+  fetchImpl?: typeof fetch;
 }
 
 const MAX_BODY_BYTES = 200_000;
@@ -470,6 +474,122 @@ export function createWeb(options: WebOptions): RequestListener {
           ? undefined
           : seasonSummary({ plan, entries: repository.listEntries(userId), today: state.now.slice(0, 10) });
       sendHtml(response, 200, renderSeason({ locale: state.locale, summary, ...periodizationOf(summary) }));
+      return;
+    }
+
+    // Connections (2026-11-05): link Strava/Garmin and choose which provider to sync from. The web process owns the
+    // pages; the API owns the provider calls, so a provider action is proxied and its refusal is shown verbatim.
+    if (url.pathname === "/connections" || url.pathname.startsWith("/connections/")) {
+      const apiBase = options.apiBaseUrl ?? "http://127.0.0.1:8082";
+      const doFetch = options.fetchImpl ?? fetch;
+      const token = state.token ?? "";
+      const proxy = async (route: string, init: RequestInit): Promise<{ ok: boolean; detail: string; authorizeUrl?: string }> => {
+        try {
+          const response = await doFetch(`${apiBase}${route}`, {
+            ...init,
+            headers: { ...(init.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          });
+          const body = (await response.json()) as Record<string, unknown>;
+          if (response.ok) {
+            return {
+              ok: true,
+              detail: typeof body["detail"] === "string" ? body["detail"] : "",
+              authorizeUrl: typeof body["authorizeUrl"] === "string" ? body["authorizeUrl"] : undefined,
+            };
+          }
+          const error = body["error"];
+          const detail = typeof error === "object" && error !== null && typeof (error as Record<string, unknown>)["detail"] === "string" ? String((error as Record<string, unknown>)["detail"]) : `API answered ${response.status}`;
+          return { ok: false, detail };
+        } catch (error) {
+          return { ok: false, detail: error instanceof Error ? error.message : String(error) };
+        }
+      };
+      const defaultConnection = (provider: Connection["provider"]): Connection => ({
+        userId,
+        provider,
+        status: "not-connected",
+        externalAthleteId: null,
+        displayName: null,
+        scope: null,
+        connectedAt: null,
+        lastSyncAt: null,
+        lastSyncStatus: null,
+        lastSyncDetail: null,
+        credentialRef: null,
+        hasCredential: false,
+      });
+
+      if (method === "GET" && url.pathname === "/connections") {
+        const connections = CONNECTION_PROVIDERS.map((provider) => repository.getConnection(userId, provider) ?? defaultConnection(provider));
+        const sync = repository.getSyncPreference(userId);
+        const web = messagesFor(state.locale).web;
+        const saved = url.searchParams.get("saved");
+        const connected = url.searchParams.get("connected");
+        const synced = url.searchParams.get("synced");
+        const error = url.searchParams.get("error");
+        const message =
+          saved === null ? (connected === null ? (synced === null ? undefined : format(web["web.connections-synced-message"], { detail: synced })) : web["web.connections-connected-message"]) : web["web.connections-saved"];
+        sendHtml(
+          response,
+          200,
+          renderConnections({
+            locale: state.locale,
+            connections,
+            sync,
+            today: state.now.slice(0, 10),
+            stravaStartUrl: `${apiBase}/connections/strava/start`,
+            ...(message === undefined ? {} : { message }),
+            ...(error === null ? {} : { error }),
+          }),
+        );
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/connections/sync-preference") {
+        const form = await readForm(request);
+        const source = form.get("source") ?? "";
+        if (!isSyncSource(source)) {
+          redirect(response, `/connections?error=${encodeURIComponent("source must be manual, strava, garmin or both")}`);
+          return;
+        }
+        const sync: SyncPreference = { userId, source, updatedAt: state.now };
+        repository.saveSyncPreference(sync);
+        redirect(response, "/connections?saved=1");
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/connections/garmin/connect") {
+        const form = await readForm(request);
+        const apiKey = (form.get("apiKey") ?? "").trim();
+        if (apiKey.length === 0) {
+          redirect(response, "/connections?error=" + encodeURIComponent("paste a Garmin Personal API key first"));
+          return;
+        }
+        const result = await proxy("/connections/garmin/token", { method: "POST", body: JSON.stringify({ apiKey }) });
+        redirect(response, result.ok ? "/connections?connected=1" : `/connections?error=${encodeURIComponent(result.detail)}`);
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/connections/garmin/sync") {
+        const form = await readForm(request);
+        const from = form.get("from") ?? state.now.slice(0, 10);
+        const to = form.get("to") ?? state.now.slice(0, 10);
+        const result = await proxy("/connections/garmin/sync", { method: "POST", body: JSON.stringify({ from, to }) });
+        redirect(response, result.ok ? `/connections?synced=${encodeURIComponent(result.detail)}` : `/connections?error=${encodeURIComponent(result.detail)}`);
+        return;
+      }
+
+      if (method === "GET" && url.pathname === "/connections/strava/start") {
+        const result = await proxy("/connections/strava/start", { method: "GET" });
+        if (result.ok && result.authorizeUrl !== undefined) {
+          redirect(response, result.authorizeUrl);
+        } else {
+          redirect(response, `/connections?error=${encodeURIComponent(result.detail)}`);
+        }
+        return;
+      }
+
+      sendHtml(response, 404, renderLogin(state.locale, "no such connections route"));
       return;
     }
 

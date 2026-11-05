@@ -48,6 +48,7 @@ export function layout(input: LayoutInput): string {
       <a href="/console">${escapeHtml(messages.web["web.nav-console"])}</a>
       <a href="/wizard">${escapeHtml(messages.web["web.nav-wizard"])}</a>
       <a href="/pain">${escapeHtml(messages.web["web.nav-pain"])}</a>
+      <a href="/connections">${escapeHtml(messages.web["web.nav-connections"])}</a>
       <a href="/export">${escapeHtml(messages.web["web.nav-export"])}</a>
     </nav>`
     : "";

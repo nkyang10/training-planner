@@ -20,6 +20,7 @@ import type {
 import { WIZARD_STEPS } from "@training-planner/domain";
 import type { PainTrend } from "@training-planner/entries";
 import type { SeasonSummary, SeasonWeek } from "@training-planner/season";
+import type { Connection, SyncPreference } from "@training-planner/domain";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
 import { escapeHtml, layout } from "./html";
@@ -404,6 +405,112 @@ export function renderWeek(input: WeekPageInput): string {
     </section>`;
   return layout({ locale: input.locale, title: format(web["web.week-title"], { day: input.weekStart }), body, signedIn: true });
 }
+
+export interface ConnectionsPageInput {
+  locale: Locale;
+  connections: readonly Connection[];
+  sync: SyncPreference | undefined;
+  today: string;
+  /** Absolute URL of the API's Strava start route, when the API is reachable. */
+  stravaStartUrl?: string;
+  message?: string;
+  error?: string;
+}
+
+/** Link Strava/Garmin and choose which provider to sync from (2026-11-05). */
+export function renderConnections(input: ConnectionsPageInput): string {
+  const web = messagesFor(input.locale).web;
+  const statusOf = (connection: Connection): string =>
+    connection.status === "connected" ? web["web.connections-connected"] : web["web.connections-not-connected"];
+  const card = (provider: Connection["provider"]): string => {
+    const connection = input.connections.find((candidate) => candidate.provider === provider);
+    const title = provider === "strava" ? web["web.connections-strava"] : web["web.connections-garmin"];
+    const account =
+      connection?.displayName === undefined || connection.displayName === null || connection.displayName.length === 0
+        ? ""
+        : `<p class="muted">${escapeHtml(web["web.connections-display-name"])}: ${escapeHtml(connection.displayName)}</p>`;
+    const lastSync =
+      connection?.lastSyncAt === undefined || connection.lastSyncAt === null
+        ? web["web.connections-never"]
+        : `${escapeHtml(connection.lastSyncAt)}${connection.lastSyncDetail === null ? "" : ` · ${escapeHtml(connection.lastSyncDetail)}`}`;
+    const credential =
+      connection?.hasCredential === true ? "" : `<p class="note">${escapeHtml(web["web.connections-no-credential"])}</p>`;
+    const body =
+      provider === "garmin"
+        ? `<form method="post" action="/connections/garmin/connect" class="stack">
+            <label for="garminKey">${escapeHtml(web["web.connections-garmin-key"])}</label>
+            <input id="garminKey" name="apiKey" type="password" autocomplete="off" required>
+            <p class="note">${escapeHtml(web["web.connections-garmin-key-hint"])}</p>
+            <button type="submit">${escapeHtml(web["web.connections-connect"])}</button>
+          </form>
+          <form method="post" action="/connections/garmin/sync" class="stack">
+            <p class="note">${escapeHtml(web["web.connections-sync-hint"])}</p>
+            <label for="from">${escapeHtml(web["web.connections-sync-from"])} (from)</label>
+            <input id="from" name="from" type="date" value="${escapeHtml(input.today)}" required>
+            <label for="to">${escapeHtml(web["web.connections-sync-from"])} (to)</label>
+            <input id="to" name="to" type="date" value="${escapeHtml(input.today)}" required>
+            <button type="submit">${escapeHtml(web["web.connections-sync-now"])}</button>
+          </form>`
+        : `<p class="note">${escapeHtml(web["web.connections-strava-hint"])}</p>
+          ${
+            input.stravaStartUrl === undefined
+              ? `<button type="button" disabled>${escapeHtml(web["web.connections-link-strava"])}</button>`
+              : `<p><a class="chip" href="${escapeHtml(input.stravaStartUrl)}">${escapeHtml(web["web.connections-link-strava"])}</a></p>`
+          }`;
+    return `<section class="card">
+      <h2>${escapeHtml(title)}</h2>
+      <p><span class="chip ${connection?.status === "connected" ? "done" : "quiet"}">${escapeHtml(statusOf(connection ?? { ...emptyConnection(input, provider) }))}</span></p>
+      ${account}
+      <p class="muted">${escapeHtml(web["web.connections-last-sync"])}: ${lastSync}</p>
+      ${credential}
+      ${body}
+    </section>`;
+  };
+  const sources: Array<{ value: SyncPreference["source"]; label: string }> = [
+    { value: "manual", label: web["web.connections-manual"] },
+    { value: "strava", label: web["web.connections-strava"] },
+    { value: "garmin", label: web["web.connections-garmin"] },
+    { value: "both", label: web["web.connections-both"] },
+  ];
+  const current = input.sync?.source ?? "manual";
+  const radios = sources
+    .map(
+      (source) => `<label class="choice"><input type="radio" name="source" value="${source.value}"${source.value === current ? " checked" : ""}><span>${escapeHtml(source.label)}</span></label>`,
+    )
+    .join("\n");
+  const message = input.message === undefined ? "" : `<p class="chip done" role="status">${escapeHtml(input.message)}</p>`;
+  const error = input.error === undefined ? "" : `<p class="error" role="alert">${escapeHtml(input.error)}</p>`;
+  const body = `<section class="card">
+      <h2>${escapeHtml(web["web.connections-title"])}</h2>
+      <p class="muted">${escapeHtml(web["web.connections-intro"])}</p>
+      ${message}${error}
+    </section>
+    ${card("strava")}
+    ${card("garmin")}
+    <section class="card">
+      <h2>${escapeHtml(web["web.connections-sync-from"])}</h2>
+      <form method="post" action="/connections/sync-preference" class="stack">
+        ${radios}
+        <button type="submit">${escapeHtml(web["web.connections-save-sync"])}</button>
+      </form>
+    </section>`;
+  return layout({ locale: input.locale, title: web["web.connections-title"], body, signedIn: true });
+}
+
+const emptyConnection = (input: ConnectionsPageInput, provider: Connection["provider"]): Connection => ({
+  userId: "",
+  provider,
+  status: "not-connected",
+  externalAthleteId: null,
+  displayName: null,
+  scope: null,
+  connectedAt: null,
+  lastSyncAt: null,
+  lastSyncStatus: null,
+  lastSyncDetail: null,
+  credentialRef: null,
+  hasCredential: false,
+});
 
 export function renderPain(input: PainPageInput): string {
   const messages = messagesFor(input.locale);

@@ -10,8 +10,8 @@
  */
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from "node:http";
 import { z } from "zod";
-import { athleteProfileSchema, planVersionSchema } from "@training-planner/domain";
-import type { DayEntry, PlanDiff, PlanVersion } from "@training-planner/domain";
+import { athleteProfileSchema, CONNECTION_PROVIDERS, isSyncSource, planVersionSchema } from "@training-planner/domain";
+import type { Connection, DayEntry, PlanDiff, PlanVersion, SyncPreference } from "@training-planner/domain";
 import { painReportsOf, painTrendOf, submitEntry } from "@training-planner/entries";
 import type { EntryDraft } from "@training-planner/entries";
 import { format, isLocale, messagesFor, weekdayName } from "@training-planner/i18n";
@@ -39,6 +39,8 @@ import {
 import type { WizardStepId } from "@training-planner/domain";
 import { guidelineSchema } from "@training-planner/domain";
 import { computeSignals } from "@training-planner/signals";
+import { createGarminClient, GarminError } from "./garmin";
+import type { GarminClient } from "./garmin";
 import { evaluateTriggers } from "@training-planner/triggers";
 import { decideReview, openReview } from "@training-planner/review";
 import type { ProposedOption, ReviewCandidate } from "@training-planner/review";
@@ -73,6 +75,8 @@ export interface ApiOptions {
   modelPort?: ModelPort;
   /** What the audit row calls the model. A deployment names the provider; tests name the fake. */
   modelId?: string;
+  /** The Garmin Personal API client; tests inject a fake, a deployment uses the real fetch client. */
+  garminClient?: GarminClient;
 }
 
 interface ApiError {
@@ -721,6 +725,168 @@ export function createApi(options: ApiOptions): RequestListener {
       return;
     }
 
+    // Connections (2026-11-05): the runner links an external account and chooses which provider to sync from. A record
+    // never holds a secret - it says where the secret lives - and a flow that cannot work says so.
+    if (segments[0] === "connections") {
+      const garmin = options.garminClient ?? createGarminClient();
+      const connectionOr = (provider: Connection["provider"]): Connection =>
+        repository.getConnection(userId, provider) ?? {
+          userId,
+          provider,
+          status: "not-connected",
+          externalAthleteId: null,
+          displayName: null,
+          scope: null,
+          connectedAt: null,
+          lastSyncAt: null,
+          lastSyncStatus: null,
+          lastSyncDetail: null,
+          credentialRef: null,
+          hasCredential: false,
+        };
+      const syncOr = (): SyncPreference =>
+        repository.getSyncPreference(userId) ?? { userId, source: "manual", updatedAt: "" };
+
+      if (segments.length === 1 && method === "GET") {
+        sendJson(response, 200, { connections: CONNECTION_PROVIDERS.map((provider) => connectionOr(provider)), sync: syncOr() });
+        return;
+      }
+
+      if (segments.length === 3 && segments[1] === "strava" && segments[2] === "start" && method === "GET") {
+        const clientId = process.env.STRAVA_CLIENT_ID;
+        const secret = process.env.STRAVA_CLIENT_SECRET;
+        const redirectUri = process.env.STRAVA_REDIRECT_URI;
+        if (clientId === undefined || clientId.length === 0 || secret === undefined || secret.length === 0 || redirectUri === undefined || redirectUri.length === 0) {
+          return fail(response, 503, "strava-not-configured", "set STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET and STRAVA_REDIRECT_URI (a registered Strava app and a public callback)");
+        }
+        const authorizeUrl = `https://www.strava.com/oauth/authorize?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&approval_prompt=auto&scope=activity%3Aread&state=${encodeURIComponent(uuidFrom({ userId, type: "strava.oauth.state", day: today }))}`;
+        sendJson(response, 200, { authorizeUrl });
+        return;
+      }
+
+      if (segments.length === 3 && segments[1] === "strava" && segments[2] === "callback" && method === "GET") {
+        return fail(response, 501, "strava-callback-not-implemented", "a callback needs a CSRF state store and a secret store; neither exists in this build, so no code is exchanged");
+      }
+
+      if (segments.length === 3 && segments[1] === "strava" && segments[2] === "sync" && method === "POST") {
+        return fail(response, 503, "strava-not-configured", "no Strava application is configured; nothing was fetched");
+      }
+
+      if (segments.length === 3 && segments[1] === "garmin" && segments[2] === "token" && method === "POST") {
+        const body = await readBody(request);
+        if (!isObject(body)) return fail(response, 400, "invalid-body", "expected a JSON object");
+        const fromBody = typeof body["apiKey"] === "string" && body["apiKey"].trim().length > 0 ? body["apiKey"].trim() : undefined;
+        const apiKey = fromBody ?? process.env.GARMIN_PERSONAL_API_KEY;
+        if (apiKey === undefined || apiKey.length === 0) {
+          return fail(response, 503, "garmin-not-configured", "set GARMIN_PERSONAL_API_KEY or paste a Garmin Personal API key");
+        }
+        try {
+          const token = await garmin.obtainToken(apiKey);
+          const profile = await garmin.profile(token);
+          const connection: Connection = {
+            userId,
+            provider: "garmin",
+            status: "connected",
+            externalAthleteId: null,
+            displayName: profile.displayName,
+            scope: null,
+            connectedAt: at,
+            lastSyncAt: null,
+            lastSyncStatus: null,
+            lastSyncDetail: null,
+            credentialRef: "env:GARMIN_PERSONAL_API_KEY",
+            hasCredential: true,
+          };
+          repository.saveConnection(connection);
+          sendJson(response, 200, { connection });
+        } catch (error) {
+          const detail = error instanceof GarminError ? error.message : error instanceof Error ? error.message : String(error);
+          return fail(response, 502, "garmin-token-failed", detail);
+        }
+        return;
+      }
+
+      if (segments.length === 3 && segments[1] === "garmin" && segments[2] === "sync" && method === "POST") {
+        const connection = repository.getConnection(userId, "garmin");
+        if (connection === undefined || connection.status !== "connected") {
+          return fail(response, 409, "not-connected", "link Garmin first");
+        }
+        const body = await readBody(request);
+        if (!isObject(body)) return fail(response, 400, "invalid-body", "expected a JSON object");
+        const from = typeof body["from"] === "string" ? body["from"] : "";
+        const to = typeof body["to"] === "string" ? body["to"] : "";
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) {
+          return fail(response, 400, "invalid-range", "from/to must be ISO days with from <= to");
+        }
+        const apiKey = process.env.GARMIN_PERSONAL_API_KEY;
+        if (apiKey === undefined || apiKey.length === 0) {
+          return fail(response, 503, "garmin-not-configured", "set GARMIN_PERSONAL_API_KEY; nothing was fetched");
+        }
+        let imported = 0;
+        let skipped = 0;
+        try {
+          const token = await garmin.obtainToken(apiKey);
+          const activities = await garmin.activities(token, from, to);
+          for (const activity of activities) {
+            const day = typeof activity.startTimeLocal === "string" ? activity.startTimeLocal.slice(0, 10) : "";
+            const metres = typeof activity.distance === "number" ? activity.distance : 0;
+            if (day.length === 0 || day < from || day > to || !(metres > 0)) {
+              skipped += 1;
+              continue;
+            }
+            const draft: EntryDraft = {
+              day,
+              outcome: "completed",
+              tzAtEvent: timezone,
+              sessionTaken: "as-prescribed",
+              completedKm: Math.round((metres / 1000) * 10) / 10,
+              ...(typeof activity.duration === "number" ? { durationMin: Math.round(activity.duration / 60) } : {}),
+              source: "import-assistant",
+              idempotencyKey: `garmin:${activity.activityId}`,
+            };
+            const result = submitEntry(
+              draft,
+              { entries: repository.listEntriesForDay(userId, day), events: repository.listEvents(userId) },
+              { userId, today, occurredAt: at, knowledge },
+            );
+            if (result.status === "accepted") {
+              repository.appendEntryWithEventAndPointer({
+                entry: result.entry,
+                event: result.event,
+                ...(result.superseded === undefined ? {} : { superseded: result.superseded }),
+              });
+              for (const report of painReportsOf({ userId, entry: result.entry })) repository.savePainReport(report);
+              imported += 1;
+            } else {
+              skipped += 1;
+            }
+          }
+        } catch (error) {
+          const detail = error instanceof GarminError ? error.message : error instanceof Error ? error.message : String(error);
+          repository.saveConnection({ ...connection, lastSyncAt: at, lastSyncStatus: "failed", lastSyncDetail: detail });
+          return fail(response, 502, "garmin-sync-failed", detail);
+        }
+        const detail = `${imported} imported, ${skipped} skipped`;
+        repository.saveConnection({ ...connection, lastSyncAt: at, lastSyncStatus: "ok", lastSyncDetail: detail });
+        sendJson(response, 200, { imported, skipped, detail });
+        return;
+      }
+
+      if (segments.length === 2 && segments[1] === "sync-preference" && method === "POST") {
+        const body = await readBody(request);
+        if (!isObject(body)) return fail(response, 400, "invalid-body", "expected a JSON object");
+        const source = typeof body["source"] === "string" ? body["source"] : "";
+        if (!isSyncSource(source)) {
+          return fail(response, 400, "invalid-source", "source must be manual, strava, garmin or both");
+        }
+        const sync: SyncPreference = { userId, source, updatedAt: at };
+        repository.saveSyncPreference(sync);
+        sendJson(response, 200, { sync });
+        return;
+      }
+
+      return fail(response, 404, "not-found", "no such connections route");
+    }
     // POST /reviews/orientation - offer the ADR-0010 re-plan option: a changed orientation, taken to a new block,
     // with the past and the freeze window kept. The option is staged; accepting it is the runner's decision.
     if (segments.length === 2 && segments[0] === "reviews" && segments[1] === "orientation") {
