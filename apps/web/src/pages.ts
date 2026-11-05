@@ -484,8 +484,13 @@ export function renderWeek(input: WeekPageInput): string {
         <a href="/">${escapeHtml(web["web.nav-week"])}</a>
       </p>
       <div class="period-nav">
+        <form method="post" action="/program/request" class="inline">
+          <label for="days">${escapeHtml(web["web.program-days"])}</label>
+          <select id="days" name="days"><option value="7">7</option><option value="14" selected>14</option><option value="21">21</option><option value="28">28</option></select>
+          <button type="submit" class="btn btn-primary">${escapeHtml(web["web.program-cta"])}</button>
+        </form>
         <form method="post" action="/week/${escapeHtml(input.weekStart)}/sync" class="inline">
-          <button type="submit" class="btn btn-primary">${escapeHtml(web["web.sync-garmin"])}</button>
+          <button type="submit" class="btn btn-ghost">${escapeHtml(web["web.sync-garmin"])}</button>
         </form>
         <a class="btn btn-ghost" href="/day/${escapeHtml(today)}">${escapeHtml(web["web.coach-ask-title"])}</a>
       </div>
@@ -1135,6 +1140,42 @@ export function renderAdminLogin(locale: Locale, error: string | undefined): str
         <button type="submit">${escapeHtml(messages.web["web.admin-login-button"])}</button>
       </form></section>`;
   return layout({ locale, title: messages.web["web.admin-title"], body, signedIn: false });
+}
+
+export interface AdminProgramsPageInput {
+  locale: Locale;
+  userId?: string;
+  profile?: object;
+  plan?: { firstDay: string; sessions: readonly { day: string; distanceKm?: number | null }[] };
+  reviews?: readonly { reviewId: string; openedAtDay: string; status: string }[];
+  entries?: readonly { day: string; outcome: string; completedKm: number | null }[];
+}
+
+/** Admin mode is read-only: an administrator reviews a runner's programme, never edits it (ADR-0012). */
+export function renderAdminPrograms(input: AdminProgramsPageInput): string {
+  const web = messagesFor(input.locale).web;
+  const form = `<form method="get" action="/admin/programs" class="card stack">
+      <label for="userId">${escapeHtml(web["web.admin-user-id"])}</label>
+      <input id="userId" name="userId" value="${escapeHtml(input.userId ?? "")}" required>
+      <button type="submit" class="btn btn-primary">${escapeHtml(web["web.admin-open"])}</button>
+    </form>`;
+  const profile = input.profile as Record<string, unknown> | undefined;
+  const details = input.userId === undefined
+    ? ""
+    : `<section class="card stack">
+        <h2>${escapeHtml(input.userId)}</h2>
+        ${profile === undefined ? `<p class="muted">no profile</p>` : `<p class="note">${escapeHtml(`${String(profile["goal"] ?? "-")} / ${String(profile["level"] ?? "-")} / ${String(profile["daysPerWeek"] ?? "-")} days`)}</p>`}
+        ${input.plan === undefined ? `<p class="muted">no plan</p>` : `<p class="note">${escapeHtml(`${input.plan.firstDay} · ${input.plan.sessions.length} sessions`)}</p>`}
+        ${input.entries === undefined ? "" : `<p class="note">${escapeHtml(`${input.entries.length} entries`)}</p>`}
+        ${input.reviews === undefined || input.reviews.length === 0 ? `<p class="muted">no reviews</p>` : `<table class="table"><thead><tr><th>opened</th><th>status</th></tr></thead><tbody>${input.reviews.map((review) => `<tr><td><a href="/review/${escapeHtml(review.reviewId)}">${escapeHtml(review.openedAtDay)}</a></td><td>${escapeHtml(review.status)}</td></tr>`).join("")}</tbody></table>`}
+      </section>`;
+  return layout({
+    locale: input.locale,
+    title: web["web.admin-programs"],
+    body: `<header class="page-head"><p class="eyebrow">${escapeHtml(web["web.nav-console"])}</p><h1 class="page-title">${escapeHtml(web["web.admin-programs"])}</h1></header>${form}${details}`,
+    signedIn: true,
+    active: "/admin/programs",
+  });
 }
 
 export interface AdminGuidelinesPageInput {
