@@ -36,7 +36,7 @@ import type { CommentRecord, Repository, Sessions } from "@training-planner/stor
 import { escapeHtml } from "./html";
 import { stripExif } from "./image";
 import { localClockOf } from "./local-clock";
-import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderCoachPage, renderConnections, renderConsole, renderDay, renderLogin, renderMonth, renderPain, renderReview, renderStats, renderSeason, renderWeek, renderWizard } from "./pages";
+import { renderAdminGuidelines, renderAdminLogin, renderAdminPrograms, renderCalendar, renderCoachPage, renderConnections, renderConsole, renderDay, renderLogin, renderMonth, renderPain, renderReview, renderStats, renderSeason, renderWeek, renderWizard } from "./pages";
 import { STYLES } from "./styles";
 
 export interface WebOptions {
@@ -330,6 +330,29 @@ export function createWeb(options: WebOptions): RequestListener {
       return;
     }
 
+    if (url.pathname === "/admin/programs") {
+      if (!isOperator) {
+        sendHtml(response, 200, renderAdminLogin(state.locale, messagesFor(state.locale).web["web.admin-forbidden"]));
+        return;
+      }
+      const target = url.searchParams.get("userId") ?? undefined;
+      const today = state.now.slice(0, 10);
+      const plan = target === undefined ? undefined : repository.latestPlanVersionFor(target, today);
+      sendHtml(
+        response,
+        200,
+        renderAdminPrograms({
+          locale: state.locale,
+          ...(target === undefined ? {} : { userId: target }),
+          ...(target === undefined ? {} : { profile: repository.getAthleteProfile(target) }),
+          ...(plan === undefined ? {} : { plan }),
+          ...(target === undefined ? {} : { reviews: repository.listReviews(target).map((review) => ({ reviewId: review.reviewId, openedAtDay: review.openedAtDay, status: review.status })) }),
+          ...(target === undefined ? {} : { entries: repository.listEntries(target).map((entry) => ({ day: entry.day, outcome: entry.outcome, completedKm: entry.completedKm ?? null })) }),
+        }),
+      );
+      return;
+    }
+
     if (url.pathname === "/admin/guidelines") {
       if (!isOperator) {
         sendHtml(response, 200, renderAdminLogin(state.locale, messagesFor(state.locale).web["web.admin-forbidden"]));
@@ -484,6 +507,48 @@ export function createWeb(options: WebOptions): RequestListener {
       return;
     }
 
+    // Request a program: the runner asks the AI coach for a block of N days; the deterministic planner generates it and
+    // the web shows the week. The model never chooses a distance, even when the runner asks in chat.
+    if (method === "POST" && url.pathname === "/program/request") {
+      const form = await readForm(request);
+      const days = Number(form.get("days") ?? "14");
+      if (![7, 14, 21, 28].includes(days)) {
+        redirect(response, "/?programError=" + encodeURIComponent("days must be 7, 14, 21 or 28"));
+        return;
+      }
+      const profile = repository.getAthleteProfile(userId);
+      if (profile === undefined) {
+        redirect(response, "/wizard?program=none");
+        return;
+      }
+      const today = state.now.slice(0, 10);
+      const entries = repository.listEntries(userId).filter((entry) => entry.day <= today && entry.completedKm !== null && entry.completedKm !== undefined);
+      const kmIn = (from: number, to: number): number =>
+        entries
+          .filter((entry) => entry.day >= addDays(today, -to) && entry.day <= addDays(today, -from))
+          .reduce((total, entry) => total + (entry.completedKm ?? 0), 0);
+      const evidence = { recentWeeklyKm: [kmIn(0, 6), kmIn(7, 13), kmIn(14, 20)] };
+      const apiBase = options.apiBaseUrl ?? "http://127.0.0.1:8082";
+      const doFetch = options.fetchImpl ?? fetch;
+      try {
+        const apiResponse = await doFetch(`${apiBase}/plan`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${state.token ?? ""}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ profile, evidence, state: { planStartDay: today, horizonDays: days }, seed: `program:${today}:${days}` }),
+        });
+        const payload = (await apiResponse.json()) as { version?: { planStartDay?: string } };
+        if (apiResponse.ok && payload.version?.planStartDay !== undefined) {
+          redirect(response, `/week/${payload.version.planStartDay}?requested=1`);
+          return;
+        }
+        redirect(response, "/?programError=" + encodeURIComponent(`the planner answered ${apiResponse.status}`));
+        return;
+      } catch (error) {
+        redirect(response, "/?programError=" + encodeURIComponent(error instanceof Error ? error.message : String(error)));
+        return;
+      }
+    }
+
     // The coach conversation (ADR-0011): the page reads the stored thread; a turn is proxied to the API, which owns the
     // model, the grounding check and the store. A change still has to become a review the runner decides.
     if (url.pathname === "/coach" || url.pathname === "/coach/review" || url.pathname.startsWith("/coach/photo/")) {
@@ -597,7 +662,17 @@ export function createWeb(options: WebOptions): RequestListener {
           const opened = await proxyJson("/reviews/open", {});
           const review = opened.payload["review"];
           if (opened.ok && typeof review === "object" && review !== null) {
-            redirect(response, `/review/${encodeURIComponent(String((review as Record<string, unknown>)["reviewId"]))}`);
+            const reviewId = String((review as Record<string, unknown>)["reviewId"]);
+            repository.appendCoachMessage({
+              messageId: uuidFrom({ userId, day: state.now.slice(0, 10), kind: "coach-decision", nonce: reviewId }),
+              userId,
+              role: "coach",
+              text: messagesFor(state.locale).web["web.coach-change-ready"],
+              createdAt: state.now,
+              contextHash: "",
+              reviewId,
+            });
+            redirect(response, `/review/${encodeURIComponent(reviewId)}`);
             return;
           }
           redirect(response, `/coach?sent=1&auto=none`);

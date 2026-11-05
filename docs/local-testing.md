@@ -209,6 +209,18 @@ retention rules).
 Honest boundary: vision needs a vision model (the demo `dgx/general` is text-only); EXIF stripping is a segment filter, not a
 re-encode; the pain overlay counts reports, it does not diagnose.
 
+## AI-coach revamp (2026-11-05 pass)
+
+| Piece | Behaviour |
+|---|---|
+| Copy | "AI Coach" and "Admin" replace the human-coach framing; `web.program-*`, `web.coach-change-ready`, `web.admin-*` keys in both languages |
+| Request a program | week-page form (7/14/21/28 days) → `POST /program/request` → API `POST /plan` with the stored profile and the runner's last-21-day kilometres → `/week/<firstDay>?requested=1`; no profile → `/wizard?program=none` |
+| Decision message | when the opt-in auto-review opens, the web stores a coach message carrying the review id and the decision copy, so the thread shows what the AI decided |
+| Admin | `/admin/programs` (operator token) looks up a runner's profile, plan, entries and reviews; read-only, no edit path |
+
+Live check: request 14 days as the demo runner, land on the new week, and open `/admin/programs?userId=<demo>` with the
+operator cookie.
+
 ## Honest limits
 
 | Limit | Why |

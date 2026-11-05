@@ -1179,3 +1179,76 @@ describe("stats range and coach references", () => {
   });
 });
 
+describe("AI coach revamp", () => {
+  it("asks for setup before generating a program when no profile exists", async () => {
+    const response = await fetch(`${base}/program/request`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", cookie: "session=token-a" },
+      body: "days=14",
+      redirect: "manual",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/wizard?program=none");
+  });
+
+  it("generates a program through the API and lands on its first week", async () => {
+    repository.saveAthleteProfile(
+      {
+        userId: USER_A,
+        goal: "5k",
+        level: "novice",
+        daysPerWeek: 3,
+        sessionMinutes: 45,
+        preferredDays: ["Tue", "Thu", "Sun"],
+        longRunDay: "Sun",
+        units: "km",
+        locale: "en",
+        createdAt: NOW,
+        updatedAt: NOW,
+      } as never,
+      { changedBy: "runner", source: "user", diff: [], occurredAt: NOW },
+    );
+    fakeApiFetch = async () => new Response(JSON.stringify({ version: { planStartDay: "2026-11-05" } }), { status: 201 });
+    const response = await fetch(`${base}/program/request`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", cookie: "session=token-a" },
+      body: "days=14",
+      redirect: "manual",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/week/2026-11-05?requested=1");
+    fakeApiFetch = undefined;
+  });
+
+  it("records the coach's change decision with the review id", async () => {
+    fakeApiFetch = async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/coach/messages")) {
+        return new Response(JSON.stringify({ reply: { reply: "I am changing Friday.", proposeReview: true, reasonCode: "pain" }, messages: [] }), { status: 201 });
+      }
+      return new Response(JSON.stringify({ review: { reviewId: "decision-review" } }), { status: 201 });
+    };
+    const response = await fetch(`${base}/coach`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", cookie: "session=token-a" },
+      body: "question=Friday%3F&autoReview=1",
+      redirect: "manual",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/review/decision-review");
+    const decision = repository.listCoachMessages(USER_A, 50).find((message) => message.reviewId === "decision-review");
+    expect(decision?.text).toContain("decided a change is needed");
+    fakeApiFetch = undefined;
+  });
+
+  it("keeps admin mode read-only and closed without the operator token", async () => {
+    const denied = await fetch(`${base}/admin/programs?userId=${USER_A}`);
+    expect(denied.status).toBe(200);
+    expect(await denied.text()).toContain("operator");
+
+    const allowed = await fetch(`${base}/admin/programs?userId=${USER_A}`, { headers: { cookie: "operator=operator-token" } });
+    expect(allowed.status).toBe(200);
+    expect(await allowed.text()).toContain(USER_A);
+  });
+});
+
