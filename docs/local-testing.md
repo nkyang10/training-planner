@@ -129,6 +129,23 @@ this period look like". Changed and verified:
 On ≤640 px the week grid becomes two columns; the month grid stays seven columns with the session text hidden so the
 shape survives.
 
+## Tablet app shell and visual revamp (2026-11-05 pass)
+
+The product no longer looks like a mini tool. The shell is a tablet app: a fixed ember-lit rail, a blurred topbar, a
+1320px working column, and page headers with a hero band and stat tiles.
+
+| Piece | What changed |
+|---|---|
+| Shell | `.app-shell` = sidebar (Train / Log / Plan / Account groups) + topbar + `.main`; the same destinations fold into the bottom `.tabs` on ≤900 px |
+| Type | Bricolage Grotesque display + Inter body (Google Fonts with system fallbacks); page titles clamp 30–46 px |
+| Colour | ember `#FF5A1F`, solar `#FFB020`, coral `#FF4D6D`, lime `#C6F24E` on cream `#FFF8F0`; `--heat` gradient for primary actions, active nav and heroes |
+| Pages | `page-head` (eyebrow/title/sub) on week, month, season, day, connections, console, wizard; week and month add generated hero art; season adds three stat tiles |
+| Art | ComfyUI Flux 2 generated `hero-week.png`, `hero-season.png`, `surface-texture.png`; served from `/static/assets/*.png` with a path-traversal guard |
+| Sign-in | `main-auth` layout: brand + card, no rail |
+
+Honest gaps: `renderWeek`, `renderPain` and `renderReview` still use their old plain headings (flagged as follow-up); the
+rail has no active-item highlight yet; the month grid hides session text under 900 px and relies on the status dot.
+
 ## Honest limits
 
 | Limit | Why |

@@ -156,8 +156,28 @@ export function renderCalendar(input: CalendarPageInput): string {
     start === input.peakWeek ? web["web.calendar-peak"] : "",
     start === input.finalWeek ? web["web.calendar-final"] : "",
   ].filter((marker) => marker.length > 0);
-  const body = `<section class="card">
-      <h2>${escapeHtml(title)}</h2>
+  const totals = format(web["web.grid-totals"], {
+    planned: formatNumber(plannedKm),
+    done: formatNumber(doneKm),
+    doneSessions,
+    plannedSessions,
+  });
+  const pageHead = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(web["web.nav-week"])}</p>
+      <h1 class="page-title">${escapeHtml(title)}</h1>
+      <p class="page-sub">${escapeHtml(totals)}</p>
+    </header>`;
+  const hero = `<section class="hero hero-week">
+      <span class="hero-art" style="background-image:url('/static/assets/hero-week.png')" aria-hidden="true"></span>
+      <div class="hero-copy">
+        <p>${escapeHtml(totals)}</p>
+        <p><a class="btn btn-primary" href="/day/${escapeHtml(input.today)}">${escapeHtml(web["web.grid-today"])}</a>
+          <a class="btn btn-ghost" href="/season">${escapeHtml(web["web.nav-season"])}</a></p>
+      </div>
+    </section>`;
+  const body = `${pageHead}
+    ${hero}
+    <section class="card">
       <p class="period-nav">
         <a href="/?week=${escapeHtml(addDays(start, -7))}">${escapeHtml(web["web.calendar-prev"])}</a>
         <a class="chip ${input.isCurrentWeek === true ? "done" : "quiet"}" href="/?week=${escapeHtml(weekStart(input.today))}">${escapeHtml(web["web.grid-today"])}</a>
@@ -165,7 +185,7 @@ export function renderCalendar(input: CalendarPageInput): string {
         <a href="/month/${escapeHtml(start.slice(0, 7))}">${escapeHtml(web["web.nav-month"])}</a>
         <a href="/season">${escapeHtml(web["web.nav-season"])}</a>
       </p>
-      <p class="totals">${escapeHtml(format(web["web.grid-totals"], { planned: formatNumber(plannedKm), done: formatNumber(doneKm), doneSessions, plannedSessions }))}</p>
+      <p class="totals">${escapeHtml(totals)}</p>
       ${markers.length === 0 ? "" : `<p class="muted"><span class="chip quiet">${escapeHtml(markers.join(" · "))}</span></p>`}
       <div class="week-grid">${cards}</div>
       ${input.intro === undefined ? "" : `<p class="note">${escapeHtml(input.intro)}</p>`}
@@ -261,10 +281,30 @@ export function renderSeason(input: SeasonPageInput): string {
       ? messages.web["web.season-adherence-none"]
       : format(messages.web["web.season-adherence"], { pct: formatNumber(summary.adherencePct) });
 
-  const body = `
+  const totals = summary.weeks.reduce(
+    (running, week) => ({
+      plannedKm: running.plannedKm + week.plannedKm,
+      completedKm: running.completedKm + week.completedKm,
+      plannedSessions: running.plannedSessions + week.plannedSessions,
+      completedSessions: running.completedSessions + week.completedSessions,
+    }),
+    { plannedKm: 0, completedKm: 0, plannedSessions: 0, completedSessions: 0 },
+  );
+
+  const pageHead = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(messages.web["web.nav-season"])}</p>
+      <h1 class="page-title">${escapeHtml(messages.web["web.season-title"])}</h1>
+      <p class="page-sub">${escapeHtml(adherence)}</p>
+    </header>`;
+  const stats = `<div class="stat-grid">
+      <div class="stat"><span class="stat-value">${escapeHtml(formatNumber(totals.plannedKm))}</span><span class="stat-label">${escapeHtml(messages.web["web.stat-planned-km"])}</span></div>
+      <div class="stat"><span class="stat-value">${escapeHtml(formatNumber(totals.completedKm))}</span><span class="stat-label">${escapeHtml(messages.web["web.stat-done-km"])}</span></div>
+      <div class="stat"><span class="stat-value">${escapeHtml(`${formatNumber(totals.completedSessions)} / ${formatNumber(totals.plannedSessions)}`)}</span><span class="stat-label">${escapeHtml(messages.web["web.stat-sessions"])}</span></div>
+    </div>`;
+
+  const body = `${pageHead}
+    ${stats}
     <section class="card">
-      <h2>${escapeHtml(messages.web["web.season-title"])}</h2>
-      <p class="muted">${escapeHtml(adherence)}</p>
       <ul class="week">${rows.join("\n")}</ul>
       <p class="muted">
         <a href="/">${escapeHtml(messages.web["web.season-back"])}</a> ·
@@ -312,10 +352,27 @@ export function renderMonth(input: MonthPageInput): string {
   const messages = messagesFor(input.locale);
   const web = messages.web;
   const title = format(web["web.month-title"], { month: input.month });
-  const header = `<h2>${escapeHtml(title)}</h2>
-      <p class="period-nav">
+  const todayMonth = (input.today ?? `${input.month}-01`).slice(0, 7);
+  const markers = [
+    input.peakWeek === undefined ? "" : web["web.month-peak"],
+    input.finalWeek === undefined ? "" : web["web.month-final"],
+  ].filter((marker) => marker.length > 0);
+  const pageHead = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(title)}</p>
+      <h1 class="page-title">${escapeHtml(input.month)}</h1>
+      ${markers.length === 0 ? "" : `<p class="page-sub">${escapeHtml(markers.join(" · "))}</p>`}
+    </header>`;
+  const hero = `<section class="hero hero-season">
+      <span class="hero-art" style="background-image:url('/static/assets/hero-season.png')" aria-hidden="true"></span>
+      <div class="hero-copy">
+        <p>${escapeHtml(title)}</p>
+        <p><a class="btn btn-primary" href="/month/${escapeHtml(todayMonth)}">${escapeHtml(web["web.month-this"])}</a>
+          <a class="btn btn-ghost" href="/">${escapeHtml(web["web.nav-week"])}</a></p>
+      </div>
+    </section>`;
+  const periodNav = `<p class="period-nav">
         <a href="/month/${escapeHtml(input.prevMonth)}">${escapeHtml(web["web.month-prev"])}</a>
-        <a class="chip quiet" href="/month/${escapeHtml((input.today ?? `${input.month}-01`).slice(0, 7))}">${escapeHtml(web["web.month-this"])}</a>
+        <a class="chip quiet" href="/month/${escapeHtml(todayMonth)}">${escapeHtml(web["web.month-this"])}</a>
         <a href="/month/${escapeHtml(input.nextMonth)}">${escapeHtml(web["web.month-next"])}</a>
         <a href="/">${escapeHtml(web["web.nav-week"])}</a>
         <a href="/season">${escapeHtml(web["web.nav-season"])}</a>
@@ -331,17 +388,17 @@ export function renderMonth(input: MonthPageInput): string {
                 format(web["web.season-done"], { km: formatNumber(week.completedKm) }),
                 format(web["web.season-sessions"], { done: week.completedSessions, planned: week.plannedSessions }),
               ];
-              const markers = [
+              const weekMarkers = [
                 week.weekStart === input.peakWeek ? web["web.month-peak"] : "",
                 week.weekStart === input.finalWeek ? web["web.month-final"] : "",
               ].filter((marker) => marker.length > 0);
               return `<li class="row"><a class="row-link" href="/week/${escapeHtml(week.weekStart)}">
         <span class="day">${escapeHtml(format(web["web.month-week"], { day: week.weekStart }))}</span>
         <span class="session">${escapeHtml(facts.join(" · "))}</span>
-      </a>${markers.length === 0 ? "" : ` <span class="chip quiet">${escapeHtml(markers.join(" · "))}</span>`}</li>`;
+      </a>${weekMarkers.length === 0 ? "" : ` <span class="chip quiet">${escapeHtml(weekMarkers.join(" · "))}</span>`}</li>`;
             })
             .join("\n");
-    return layout({ locale: input.locale, title, body: `<section class="card">${header}<ul class="week">${rows}</ul></section>`, signedIn: true });
+    return layout({ locale: input.locale, title, body: `${pageHead}${hero}<section class="card">${periodNav}<ul class="week">${rows}</ul></section>`, signedIn: true });
   }
   const head = WEEKDAYS.map((day) => `<span class="dow">${escapeHtml(messages.weekday[day])}</span>`).join("");
   const cells = input.days
@@ -356,12 +413,10 @@ export function renderMonth(input: MonthPageInput): string {
       </a>`;
     })
     .join("\n");
-  const markers = [
-    input.peakWeek === undefined ? "" : web["web.month-peak"],
-    input.finalWeek === undefined ? "" : web["web.month-final"],
-  ].filter((marker) => marker.length > 0);
-  const body = `<section class="card">
-      ${header}
+  const body = `${pageHead}
+    ${hero}
+    <section class="card">
+      ${periodNav}
       ${markers.length === 0 ? "" : `<p class="muted"><span class="chip quiet">${escapeHtml(markers.join(" · "))}</span></p>`}
       <div class="month-grid">${head}${cells}</div>
     </section>`;
@@ -491,11 +546,14 @@ export function renderConnections(input: ConnectionsPageInput): string {
     .join("\n");
   const message = input.message === undefined ? "" : `<p class="chip done" role="status">${escapeHtml(input.message)}</p>`;
   const error = input.error === undefined ? "" : `<p class="error" role="alert">${escapeHtml(input.error)}</p>`;
-  const body = `<section class="card">
-      <h2>${escapeHtml(web["web.connections-title"])}</h2>
-      <p class="muted">${escapeHtml(web["web.connections-intro"])}</p>
-      ${message}${error}
-    </section>
+  const pageHead = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(web["web.nav-connections"])}</p>
+      <h1 class="page-title">${escapeHtml(web["web.connections-title"])}</h1>
+      <p class="page-sub">${escapeHtml(web["web.connections-intro"])}</p>
+    </header>`;
+  const notice = `${message}${error}`;
+  const body = `${pageHead}
+    ${notice.length === 0 ? "" : `<section class="card">${notice}</section>`}
     ${card("strava")}
     ${card("garmin")}
     <section class="card">
@@ -628,13 +686,15 @@ export function renderDay(input: DayPageInput): string {
           <option value="extra">${escapeHtml(messages.web["web.taken-extra"])}</option>
         </select>`;
 
-  const body = `
-    <section class="card">
-      <h2>${escapeHtml(format(messages.web["web.day-title"], { weekday: weekdayName(input.locale, input.day), day: input.day }))}</h2>
-      <p class="muted">${escapeHtml(sessionText)}</p>
-      ${saved}
-      ${errorBlock}
-    </section>
+  const dayTitle = format(messages.web["web.day-title"], { weekday: weekdayName(input.locale, input.day), day: input.day });
+  const pageHead = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(messages.web["web.nav-week"])}</p>
+      <h1 class="page-title">${escapeHtml(dayTitle)}</h1>
+      <p class="page-sub">${escapeHtml(sessionText)}</p>
+    </header>`;
+  const notice = `${saved}${errorBlock}`;
+  const body = `${pageHead}
+    ${notice.length === 0 ? "" : `<section class="card">${notice}</section>`}
     <form method="post" action="/day/${escapeHtml(input.day)}" class="card stack" data-offline-queue data-day="${escapeHtml(input.day)}" data-saved-locally="${escapeHtml(messages.web["web.saved-locally"])}">
       <fieldset>
         <legend>${escapeHtml(messages.web["web.form-legend"])}</legend>
@@ -831,8 +891,12 @@ export function renderWizard(input: WizardPageInput): string {
         <a href="/wizard?step=${encodeURIComponent(step.id)}">${escapeHtml(messages.web["web.wizard-change"])}</a></li>`,
       )
       .join("\n");
-    const done = `<section class="card narrow"><h2>${escapeHtml(wizard["wizard.title"])}</h2>
-      <p>${escapeHtml(wizard["wizard.done"])}</p>
+    const pageHead = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(messages.web["web.nav-wizard"])}</p>
+      <h1 class="page-title">${escapeHtml(wizard["wizard.title"])}</h1>
+      <p class="page-sub">${escapeHtml(wizard["wizard.done"])}</p>
+    </header>`;
+    const done = `${pageHead}<section class="card narrow">
       <ul class="week">${answers}</ul>
       <p class="muted"><a href="/console">${escapeHtml(messages.web["web.console-link"])}</a></p></section>`;
     return layout({ locale: input.locale, title: wizard["wizard.title"], body: done, signedIn: true });
@@ -848,8 +912,13 @@ export function renderWizard(input: WizardPageInput): string {
   const originalHtml = changed
     ? `<p class="muted">${escapeHtml(messages.web["web.console-original"])}: ${escapeHtml(answerLabel(input.locale, step.id, original))}</p>`
     : "";
-  const body = `<section class="card narrow"><h2>${escapeHtml(wizard["wizard.title"])}</h2>
-      <p class="muted">${escapeHtml(progressLine)}</p>${errorHtml}
+  const pageHead = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(messages.web["web.nav-wizard"])}</p>
+      <h1 class="page-title">${escapeHtml(wizard["wizard.title"])}</h1>
+      <p class="page-sub">${escapeHtml(progressLine)}</p>
+    </header>`;
+  const body = `${pageHead}<section class="card narrow">
+      ${errorHtml}
       <form method="post" action="/wizard" class="stack">
         <input type="hidden" name="stepId" value="${escapeHtml(step.id)}">
         <p>${escapeHtml(wizardQuestion(input.locale, step))}</p>
@@ -889,7 +958,20 @@ export function renderConsole(input: ConsolePageInput): string {
     input.guidelines.length === 0
       ? `<p class="muted">${escapeHtml(web["web.console-guidelines-empty"])}</p>`
       : `<ul class="week">${input.guidelines.map((guideline) => `<li class="row"><span class="session">${escapeHtml(guideline.text)}</span></li>`).join("\n")}</ul>`;
-  const body = `<section class="card"><h2>${escapeHtml(web["web.console-title"])}</h2>
+  const doneSteps = input.steps.filter((step) => input.current[step.id] !== undefined).length;
+  const sub =
+    rows.length === 0
+      ? web["web.console-empty"]
+      : format(messages.wizard["wizard.progress"], {
+          done: formatNumber(doneSteps),
+          total: formatNumber(input.steps.length),
+        });
+  const pageHead = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(web["web.nav-console"])}</p>
+      <h1 class="page-title">${escapeHtml(web["web.console-title"])}</h1>
+      <p class="page-sub">${escapeHtml(sub)}</p>
+    </header>`;
+  const body = `${pageHead}<section class="card">
       ${rows.length === 0 ? `<p>${escapeHtml(web["web.console-empty"])}</p>` : `<ul class="week">${rows.join("\n")}</ul>`}
       <p class="muted"><a href="/wizard">${escapeHtml(messages.wizard["wizard.title"])}</a></p>
       <h2>${escapeHtml(web["web.console-guidelines"])}</h2>

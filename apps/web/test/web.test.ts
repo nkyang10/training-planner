@@ -957,3 +957,30 @@ describe("grid calendar", () => {
   });
 });
 
+describe("tablet shell", () => {
+  it("wraps a signed-in page in the app shell with a sidebar and a folded mobile bar", async () => {
+    const page = await call("/", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('class="app-shell"');
+    expect(page.html).toContain('class="sidebar"');
+    expect(page.html).toContain('class="brand-mark"');
+    expect(page.html).toContain('class="side-nav"');
+    expect(page.html).toContain('class="tabs"');
+    expect(page.html).toContain('href="/connections"');
+  });
+
+  it("serves the generated brand art as a real image", async () => {
+    const response = await fetch(`${base}/static/assets/hero-week.png`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(10_000);
+  });
+
+  it("keeps the sign-in page out of the signed-in shell", async () => {
+    const page = await call("/login");
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("main-auth");
+    expect(page.html).not.toContain('class="sidebar"');
+  });
+});
+
