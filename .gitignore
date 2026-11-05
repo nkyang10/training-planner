@@ -36,6 +36,9 @@ fixtures/**/real/**
 Thumbs.db
 *.swp
 
+# local scratch (page dumps from manual UI passes)
+/tmp/
+
 # tooling caches
 .eslintcache
 .cache/

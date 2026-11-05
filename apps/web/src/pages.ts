@@ -17,6 +17,7 @@ import type {
   WizardStep,
   WizardStepId,
 } from "@training-planner/domain";
+import { WIZARD_STEPS } from "@training-planner/domain";
 import type { PainTrend } from "@training-planner/entries";
 import type { SeasonSummary } from "@training-planner/season";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
@@ -265,10 +266,10 @@ export function renderPain(input: PainPageInput): string {
       <ul class="week">${input.reports
         .map((report) => {
           const flags: string[] = [];
-          if (report.nightPain) flags.push("night pain");
-          if (report.trendGaitChange) flags.push("gait change");
-          if (report.knownInjury) flags.push("known injury");
-          const flagText = flags.length === 0 ? "" : `<p class="note">${escapeHtml(messages.web["web.pain-flags"])}</p>`;
+          if (report.nightPain) flags.push(messages.web["web.pain-flag-night"]);
+          if (report.trendGaitChange) flags.push(messages.web["web.pain-flag-gait"]);
+          if (report.knownInjury) flags.push(messages.web["web.pain-flag-known"]);
+          const flagText = flags.length === 0 ? "" : `<p class="note">${escapeHtml(flags.join(" · "))}</p>`;
           return `<li class="row">
         <span class="day">${escapeHtml(report.day)}</span>
         <span class="session">${escapeHtml(
@@ -318,7 +319,7 @@ export function renderDay(input: DayPageInput): string {
 
   const radios = OUTCOMES.map(
     (outcome) => `<label class="choice">
-        <input type="radio" name="outcome" value="${outcome}"${outcome === "completed" ? " checked" : ""}>
+        <input type="radio" name="outcome" value="${outcome}"${outcome === (input.current?.outcome ?? "completed") ? " checked" : ""}>
         <span>${escapeHtml(outcomeLabel(input.locale, outcome))}</span>
       </label>`,
   ).join("\n");
@@ -364,8 +365,10 @@ export function renderDay(input: DayPageInput): string {
       <input id="rpe" name="rpe" type="range" min="1" max="10" step="1" value="${input.current?.rpe ?? 6}">
       <label for="legs">${escapeHtml(messages.web["web.legs"])}</label>
       <input id="legs" name="legs" type="range" min="1" max="5" step="1" value="${input.current?.legs ?? 2}">
-      <label for="correctionReason">${escapeHtml(messages.web["web.correction-reason"])}</label>
-      <input id="correctionReason" name="correctionReason" type="text" maxlength="280" value="">
+      ${input.current === undefined
+        ? ""
+        : `<label for="correctionReason">${escapeHtml(messages.web["web.correction-reason"])}</label>
+      <input id="correctionReason" name="correctionReason" type="text" maxlength="280" value="">`}
       <label for="note">${escapeHtml(messages.web["web.note"])}</label>
       <textarea id="note" name="note" rows="2">${escapeHtml(input.current?.note ?? "")}</textarea>
       <input type="hidden" name="idempotencyKey" value="${escapeHtml(input.idempotencyKey)}">
@@ -392,6 +395,18 @@ export interface ReviewSheetInput {
  * option is not "keep the plan", and this page renders the options in the order it was given. The visible cost
  * of every option is the narrator's rendered cost, stored on the option.
  */
+/** A review option's wire labelKey is not a sentence; map the ones we ship and fall back to the key. */
+function optionLabel(locale: Locale, labelKey: string): string {
+  const web = messagesFor(locale).web;
+  const known: Record<string, string> = {
+    "keep-the-plan": web["web.option-keep-the-plan"],
+    "ease-the-easy-day": web["web.option-ease-the-easy-day"],
+    "replan-for-orientation": web["web.option-replan-for-orientation"],
+    "advisor-proposal": web["web.option-advisor-proposal"],
+  };
+  return known[labelKey] ?? labelKey;
+}
+
 export function renderReview(input: ReviewSheetInput): string {
   const messages = messagesFor(input.locale);
   const web = messages.web;
@@ -419,7 +434,7 @@ export function renderReview(input: ReviewSheetInput): string {
     .map(
       (option, index) => `<label class="choice">
         <input type="radio" name="optionId" value="${escapeHtml(option.optionId)}"${index === 0 ? " checked" : ""}>
-        <span>${escapeHtml(option.labelKey)}<br><small class="muted">${escapeHtml(
+        <span>${escapeHtml(optionLabel(input.locale, option.labelKey))}<br><small class="muted">${escapeHtml(
           format(web["web.review-cost"], { cost: option.costSummary }),
         )}</small>${
           option.kind === "replan" && option.changeSummary !== undefined && option.changeSummary !== null
@@ -462,7 +477,8 @@ const wizardQuestion = (locale: Locale, step: WizardStep): string => {
 
 const wizardOptionLabel = (locale: Locale, stepId: WizardStepId, value: string): string => {
   const wizard = messagesFor(locale).wizard;
-  if (stepId === "availability") return weekdayName(locale, value as DayName);
+  // Availability answers are day names ("Mon"), not civil dates; weekdayName() parses a date and would throw.
+  if (stepId === "availability") return messagesFor(locale).weekday[value as DayName] ?? value;
   return wizard[`wizard.${stepId}.${value}` as keyof typeof wizard] ?? value;
 };
 
@@ -524,8 +540,17 @@ export function renderWizard(input: WizardPageInput): string {
     total: formatNumber(input.progress.total),
   });
   if (input.step === undefined) {
+    // A finished wizard is a summary, not a dead end: every answer is shown with the link that changes it.
+    const answers = WIZARD_STEPS.filter((step) => input.current[step.id] !== undefined)
+      .map(
+        (step) => `<li class="row"><span class="session">${escapeHtml(wizardQuestion(input.locale, step))}</span>
+        <span class="muted">${escapeHtml(answerLabel(input.locale, step.id, input.current[step.id]))}</span>
+        <a href="/wizard?step=${encodeURIComponent(step.id)}">${escapeHtml(messages.web["web.wizard-change"])}</a></li>`,
+      )
+      .join("\n");
     const done = `<section class="card narrow"><h2>${escapeHtml(wizard["wizard.title"])}</h2>
       <p>${escapeHtml(wizard["wizard.done"])}</p>
+      <ul class="week">${answers}</ul>
       <p class="muted"><a href="/console">${escapeHtml(messages.web["web.console-link"])}</a></p></section>`;
     return layout({ locale: input.locale, title: wizard["wizard.title"], body: done, signedIn: true });
   }
