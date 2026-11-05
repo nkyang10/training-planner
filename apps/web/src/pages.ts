@@ -197,6 +197,11 @@ export function renderCalendar(input: CalendarPageInput): string {
         <a href="/season">${escapeHtml(web["web.nav-season"])}</a>
       </p>
       ${markers.length === 0 ? "" : `<p class="muted"><span class="chip quiet">${escapeHtml(markers.join(" · "))}</span></p>`}
+      <form method="post" action="/program/request" class="period-nav">
+        <label for="days">${escapeHtml(web["web.program-days"])}</label>
+        <select id="days" name="days"><option value="7">7</option><option value="14" selected>14</option><option value="21">21</option><option value="28">28</option></select>
+        <button type="submit" class="btn btn-primary">${escapeHtml(web["web.program-request"])}</button>
+      </form>
       <div class="week-grid">${cards}</div>
       ${input.intro === undefined ? "" : `<p class="note">${escapeHtml(input.intro)}</p>`}
       ${input.prompt === undefined ? "" : `<p class="muted">${escapeHtml(input.prompt)}</p>`}

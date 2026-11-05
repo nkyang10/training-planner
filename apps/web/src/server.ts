@@ -536,9 +536,10 @@ export function createWeb(options: WebOptions): RequestListener {
           headers: { Authorization: `Bearer ${state.token ?? ""}`, "Content-Type": "application/json" },
           body: JSON.stringify({ profile, evidence, state: { planStartDay: today, horizonDays: days }, seed: `program:${today}:${days}` }),
         });
-        const payload = (await apiResponse.json()) as { version?: { planStartDay?: string } };
-        if (apiResponse.ok && payload.version?.planStartDay !== undefined) {
-          redirect(response, `/week/${payload.version.planStartDay}?requested=1`);
+        const payload = (await apiResponse.json()) as { version?: { planStartDay?: string; firstDay?: string } };
+        const firstDay = payload.version?.planStartDay ?? payload.version?.firstDay;
+        if (apiResponse.ok && firstDay !== undefined) {
+          redirect(response, `/week/${firstDay}?requested=1`);
           return;
         }
         redirect(response, "/?programError=" + encodeURIComponent(`the planner answered ${apiResponse.status}`));
