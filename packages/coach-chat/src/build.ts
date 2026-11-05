@@ -6,7 +6,7 @@
  * grounded in. The rules are restated in the request itself, not only in prompt prose, so a caller can assert that
  * the rules being enforced are the rules that were sent.
  */
-import type { CoachChatRequest, CoachChatTurn, CoachFactSnapshot } from "./types";
+import type { CoachChatImage, CoachChatRequest, CoachChatTurn, CoachFactSnapshot } from "./types";
 
 /** The rules the model cannot break. Order is part of the contract; the validator mirrors the ones it can check. */
 export const COACH_CHAT_RULES: readonly string[] = [
@@ -30,6 +30,7 @@ export interface BuildCoachChatInput {
   facts: CoachFactSnapshot;
   history: readonly CoachChatTurn[];
   question: string;
+  images?: readonly CoachChatImage[];
 }
 
 /** Copy the snapshot so a later mutation by the caller cannot change a request that was already built. */
@@ -56,10 +57,11 @@ function normalizeTurn(turn: CoachChatTurn): CoachChatTurn | null {
 }
 
 export function buildCoachChatRequest(input: BuildCoachChatInput): CoachChatRequest {
-  let history = input.history
+  const normalized = input.history
     .map(normalizeTurn)
-    .filter((turn): turn is CoachChatTurn => turn !== null)
-    .slice(-MAX_HISTORY_TURNS);
+    .filter((turn): turn is CoachChatTurn => turn !== null);
+  const dropped = normalized.slice(0, Math.max(0, normalized.length - MAX_HISTORY_TURNS));
+  let history = normalized.slice(-MAX_HISTORY_TURNS);
   const question = input.question.trim().slice(0, MAX_QUESTION_CHARS).trim();
   // The newest turns matter most: drop the oldest until the prompt fits the character budget. The question always
   // survives; a conversation never silently loses the thing the runner just asked.
@@ -69,9 +71,17 @@ export function buildCoachChatRequest(input: BuildCoachChatInput): CoachChatRequ
     chars -= removed === undefined ? 0 : removed.text.length;
     history = history.slice(1);
   }
+  // A compact digest of the turns that fell out of the window: names and the first 40 characters only, capped so the
+  // summary can never become a second, unbounded transcript.
+  const summary = dropped
+    .map((turn) => `${turn.role}: ${turn.text.slice(0, 40)}`)
+    .join(" | ")
+    .slice(0, 2000);
   return {
     system: { rules: [...COACH_CHAT_RULES], facts: cloneFacts(input.facts) },
     history,
     question,
+    ...(summary.length === 0 ? {} : { summary }),
+    ...(input.images === undefined || input.images.length === 0 ? {} : { images: [...input.images] }),
   };
 }

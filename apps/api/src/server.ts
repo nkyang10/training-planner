@@ -477,6 +477,17 @@ export function createApi(options: ApiOptions): RequestListener {
           return fail(response, 400, "invalid-attachment", "attachments must be png/jpeg/webp up to 5 MB");
         }
         const validAttachments = attachments.filter((attachment): attachment is NonNullable<typeof attachment> => attachment !== null);
+        const images =
+          process.env.TRAINING_PLANNER_MODEL_VISION === "1"
+            ? rawAttachments.flatMap((candidate) => {
+                if (typeof candidate !== "object" || candidate === null) return [];
+                const item = candidate as Record<string, unknown>;
+                const dataBase64 = typeof item["dataBase64"] === "string" ? item["dataBase64"] : "";
+                const contentType = typeof item["contentType"] === "string" ? item["contentType"] : "";
+                if (dataBase64.length === 0 || dataBase64.length > 2_100_000) return [];
+                return [{ contentType, dataBase64 }];
+              })
+            : [];
         const port = options.coachChatPort;
         if (port === undefined) return fail(response, 503, "coach-not-configured", "no model is wired for the coach conversation");
         const plan = repository.latestPlanVersionFor(userId, today);
@@ -496,7 +507,7 @@ export function createApi(options: ApiOptions): RequestListener {
           ...(validAttachments.length === 0 ? {} : { attachments: validAttachments.length }),
         };
         const history = repository.listCoachMessages(userId, 12).map((message) => ({ role: message.role, text: message.text }));
-        const coachRequest = buildCoachChatRequest({ facts, history, question });
+        const coachRequest = buildCoachChatRequest({ facts, history, question, ...(images.length === 0 ? {} : { images }) });
         let output: unknown;
         try {
           output = await port.complete(coachRequest, { userId });

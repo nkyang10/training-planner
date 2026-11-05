@@ -184,11 +184,19 @@ export function coachChatPortFromEnv(
         system: { rules: readonly string[]; facts: unknown };
         history: readonly { role: string; text: string }[];
         question: string;
+        images?: readonly { contentType: string; dataBase64: string }[];
       };
+      const images = (call as { images?: readonly { contentType: string; dataBase64: string }[] }).images ?? [];
+      const questionContent = images.length === 0
+        ? call.question
+        : [
+            { type: "text", text: call.question },
+            ...images.map((image) => ({ type: "image_url", image_url: { url: `data:${image.contentType};base64,${image.dataBase64}` } })),
+          ];
       const messages = [
         { role: "system", content: `${call.system.rules.join("\n")}\nFacts: ${JSON.stringify(call.system.facts)}\nAnswer with exactly this JSON object: {"reply": string, "proposeReview": boolean, "reasonCode": string|null}.` },
         ...call.history.map((turn) => ({ role: turn.role === "user" ? "user" : "assistant", content: turn.text })),
-        { role: "user", content: call.question },
+        { role: "user", content: questionContent },
       ];
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);

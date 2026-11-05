@@ -145,3 +145,20 @@ describe("validateCoachReply", () => {
     expect(verdict.code).toBe("reply-too-long");
   });
 });
+
+describe("window summary and images", () => {
+  it("summarises the turns that fell outside the window", () => {
+    const history = Array.from({ length: 150 }, (_, index) => turn("user", `turn-${index}`));
+    const request = buildCoachChatRequest({ facts, history, question: "Now?" });
+    expect(request.summary).toContain("turn-0");
+    expect(request.summary?.length ?? 0).toBeLessThanOrEqual(2000);
+  });
+
+  it("carries images only when provided", () => {
+    const image = { contentType: "image/png", dataBase64: "AAAA" };
+    const withImage = buildCoachChatRequest({ facts, history: [], question: "See?", images: [image] });
+    expect(withImage.images).toEqual([image]);
+    expect(buildCoachChatRequest({ facts, history: [], question: "See?" }).images).toBeUndefined();
+  });
+});
+

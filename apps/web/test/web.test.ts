@@ -1163,3 +1163,19 @@ describe("coach photos", () => {
   });
 });
 
+describe("stats range and coach references", () => {
+  it("switches the trend window between 8 and 12 weeks", async () => {
+    const page = await call("/stats?weeks=12", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('href="/stats?weeks=8"');
+    expect(page.html).toContain('href="/stats?weeks=12"');
+    expect(page.html).toContain("W1:");
+  });
+
+  it("shows the references the coach page is grounded in", async () => {
+    const page = await call("/coach", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('class="chip quiet" title="');
+  });
+});
+

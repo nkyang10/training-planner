@@ -116,3 +116,19 @@ describe("Garmin fixture privacy", () => {
     expect(Math.min(...ids)).toBe(900001);
   });
 });
+
+describe("pace and heart-rate note", () => {
+  it("writes a factual note from the activity's own averages", () => {
+    const draft = mapGarminActivity(
+      { activityId: 999, distance: 5000, duration: 1800, startTimeLocal: "2026-11-04 08:00:00", averageSpeed: 2.7777778, averageHR: 150 },
+      "Asia/Taipei",
+    );
+    expect(draft?.note).toBe("Garmin: 6:00 min/km, avg HR 150 bpm");
+  });
+
+  it("writes no note when the averages are absent", () => {
+    const draft = mapGarminActivity({ activityId: 998, distance: 5000, duration: 1800, startTimeLocal: "2026-11-04 08:00:00" }, "Asia/Taipei");
+    expect(draft?.note).toBeUndefined();
+  });
+});
+

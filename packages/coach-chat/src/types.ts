@@ -22,10 +22,19 @@ export interface CoachChatTurn {
   text: string;
 }
 
+export interface CoachChatImage {
+  contentType: string;
+  dataBase64: string;
+}
+
 export interface CoachChatRequest {
   system: { rules: readonly string[]; facts: CoachFactSnapshot };
   history: readonly CoachChatTurn[];
   question: string;
+  /** Present only when a vision-capable port is configured; a text-only port ignores it. */
+  images?: readonly CoachChatImage[];
+  /** A deterministic digest of turns that fell outside the window, so old context is not silently forgotten. */
+  summary?: string;
 }
 
 export interface CoachReply {

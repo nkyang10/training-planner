@@ -194,6 +194,21 @@ Honest boundary: the current provider (`dgx/general`) is text-only, so the coach
 pixels. Uploads are not EXIF-stripped yet, and the upload directory is local disk (a deployment needs object storage and
 retention rules).
 
+## Coach intelligence and data depth (2026-11-05 pass)
+
+| Piece | Behaviour |
+|---|---|
+| Auto-review (opt-in) | a checkbox on the composer: if the coach proposes a change, the web opens the bounded review automatically and goes to the sheet; unchecked, the runner still has the one-tap button |
+| Vision | when `TRAINING_PLANNER_MODEL_VISION=1`, small photos (≤1.5 MB) travel as base64 image parts to a vision-capable model; otherwise the model is told only the attachment count |
+| EXIF | JPEG APP1/APP2/APP13/APP14/APP15 and the PNG eXIf chunk are stripped before the file is stored |
+| Rolling summary | turns older than the 100-turn window become a ≤2,000-character digest (`role: first 40 chars`) sent as `summary` |
+| References | the coach page shows which repository references ground the conversation |
+| Garmin depth | imported entries carry a factual note from the activity's own averages, e.g. `Garmin: 6:00 min/km, avg HR 150 bpm` |
+| Stats range | `/stats?weeks=8` or `?weeks=12` changes the sparkline and adds a per-week pain count |
+
+Honest boundary: vision needs a vision model (the demo `dgx/general` is text-only); EXIF stripping is a segment filter, not a
+re-encode; the pain overlay counts reports, it does not diagnose.
+
 ## Honest limits
 
 | Limit | Why |

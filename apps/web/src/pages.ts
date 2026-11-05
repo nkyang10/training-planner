@@ -364,8 +364,8 @@ export function renderMonth(input: MonthPageInput): string {
   const title = format(web["web.month-title"], { month: input.month });
   const todayMonth = (input.today ?? `${input.month}-01`).slice(0, 7);
   const markers = [
-    input.peakWeek === undefined ? "" : web["web.month-peak"],
-    input.finalWeek === undefined ? "" : web["web.month-final"],
+    input.peakWeek === undefined || !input.weeks.some((week) => week.weekStart === input.peakWeek) ? "" : web["web.month-peak"],
+    input.finalWeek === undefined || !input.weeks.some((week) => week.weekStart === input.finalWeek) ? "" : web["web.month-final"],
   ].filter((marker) => marker.length > 0);
   const pageHead = `<header class="page-head">
       <p class="eyebrow">${escapeHtml(title)}</p>
@@ -416,7 +416,7 @@ export function renderMonth(input: MonthPageInput): string {
       const inMonth = day.slice(0, 7) === input.month;
       const status = input.statusOf?.(day) ?? "none";
       const session = input.sessionOf?.(day) ?? "";
-      return `<a class="month-day${day === input.today ? " today" : ""}${inMonth ? "" : " pad"}" href="/day/${escapeHtml(day)}">
+      return `<a class="month-day${day === input.today ? " today" : ""}${inMonth ? "" : " pad"}" href="/day/${escapeHtml(day)}" aria-label="${escapeHtml(`${day} ${session}`.trim())}">
         <span class="num">${escapeHtml(day.slice(8, 10))}</span>
         <span class="session">${escapeHtml(session)}</span>
         <span class="dot ${status}" aria-hidden="true"></span>
@@ -507,6 +507,8 @@ export interface StatsPageInput {
   loggedDays: number;
   comments: readonly { day: string; text: string }[];
   trend: readonly number[];
+  weeks: number;
+  painByWeek: readonly number[];
 }
 
 /** Completeness against the plan, plus the coach's comments in one place (2026-11-05). */
@@ -536,7 +538,11 @@ export function renderStats(input: StatsPageInput): string {
   const table = `<section class="card"><h2>${escapeHtml(web["web.stats-week"])}</h2><table class="table"><thead><tr><th>${escapeHtml(web["web.stats-week"])}</th><th>${escapeHtml(web["web.stats-done-sessions"])}</th><th>${escapeHtml(web["web.stat-done-km"])}</th><th>${escapeHtml(web["web.stats-logged"])}</th></tr></thead><tbody>${rows}</tbody></table></section>`;
   const trend = input.trend.length < 2
     ? ""
-    : `<section class="card"><h2>${escapeHtml(web["web.stats-trend"])}</h2>${renderSparkline({ values: input.trend })}</section>`;
+    : `<section class="card"><h2>${escapeHtml(web["web.stats-trend"])}</h2>
+        <p class="period-nav"><a href="/stats?weeks=8"${input.weeks === 8 ? ' class="chip done"' : ""}>8</a><a href="/stats?weeks=12"${input.weeks === 12 ? ' class="chip done"' : ""}>12</a></p>
+        ${renderSparkline({ values: input.trend })}
+        <p class="period-nav">${input.painByWeek.map((count, index) => `<span class="chip quiet">W${index + 1}: ${escapeHtml(String(count))}</span>`).join("")}</p>
+      </section>`;
   const comments = input.comments.length === 0
     ? `<p class="muted">${escapeHtml(web["web.stats-no-comments"])}</p>`
     : `<ul class="week">${input.comments.map((comment) => `<li class="row"><p class="note"><a href="/day/${escapeHtml(comment.day)}">${escapeHtml(comment.day)}</a> · ${escapeHtml(comment.text)}</p></li>`).join("\n")}</ul>`;
@@ -548,6 +554,7 @@ export interface CoachPageInput {
   locale: Locale;
   messages: readonly CoachMessage[];
   factsSummary: string;
+  references?: readonly { id: string; title: string; tier: string }[];
   reviewId?: string;
   error?: string;
 }
@@ -581,9 +588,14 @@ export function renderCoachPage(input: CoachPageInput): string {
       <textarea id="question" name="question" required maxlength="500" rows="3"></textarea>
       <label for="photo">${escapeHtml(web["web.coach-photo"])}</label>
       <input id="photo" name="photo" type="file" accept="image/png,image/jpeg,image/webp">
+      <label class="choice"><input type="checkbox" name="autoReview" value="1"><span>${escapeHtml(web["web.coach-auto-review"])}</span></label>
       <button type="submit" class="btn btn-primary">${escapeHtml(web["web.coach-send"])}</button>
     </form>`;
-  const context = `<p class="muted">${escapeHtml(web["web.coach-context"])}: ${escapeHtml(input.factsSummary)}</p>`;
+  const context = `<p class="muted">${escapeHtml(web["web.coach-context"])}: ${escapeHtml(input.factsSummary)}</p>${
+    input.references === undefined || input.references.length === 0
+      ? ""
+      : `<p class="period-nav">${input.references.map((reference) => `<span class="chip quiet" title="${escapeHtml(reference.id)}">${escapeHtml(reference.title)}</span>`).join("")}</p>`
+  }`;
   const review = input.reviewId === undefined ? "" : `<p><a class="chip done" href="/review/${escapeHtml(input.reviewId)}">${escapeHtml(web["web.coach-review-opened"])}</a></p>`;
   const error = input.error === undefined ? "" : `<p class="error" role="alert">${escapeHtml(format(web["web.coach-error"], { detail: input.error }))}</p>`;
   const body = `${head}${error}${review}${context}<section class="card">${thread}</section>${composer}`;
