@@ -411,6 +411,17 @@ export function createWeb(options: WebOptions): RequestListener {
       return;
     }
 
+    // Jump to a date: a calendar without a date picker makes the runner page backwards to find a day.
+    if (method === "GET" && url.pathname === "/jump") {
+      const requested = url.searchParams.get("date") ?? "";
+      if (!ISO_DAY.test(requested)) {
+        sendHtml(response, 400, renderLogin(state.locale, "date must be YYYY-MM-DD"));
+        return;
+      }
+      redirect(response, `/?week=${weekStart(requested)}`);
+      return;
+    }
+
     // The month view: a runner plans in months; the seven-day week alone hid the shape of the block.
     if (method === "GET" && (url.pathname === "/month" || url.pathname.startsWith("/month/"))) {
       const today = state.now.slice(0, 10);
@@ -422,6 +433,11 @@ export function createWeb(options: WebOptions): RequestListener {
       const plan = repository.latestPlanVersionFor(userId, `${requested}-01`);
       const summary =
         plan === undefined ? undefined : seasonSummary({ plan, entries: repository.listEntries(userId), today });
+      const monthStart = `${requested}-01`;
+      const [yearPart, monthPart] = requested.split("-").map((part) => Number(part));
+      const monthEnd = new Date(Date.UTC(yearPart ?? 0, monthPart ?? 1, 0)).toISOString().slice(0, 10);
+      const days = eachDay(weekStart(monthStart), addDays(weekStart(monthEnd), 6));
+      const planForMonth = plan;
       sendHtml(
         response,
         200,
@@ -431,6 +447,20 @@ export function createWeb(options: WebOptions): RequestListener {
           weeks: weeksOfMonth(summary, requested),
           prevMonth: shiftMonth(requested, -1),
           nextMonth: shiftMonth(requested, 1),
+          days,
+          today,
+          sessionOf: (day) => {
+            const session = planForMonth?.sessions.find((candidate) => candidate.day === day);
+            return session === undefined ? "" : `${session.kind} ${session.distanceKm} km`;
+          },
+          statusOf: (day) => {
+            const entries = repository.listEntriesForDay(userId, day);
+            const latest = [...entries].sort((left, right) => right.revision - left.revision)[0];
+            if (latest === undefined) return "none";
+            if (latest.outcome === "missed" || latest.outcome === "skipped") return "missed";
+            if (latest.outcome === "rest") return "rest";
+            return "done";
+          },
           ...periodizationOf(summary),
         }),
       );

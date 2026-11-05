@@ -155,7 +155,7 @@ describe("the week page is the plan, not a dashboard", () => {
 
   it("marks the day the page is about", async () => {
     const response = await call("/", { cookie: "session=token-a" });
-    expect(response.html).toContain('class="row today"');
+    expect(response.html).toContain('class="day-card today"');
   });
 
   it("shows a generated explanation sentence above the week", async () => {
@@ -932,3 +932,28 @@ describe("connections page", () => {
     expect(page.html).toContain('href="/connections"');
   });
 });
+
+describe("grid calendar", () => {
+  it("renders the week as seven day cards, not a list", async () => {
+    const page = await call("/", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('class="week-grid"');
+    expect((page.html.match(/class="day-card/g) ?? []).length).toBe(7);
+    expect(page.html).toContain("planned");
+  });
+
+  it("renders the month as a real month grid with weekday headers", async () => {
+    const page = await call("/month/2026-11", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('class="month-grid"');
+    expect(page.html).toContain('class="dow"');
+    expect((page.html.match(/class="month-day/g) ?? []).length).toBeGreaterThanOrEqual(28);
+  });
+
+  it("jumps to the week of a chosen date", async () => {
+    const response = await fetch(`${base}/jump?date=2026-11-11`, { headers: { cookie: "session=token-a" }, redirect: "manual" });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/?week=2026-11-09");
+  });
+});
+

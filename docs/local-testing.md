@@ -112,6 +112,23 @@ and a sync that appended a day entry with idempotency key `garmin:<activityId>`.
 Still not built: token storage in a secret manager (the record keeps `credentialRef` only), Strava callback state, and a
 scheduled sync. Those are deployment decisions, not UI gaps.
 
+## Calendar grid: week and month (2026-11-05 pass)
+
+The first phone/laptop pass showed the "calendar" was a **list of rows**, which answers "what is next" but not "what does
+this period look like". Changed and verified:
+
+| Before | Now |
+|---|---|
+| week = a vertical list of 7 rows | **7 day cards in a grid** (`.week-grid`), each with date, session, logged state, note/comment; today has an accent ring |
+| month = a list of weeks | **real month grid** (`.month-grid`, Monday first, padded to whole weeks): weekday headers, day numbers, session text, status dots (done/missed/rest) |
+| no totals | a totals line above the week: planned km · done km · sessions done/planned |
+| no date jump | a **Go to date** picker on the week view (`/jump?date=…` → the week containing that date) |
+| period navigation only prev/next | period nav now carries **Today · Month · Season** on the week, and **This month · Week · Season** on the month |
+| 8 flat tabs | unchanged in this pass; grouping the secondary tabs is the next navigation slice |
+
+On ≤640 px the week grid becomes two columns; the month grid stays seven columns with the session text hidden so the
+shape survives.
+
 ## Honest limits
 
 | Limit | Why |
