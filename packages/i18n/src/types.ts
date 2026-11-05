@@ -35,6 +35,16 @@ export type PromptTemplate = "prompt.log-day" | "prompt.log-gap";
 
 export type WebTemplate =
   | "web.title"
+  | "web.brand"
+  | "web.stat-planned-km"
+  | "web.stat-done-km"
+  | "web.stat-sessions"
+  | "web.brand-tagline"
+  | "web.side-train"
+  | "web.side-log"
+  | "web.side-plan"
+  | "web.side-account"
+  | "web.side-today"
   | "web.login-title"
   | "web.login-hint"
   | "web.login-button"

@@ -207,6 +207,24 @@ export function createWeb(options: WebOptions): RequestListener {
       return;
     }
 
+    if (method === "GET" && url.pathname.startsWith("/static/assets/")) {
+      const name = url.pathname.slice("/static/assets/".length);
+      if (!/^[a-z0-9-]+\.png$/.test(name)) {
+        response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+        response.end("not found");
+        return;
+      }
+      try {
+        const bytes = readFileSync(new URL(`../public/assets/${name}`, import.meta.url));
+        response.writeHead(200, { "content-type": "image/png", "cache-control": "public, max-age=3600" });
+        response.end(bytes);
+      } catch {
+        response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+        response.end("not found");
+      }
+      return;
+    }
+
     if (method === "GET" && url.pathname === "/static/queue.js") {
       response.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=300" });
       response.end(QUEUE_JS);
