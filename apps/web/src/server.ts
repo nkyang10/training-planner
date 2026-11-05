@@ -33,7 +33,7 @@ import { exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
 import { localClockOf } from "./local-clock";
-import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderConnections, renderConsole, renderDay, renderLogin, renderMonth, renderPain, renderReview, renderSeason, renderWeek, renderWizard } from "./pages";
+import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderConnections, renderConsole, renderDay, renderLogin, renderMonth, renderPain, renderReview, renderStats, renderSeason, renderWeek, renderWizard } from "./pages";
 import { STYLES } from "./styles";
 
 export interface WebOptions {
@@ -510,6 +510,31 @@ export function createWeb(options: WebOptions): RequestListener {
           nextWeek: addDays(week, 7),
           month: monthOf(week),
         }),
+      );
+      return;
+    }
+
+    // Stats: completeness against the plan plus the coach's comments (2026-11-05).
+    if (method === "GET" && url.pathname === "/stats") {
+      const today = state.now.slice(0, 10);
+      const plan = repository.latestPlanVersionFor(userId, today);
+      const entries = repository.listEntries(userId);
+      const summary = plan === undefined ? undefined : seasonSummary({ plan, entries, today });
+      const plannedSessions = summary?.weeks.reduce((total, week) => total + week.plannedSessions, 0) ?? 0;
+      const completedSessions = summary?.weeks.reduce((total, week) => total + week.completedSessions, 0) ?? 0;
+      const plannedKm = summary?.weeks.reduce((total, week) => total + week.plannedKm, 0) ?? 0;
+      const completedKm = summary?.weeks.reduce((total, week) => total + week.completedKm, 0) ?? 0;
+      const adherencePercent = plannedSessions === 0 ? 0 : Math.round((completedSessions / plannedSessions) * 100);
+      const loggedDays = summary?.weeks.reduce((total, week) => total + week.loggedDays, 0) ?? 0;
+      const comments: string[] = [];
+      for (const day of eachDay(addDays(today, -27), today)) {
+        const comment = repository.listComments(userId, day)[0];
+        if (comment !== undefined && comment.text.length > 0) comments.push(comment.text);
+      }
+      sendHtml(
+        response,
+        200,
+        renderStats({ locale: state.locale, summary, plannedSessions, completedSessions, plannedKm, completedKm, adherencePercent, loggedDays, comments }),
       );
       return;
     }

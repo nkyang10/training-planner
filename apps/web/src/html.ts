@@ -25,10 +25,12 @@ export interface LayoutInput {
   title: string;
   body: string;
   signedIn: boolean;
+  /** The section to mark active, as a path (e.g. "/month"). Optional: a page that forgets it still renders. */
+  active?: string;
 }
 
-const link = (href: string, label: string, className = "side-link"): string =>
-  `<a class="${className}" href="${href}">${label}</a>`;
+const link = (href: string, label: string, active: string | undefined): string =>
+  `<a class="side-link${active === href ? " active" : ""}" href="${href}"${active === href ? ' aria-current="page"' : ""}>${label}</a>`;
 
 export function layout(input: LayoutInput): string {
   const messages = messagesFor(input.locale);
@@ -44,24 +46,25 @@ export function layout(input: LayoutInput): string {
       <nav class="side-nav" aria-label="Sections">
         <section class="side-group">
           <h2>${escapeHtml(web["web.side-train"])}</h2>
-          ${link("/", escapeHtml(web["web.nav-week"]))}
-          ${link("/month", escapeHtml(web["web.nav-month"]))}
-          ${link("/season", escapeHtml(web["web.nav-season"]))}
+          ${link("/", escapeHtml(web["web.nav-week"]), input.active)}
+          ${link("/month", escapeHtml(web["web.nav-month"]), input.active)}
+          ${link("/season", escapeHtml(web["web.nav-season"]), input.active)}
+          ${link("/stats", escapeHtml(web["web.nav-stats"]), input.active)}
         </section>
         <section class="side-group">
           <h2>${escapeHtml(web["web.side-log"])}</h2>
-          ${link("/", escapeHtml(web["web.side-today"]))}
-          ${link("/pain", escapeHtml(web["web.nav-pain"]))}
+          ${link("/", escapeHtml(web["web.side-today"]), input.active)}
+          ${link("/pain", escapeHtml(web["web.nav-pain"]), input.active)}
         </section>
         <section class="side-group">
           <h2>${escapeHtml(web["web.side-plan"])}</h2>
-          ${link("/wizard", escapeHtml(web["web.nav-wizard"]))}
-          ${link("/console", escapeHtml(web["web.nav-console"]))}
+          ${link("/wizard", escapeHtml(web["web.nav-wizard"]), input.active)}
+          ${link("/console", escapeHtml(web["web.nav-console"]), input.active)}
         </section>
         <section class="side-group">
           <h2>${escapeHtml(web["web.side-account"])}</h2>
-          ${link("/connections", escapeHtml(web["web.nav-connections"]))}
-          ${link("/export", escapeHtml(web["web.nav-export"]))}
+          ${link("/connections", escapeHtml(web["web.nav-connections"]), input.active)}
+          ${link("/export", escapeHtml(web["web.nav-export"]), input.active)}
         </section>
       </nav>
       <div class="sidebar-foot">
@@ -85,6 +88,7 @@ export function layout(input: LayoutInput): string {
       <a href="/">${escapeHtml(web["web.nav-week"])}</a>
       <a href="/month">${escapeHtml(web["web.nav-month"])}</a>
       <a href="/season">${escapeHtml(web["web.nav-season"])}</a>
+      <a href="/stats">${escapeHtml(web["web.nav-stats"])}</a>
       <a href="/pain">${escapeHtml(web["web.nav-pain"])}</a>
       <a href="/wizard">${escapeHtml(web["web.nav-wizard"])}</a>
       <a href="/connections">${escapeHtml(web["web.nav-connections"])}</a>

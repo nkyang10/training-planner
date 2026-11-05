@@ -984,3 +984,25 @@ describe("tablet shell", () => {
   });
 });
 
+describe("training stats", () => {
+  it("shows completeness tiles, the weekly table and the coach comments", async () => {
+    const page = await call("/stats", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Training completeness");
+    expect(page.html).toContain('class="stat-grid"');
+    expect(page.html).toContain("Coach comments");
+    expect(page.html).toContain('class="table"');
+  });
+
+  it("says there is no plan rather than showing zeroes as if they were a plan", async () => {
+    const page = await call("/stats", { cookie: "session=token-b" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("No plan yet");
+  });
+
+  it("marks the active section in the rail", async () => {
+    const page = await call("/stats", { cookie: "session=token-a" });
+    expect(page.html).toContain('class="side-link active" href="/stats"');
+  });
+});
+
