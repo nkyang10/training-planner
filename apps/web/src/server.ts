@@ -6,7 +6,8 @@
  * architecture - there is one entry pipeline, not one per client.
  */
 import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from "node:http";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Connection, DayEntry, Session, SyncPreference, WizardStepId } from "@training-planner/domain";
 import { CONNECTION_PROVIDERS, guidelineSchema, isSyncSource } from "@training-planner/domain";
 import {
@@ -52,6 +53,8 @@ export interface WebOptions {
   apiBaseUrl?: string;
   /** Injected for tests: the web process proxies provider actions to the API. */
   fetchImpl?: typeof fetch;
+  /** Where coach photos are stored; git-ignored, per user, never served without a session. */
+  uploadDir?: string;
 }
 
 const MAX_BODY_BYTES = 200_000;
@@ -109,6 +112,45 @@ function sendHtml(response: ServerResponse, status: number, html: string, header
 function redirect(response: ServerResponse, location: string, headers: Record<string, string> = {}): void {
   response.writeHead(303, { location, ...headers });
   response.end();
+}
+
+const MAX_UPLOAD_BYTES = 6_000_000;
+
+/** Minimal multipart reader for the coach composer: one text field (question) and one image (photo). */
+async function readMultipart(
+  request: IncomingMessage,
+): Promise<{ fields: Record<string, string>; file?: { filename: string; contentType: string; data: Buffer } }> {
+  const contentType = request.headers["content-type"] ?? "";
+  const boundaryMatch = /boundary=(?:"([^"]+)"|([^;]+))/.exec(contentType);
+  if (boundaryMatch === null) throw new Error("multipart without a boundary");
+  const boundary = boundaryMatch[1] ?? boundaryMatch[2] ?? "";
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of request) {
+    const buffer = chunk as Buffer;
+    size += buffer.length;
+    if (size > MAX_UPLOAD_BYTES) throw new Error("upload too large");
+    chunks.push(buffer);
+  }
+  const body = Buffer.concat(chunks);
+  const fields: Record<string, string> = {};
+  let file: { filename: string; contentType: string; data: Buffer } | undefined;
+  for (const part of body.toString("latin1").split(`--${boundary}`)) {
+    const headerEnd = part.indexOf("\r\n\r\n");
+    if (headerEnd < 0) continue;
+    const headers = part.slice(0, headerEnd);
+    const content = part.slice(headerEnd + 4, part.endsWith("\r\n") ? -2 : undefined);
+    const nameMatch = /name="([^"]+)"/.exec(headers);
+    if (nameMatch === null) continue;
+    const filenameMatch = /filename="([^"]*)"/.exec(headers);
+    const typeMatch = /Content-Type:\s*([^\r\n]+)/i.exec(headers);
+    if (filenameMatch !== null && filenameMatch[1] !== undefined && filenameMatch[1].length > 0) {
+      file = { filename: filenameMatch[1].slice(0, 120), contentType: typeMatch?.[1]?.trim() ?? "application/octet-stream", data: Buffer.from(content, "latin1") };
+    } else {
+      fields[nameMatch[1] ?? ""] = Buffer.from(content, "latin1").toString("utf8");
+    }
+  }
+  return file === undefined ? { fields } : { fields, file };
 }
 
 async function readForm(request: IncomingMessage): Promise<URLSearchParams> {
@@ -442,7 +484,7 @@ export function createWeb(options: WebOptions): RequestListener {
 
     // The coach conversation (ADR-0011): the page reads the stored thread; a turn is proxied to the API, which owns the
     // model, the grounding check and the store. A change still has to become a review the runner decides.
-    if (url.pathname === "/coach" || url.pathname === "/coach/review") {
+    if (url.pathname === "/coach" || url.pathname === "/coach/review" || url.pathname.startsWith("/coach/photo/")) {
       const apiBase = options.apiBaseUrl ?? "http://127.0.0.1:8082";
       const doFetch = options.fetchImpl ?? fetch;
       const proxyJson = async (route: string, body: unknown): Promise<{ ok: boolean; status: number; detail: string; payload: Record<string, unknown> }> => {
@@ -482,14 +524,74 @@ export function createWeb(options: WebOptions): RequestListener {
       }
 
       if (method === "POST" && url.pathname === "/coach") {
-        const form = await readForm(request);
-        const question = (form.get("question") ?? "").trim();
+        const contentType = request.headers["content-type"] ?? "";
+        let question = "";
+        let attachments: Array<{ attachmentId: string; filename: string; contentType: string; sizeBytes: number; kind: "photo" }> = [];
+        if (contentType.startsWith("multipart/form-data")) {
+          let parsed: Awaited<ReturnType<typeof readMultipart>>;
+          try {
+            parsed = await readMultipart(request);
+          } catch (error) {
+            redirect(response, `/coach?error=${encodeURIComponent(error instanceof Error ? error.message : String(error))}`);
+            return;
+          }
+          question = (parsed.fields["question"] ?? "").trim();
+          const file = parsed.file;
+          if (file !== undefined) {
+            const extensions: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp" };
+            const extension = extensions[file.contentType];
+            if (extension === undefined) {
+              redirect(response, `/coach?error=${encodeURIComponent("photos must be png, jpeg or webp")}`);
+              return;
+            }
+            if (file.data.length > 5_000_000) {
+              redirect(response, `/coach?error=${encodeURIComponent("photo is larger than 5 MB")}`);
+              return;
+            }
+            const attachmentId = uuidFrom({ userId, day: state.now.slice(0, 10), kind: "coach-photo", nonce: String(repository.listCoachMessages(userId, 1).length) });
+            const directory = join(options.uploadDir ?? "data/uploads", userId);
+            mkdirSync(directory, { recursive: true });
+            writeFileSync(join(directory, `${attachmentId}${extension}`), file.data);
+            attachments = [{ attachmentId, filename: file.filename, contentType: file.contentType, sizeBytes: file.data.length, kind: "photo" }];
+          }
+        } else {
+          const form = await readForm(request);
+          question = (form.get("question") ?? "").trim();
+        }
         if (question.length === 0) {
           redirect(response, "/coach?error=" + encodeURIComponent("write a question first"));
           return;
         }
-        const result = await proxyJson("/coach/messages", { question });
+        const result = await proxyJson("/coach/messages", { question, attachments });
         redirect(response, result.ok ? "/coach?sent=1" : `/coach?error=${encodeURIComponent(result.detail)}`);
+        return;
+      }
+
+      if (method === "GET" && url.pathname.startsWith("/coach/photo/")) {
+        const attachmentId = url.pathname.slice("/coach/photo/".length);
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(attachmentId)) {
+          response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+          response.end("not found");
+          return;
+        }
+        const attachment = repository
+          .listCoachMessages(userId, 500)
+          .flatMap((message) => message.attachments ?? [])
+          .find((candidate) => candidate.attachmentId === attachmentId);
+        if (attachment === undefined) {
+          response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+          response.end("not found");
+          return;
+        }
+        const extensions: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp" };
+        try {
+          const bytes = readFileSync(join(options.uploadDir ?? "data/uploads", userId, `${attachmentId}${extensions[attachment.contentType] ?? ""}`));
+          response.writeHead(200, { "content-type": attachment.contentType, "cache-control": "private, max-age=300" });
+          response.end(bytes);
+        } catch {
+          response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+          response.end("not found");
+        }
         return;
       }
 

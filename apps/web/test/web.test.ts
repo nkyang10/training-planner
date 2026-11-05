@@ -7,7 +7,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import { athleteProfileSchema } from "@training-planner/domain";
 import { fixtureSchema } from "@training-planner/golden-fixtures";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PlanVersion } from "@training-planner/domain";
 import { generatePlan } from "@training-planner/planner-core";
@@ -85,11 +86,12 @@ const planFor = (userId: string): PlanVersion =>
   }).version;
 
 let fakeApiFetch: typeof fetch | undefined;
+const uploadDir = mkdtempSync(join(tmpdir(), "training-planner-uploads-"));
 
 beforeAll(async () => {
   repository.savePlanVersion(planFor(USER_A));
   repository.savePlanVersion(planWithPace(USER_C));
-  server = createServer(createWeb({ repository, sessions, knowledge, now: () => NOW, operatorToken: "operator-token", apiBaseUrl: "http://api.test", fetchImpl: (input, init) => (fakeApiFetch ?? fetch)(input, init) }));
+  server = createServer(createWeb({ repository, sessions, knowledge, now: () => NOW, operatorToken: "operator-token", apiBaseUrl: "http://api.test", uploadDir, fetchImpl: (input, init) => (fakeApiFetch ?? fetch)(input, init) }));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   const port = typeof address === "object" && address !== null ? address.port : 0;
@@ -97,6 +99,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  rmSync(uploadDir, { recursive: true, force: true });
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
@@ -1090,6 +1093,73 @@ describe("coach conversation", () => {
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("/review/coach-review");
     fakeApiFetch = undefined;
+  });
+});
+
+describe("coach photos", () => {
+  const boundary = "----coachboundary";
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII=",
+    "base64",
+  );
+
+  it("uploads a photo with the turn, serves it to the owner and hides it from another runner", async () => {
+    fakeApiFetch = async () => new Response(JSON.stringify({ reply: { reply: "Noted." }, messages: [] }), { status: 201 });
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="question"\r\n\r\nHow does this look?\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="knee.png"\r\nContent-Type: image/png\r\n\r\n`),
+      png,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+    const response = await fetch(`${base}/coach`, {
+      method: "POST",
+      headers: { "content-type": `multipart/form-data; boundary=${boundary}`, cookie: "session=token-a" },
+      body,
+      redirect: "manual",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/coach?sent=1");
+    fakeApiFetch = undefined;
+
+    const files = readdirSync(join(uploadDir, USER_A));
+    expect(files).toHaveLength(1);
+    const attachmentId = files[0]?.split(".")[0] ?? "";
+    expect(attachmentId).toMatch(/^[0-9a-f-]{36}$/);
+    repository.appendCoachMessage({
+      messageId: "msg-upload",
+      userId: USER_A,
+      role: "user",
+      text: "How does this look?",
+      createdAt: NOW,
+      contextHash: "sha256:x",
+      reviewId: null,
+      attachments: [{ attachmentId, filename: "knee.png", contentType: "image/png", sizeBytes: png.length, kind: "photo" }],
+    });
+
+    const image = await fetch(`${base}/coach/photo/${attachmentId}`, { headers: { cookie: "session=token-a" } });
+    expect(image.status).toBe(200);
+    expect(image.headers.get("content-type")).toBe("image/png");
+    expect((await image.arrayBuffer()).byteLength).toBe(png.length);
+
+    const other = await fetch(`${base}/coach/photo/${attachmentId}`, { headers: { cookie: "session=token-b" } });
+    expect(other.status).toBe(404);
+  });
+
+  it("renders the thumbnail on the thread page", async () => {
+    const attachmentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    repository.appendCoachMessage({
+      messageId: "msg-photo",
+      userId: USER_A,
+      role: "user",
+      text: "Photo of the knee",
+      createdAt: NOW,
+      contextHash: "sha256:x",
+      reviewId: null,
+      attachments: [{ attachmentId, filename: "knee.png", contentType: "image/png", sizeBytes: 68, kind: "photo" }],
+    });
+    const page = await call("/coach", { cookie: "session=token-a" });
+    expect(page.html).toContain('class="coach-photo"');
+    expect(page.html).toContain(`/coach/photo/${attachmentId}`);
   });
 });
 

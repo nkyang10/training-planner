@@ -32,12 +32,21 @@ describe("buildCoachChatRequest", () => {
     expect(first.system.rules).toHaveLength(5);
   });
 
-  it("caps history at the last 12 turns", () => {
-    const history = Array.from({ length: 20 }, (_, index) => turn(index % 2 === 0 ? "user" : "coach", `turn-${index}`));
+  it("caps history at the last 100 turns", () => {
+    const history = Array.from({ length: 150 }, (_, index) => turn(index % 2 === 0 ? "user" : "coach", `turn-${index}`));
     const request = buildCoachChatRequest({ facts, history, question: "Still on track?" });
     expect(request.history).toHaveLength(MAX_HISTORY_TURNS);
-    expect(request.history[0]).toEqual({ role: "user", text: "turn-8" });
-    expect(request.history.at(-1)).toEqual({ role: "coach", text: "turn-19" });
+    expect(request.history[0]).toEqual({ role: "user", text: "turn-50" });
+    expect(request.history.at(-1)).toEqual({ role: "coach", text: "turn-149" });
+  });
+
+  it("keeps the newest turns under the character budget and never drops the question", () => {
+    const history = Array.from({ length: 120 }, (_, index) => turn("user", `${index}-${"x".repeat(1000)}`));
+    const request = buildCoachChatRequest({ facts, history, question: "Still on track?" });
+    const total = request.history.reduce((sum, item) => sum + item.text.length, 0) + request.question.length;
+    expect(total).toBeLessThanOrEqual(100_000);
+    expect(request.history.at(-1)?.text.startsWith("119-")).toBe(true);
+    expect(request.question).toBe("Still on track?");
   });
 
   it("trims the question and drops an empty one", () => {

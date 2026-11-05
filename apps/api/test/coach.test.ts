@@ -116,3 +116,35 @@ describe("coach conversation", () => {
     expect((list.body["messages"] as unknown[]).length).toBe(4);
   });
 });
+
+describe("coach attachments", () => {
+  it("stores the image metadata on the runner turn and tells the model the count", async () => {
+    captured = [];
+    const attachmentId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const answer = await call("/coach/messages", {
+      method: "POST",
+      body: JSON.stringify({
+        question: "This is the knee today.",
+        attachments: [{ attachmentId, filename: "knee.png", contentType: "image/png", sizeBytes: 68, kind: "photo" }],
+      }),
+    });
+    expect(answer.status).toBe(201);
+    const messages = answer.body["messages"] as Array<Record<string, unknown>>;
+    const lastUser = [...messages].reverse().find((message) => message["role"] === "user");
+    expect((lastUser?.["attachments"] as Array<Record<string, unknown>>)[0]?.["attachmentId"]).toBe(attachmentId);
+    expect(captured[0]?.question).toBe("This is the knee today.");
+  });
+
+  it("refuses an unsupported attachment type", async () => {
+    const answer = await call("/coach/messages", {
+      method: "POST",
+      body: JSON.stringify({
+        question: "Look",
+        attachments: [{ attachmentId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", filename: "a.gif", contentType: "image/gif", sizeBytes: 10, kind: "photo" }],
+      }),
+    });
+    expect(answer.status).toBe(400);
+    expect((answer.body["error"] as Record<string, unknown>)["code"]).toBe("invalid-attachment");
+  });
+});
+

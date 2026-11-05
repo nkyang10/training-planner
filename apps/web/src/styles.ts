@@ -629,6 +629,9 @@ a.chip:hover { border-color: #E3C6AE; background: #FFE9D6; color: var(--ink); }
 
 /* Mobile bar ------------------------------------------------------------- */
 
+.coach-photo { max-width: 180px; max-height: 180px; border-radius: 12px; border: 1px solid var(--line); object-fit: cover; }
+.coach-message .note { white-space: pre-wrap; }
+
 .tabs { display: none; }
 
 @media (max-width: 1100px) {
