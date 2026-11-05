@@ -146,6 +146,15 @@ The product no longer looks like a mini tool. The shell is a tablet app: a fixed
 Honest gaps: `renderWeek`, `renderPain` and `renderReview` still use their old plain headings (flagged as follow-up); the
 rail has no active-item highlight yet; the month grid hides session text under 900 px and relies on the status dot.
 
+## Stats, readiness and active navigation (2026-11-05 pass)
+
+| Piece | Behaviour |
+|---|---|
+| `/stats` | training completeness: done/planned sessions, done/planned km, adherence %, logged days; a weekly table; the coach's comments collected from the last 28 days |
+| readiness | the week hero shows **"Next 7 days planned"** when the plan covers today + 6, otherwise **"Plan ends {day}"** — the planner's horizon is a fact, not a promise |
+| active nav | the rail and the folded bar mark the current section (`aria-current="page"`); Stats joins Train |
+| page heads | week, pain and review now use the same `page-head` as the rest |
+
 ## Honest limits
 
 | Limit | Why |

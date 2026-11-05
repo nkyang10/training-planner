@@ -123,7 +123,7 @@ export function renderCalendar(input: CalendarPageInput): string {
       locale: input.locale,
       title: web["web.title"],
       body: `<section class="card"><p>${escapeHtml(web["web.no-plan"])}</p></section>`,
-      signedIn: true,
+      active: "/", signedIn: true,
     });
   }
   const start = input.weekStart ?? input.days[0] ?? input.today;
@@ -166,10 +166,16 @@ export function renderCalendar(input: CalendarPageInput): string {
       <p class="eyebrow">${escapeHtml(web["web.nav-week"])}</p>
       <h1 class="page-title">${escapeHtml(title)}</h1>
     </header>`;
+  const readiness =
+    input.plan === undefined
+      ? ""
+      : input.plan.lastDay >= addDays(input.today, 6)
+        ? `<span class="chip done">${escapeHtml(web["web.readiness-7"])}</span>`
+        : `<span class="chip quiet">${escapeHtml(format(web["web.readiness-short"], { day: input.plan.lastDay }))}</span>`;
   const hero = `<section class="hero hero-week">
       <span class="hero-art" style="background-image:url('/static/assets/hero-week.png')" aria-hidden="true"></span>
       <div class="hero-copy">
-        <p>${escapeHtml(totals)}</p>
+        <p>${escapeHtml(totals)} ${readiness}</p>
         <p><a class="btn btn-primary" href="/day/${escapeHtml(input.today)}">${escapeHtml(web["web.grid-today"])}</a>
           <a class="btn btn-ghost" href="/season">${escapeHtml(web["web.nav-season"])}</a></p>
       </div>
@@ -238,7 +244,7 @@ export function renderSeason(input: SeasonPageInput): string {
       locale: input.locale,
       title: messages.web["web.season-title"],
       body: `<section class="card"><p>${escapeHtml(messages.web["web.season-empty"])}</p></section>`,
-      signedIn: true,
+      active: "/season", signedIn: true,
     });
   }
 
@@ -396,7 +402,7 @@ export function renderMonth(input: MonthPageInput): string {
       </a>${weekMarkers.length === 0 ? "" : ` <span class="chip quiet">${escapeHtml(weekMarkers.join(" · "))}</span>`}</li>`;
             })
             .join("\n");
-    return layout({ locale: input.locale, title, body: `${pageHead}${hero}<section class="card">${periodNav}<ul class="week">${rows}</ul></section>`, signedIn: true });
+    return layout({ locale: input.locale, title, body: `${pageHead}${hero}<section class="card">${periodNav}<ul class="week">${rows}</ul></section>`, active: "/month", signedIn: true });
   }
   const head = WEEKDAYS.map((day) => `<span class="dow">${escapeHtml(messages.weekday[day])}</span>`).join("");
   const cells = input.days
@@ -456,7 +462,10 @@ export function renderWeek(input: WeekPageInput): string {
       </a>`;
     })
     .join("\n");
-  const body = `<section class="card">
+  const body = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(messages.web["web.nav-week"])}</p>
+      <h1 class="page-title">${escapeHtml(title)}</h1>
+    </header><section class="card">
       <h2>${escapeHtml(title)}</h2>
       <p class="period-nav">
         <a href="/week/${escapeHtml(input.prevWeek)}">${escapeHtml(web["web.week-prev"])}</a>
@@ -467,7 +476,51 @@ export function renderWeek(input: WeekPageInput): string {
       </p>
       <div class="week-grid">${cards}</div>
     </section>`;
-  return layout({ locale: input.locale, title, body, signedIn: true });
+  return layout({ locale: input.locale, title, body, active: "/", signedIn: true });
+}
+
+export interface StatsPageInput {
+  locale: Locale;
+  summary: SeasonSummary | undefined;
+  plannedSessions: number;
+  completedSessions: number;
+  plannedKm: number;
+  completedKm: number;
+  adherencePercent: number;
+  loggedDays: number;
+  comments: readonly string[];
+}
+
+/** Completeness against the plan, plus the coach's comments in one place (2026-11-05). */
+export function renderStats(input: StatsPageInput): string {
+  const messages = messagesFor(input.locale);
+  const web = messages.web;
+  const head = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(web["web.nav-stats"])}</p>
+      <h1 class="page-title">${escapeHtml(web["web.stats-title"])}</h1>
+      <p class="page-sub">${escapeHtml(web["web.stats-sub"])}</p>
+    </header>`;
+  if (input.summary === undefined) {
+    return layout({ locale: input.locale, title: web["web.stats-title"], body: `${head}<section class="card"><p>${escapeHtml(web["web.stats-empty"])}</p></section>`, signedIn: true, active: "/stats" });
+  }
+  const tiles = [
+    { value: `${formatNumber(input.completedSessions)} / ${formatNumber(input.plannedSessions)}`, label: web["web.stats-done-sessions"] },
+    { value: `${formatNumber(input.completedKm)} / ${formatNumber(input.plannedKm)}`, label: web["web.stat-planned-km"] },
+    { value: `${formatNumber(input.adherencePercent)}%`, label: web["web.stats-adherence"] },
+    { value: formatNumber(input.loggedDays), label: web["web.stats-logged"] },
+  ];
+  const stats = `<div class="stat-grid">${tiles
+    .map((tile) => `<div class="stat"><span class="stat-value">${escapeHtml(tile.value)}</span><span class="stat-label">${escapeHtml(tile.label)}</span></div>`)
+    .join("\n")}</div>`;
+  const rows = input.summary.weeks
+    .map((week) => `<tr><td>${escapeHtml(week.weekStart)}</td><td>${escapeHtml(`${formatNumber(week.completedSessions)} / ${formatNumber(week.plannedSessions)}`)}</td><td>${escapeHtml(`${formatNumber(week.completedKm)} / ${formatNumber(week.plannedKm)}`)}</td><td>${escapeHtml(String(week.loggedDays))}</td></tr>`)
+    .join("\n");
+  const table = `<section class="card"><h2>${escapeHtml(web["web.stats-week"])}</h2><table class="table"><thead><tr><th>${escapeHtml(web["web.stats-week"])}</th><th>${escapeHtml(web["web.stats-done-sessions"])}</th><th>${escapeHtml(web["web.stat-done-km"])}</th><th>${escapeHtml(web["web.stats-logged"])}</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+  const comments = input.comments.length === 0
+    ? `<p class="muted">${escapeHtml(web["web.stats-no-comments"])}</p>`
+    : `<ul class="week">${input.comments.map((comment) => `<li class="row"><p class="note">${escapeHtml(comment)}</p></li>`).join("\n")}</ul>`;
+  const body = `${head}${stats}${table}<section class="card"><h2>${escapeHtml(web["web.stats-comments"])}</h2>${comments}</section>`;
+  return layout({ locale: input.locale, title: web["web.stats-title"], body, signedIn: true, active: "/stats" });
 }
 
 export interface ConnectionsPageInput {
@@ -561,7 +614,7 @@ export function renderConnections(input: ConnectionsPageInput): string {
         <button type="submit">${escapeHtml(web["web.connections-save-sync"])}</button>
       </form>
     </section>`;
-  return layout({ locale: input.locale, title: web["web.connections-title"], body, signedIn: true });
+  return layout({ locale: input.locale, title: web["web.connections-title"], body, active: "/connections", signedIn: true });
 }
 
 const emptyConnection = (input: ConnectionsPageInput, provider: Connection["provider"]): Connection => ({
@@ -620,7 +673,7 @@ export function renderPain(input: PainPageInput): string {
         .join("\n")}</ul>
       <p class="muted"><a href="/">${escapeHtml(messages.web["web.season-back"])}</a></p>
     </section>`;
-  return layout({ locale: input.locale, title: messages.web["web.pain-title"], body, signedIn: true });
+  return layout({ locale: input.locale, title: messages.web["web.pain-title"], body, active: "/pain", signedIn: true });
 }
 
 export function renderDay(input: DayPageInput): string {
@@ -691,7 +744,10 @@ export function renderDay(input: DayPageInput): string {
       <p class="page-sub">${escapeHtml(sessionText)}</p>
     </header>`;
   const notice = `${saved}${errorBlock}`;
-  const body = `${pageHead}
+  const body = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(messages.web["web.nav-pain"])}</p>
+      <h1 class="page-title">${escapeHtml(messages.web["web.pain-title"])}</h1>
+    </header>${pageHead}
     ${notice.length === 0 ? "" : `<section class="card">${notice}</section>`}
     <form method="post" action="/day/${escapeHtml(input.day)}" class="card stack" data-offline-queue data-day="${escapeHtml(input.day)}" data-saved-locally="${escapeHtml(messages.web["web.saved-locally"])}">
       <fieldset>
@@ -717,7 +773,7 @@ export function renderDay(input: DayPageInput): string {
       <p class="note" data-offline-status role="status"></p>
     </form>
     ${comment}`;
-  return layout({ locale: input.locale, title: input.day, body, signedIn: true });
+  return layout({ locale: input.locale, title: input.day, body, active: "/", signedIn: true });
 }
 
 export { OUTCOMES };
@@ -792,7 +848,9 @@ export function renderReview(input: ReviewSheetInput): string {
     )
     .join("\n");
 
-  const body = `
+  const body = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(messages.web["web.review-title"])}</p>
+    </header>
     <section class="card">
       <h2>${escapeHtml(web["web.review-title"])}</h2>
       <p class="muted">${escapeHtml(format(web["web.review-freeze"], { day: input.firstEditableDay }))}</p>
@@ -897,7 +955,7 @@ export function renderWizard(input: WizardPageInput): string {
     const done = `${pageHead}<section class="card narrow">
       <ul class="week">${answers}</ul>
       <p class="muted"><a href="/console">${escapeHtml(messages.web["web.console-link"])}</a></p></section>`;
-    return layout({ locale: input.locale, title: wizard["wizard.title"], body: done, signedIn: true });
+    return layout({ locale: input.locale, title: wizard["wizard.title"], body: done, active: "/wizard", signedIn: true });
   }
   const step = input.step;
   const current = input.current[step.id];
@@ -975,7 +1033,7 @@ export function renderConsole(input: ConsolePageInput): string {
       <h2>${escapeHtml(web["web.console-guidelines"])}</h2>
       ${guidelines}
       <p class="muted"><a href="/">${escapeHtml(web["web.console-back"])}</a></p></section>`;
-  return layout({ locale: input.locale, title: web["web.console-title"], body, signedIn: true });
+  return layout({ locale: input.locale, title: web["web.console-title"], body, active: "/console", signedIn: true });
 }
 
 
