@@ -59,6 +59,7 @@ export function layout(input: LayoutInput): string {
         <section class="side-group">
           <h2>${escapeHtml(web["web.side-plan"])}</h2>
           ${link("/wizard", escapeHtml(web["web.nav-wizard"]), input.active)}
+          ${link("/coach", escapeHtml(web["web.nav-coach"]), input.active)}
           ${link("/console", escapeHtml(web["web.nav-console"]), input.active)}
         </section>
         <section class="side-group">
@@ -91,6 +92,7 @@ export function layout(input: LayoutInput): string {
       <a href="/stats">${escapeHtml(web["web.nav-stats"])}</a>
       <a href="/pain">${escapeHtml(web["web.nav-pain"])}</a>
       <a href="/wizard">${escapeHtml(web["web.nav-wizard"])}</a>
+      <a href="/coach">${escapeHtml(web["web.nav-coach"])}</a>
       <a href="/connections">${escapeHtml(web["web.nav-connections"])}</a>
       <a href="/export">${escapeHtml(web["web.nav-export"])}</a>
     </nav>`;

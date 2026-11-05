@@ -7,7 +7,7 @@
  * a check that can be forgotten, it is a lookup that cannot be expressed.
  */
 import { promptDeliverySchema } from "@training-planner/domain";
-import type { AiReviewProposal, AthleteProfile, Connection, DayEntry, GuidelineContract, LlmConsent, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, SyncPreference, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
+import type { AiReviewProposal, AthleteProfile, CoachMessage, Connection, DayEntry, GuidelineContract, LlmConsent, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, SyncPreference, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
 import {
   DuplicateIdempotencyError,
   type AppendEntryInput,
@@ -34,6 +34,7 @@ interface UserState {
   syncPreference: SyncPreference | null;
   reviews: Map<string, Review>;
   comments: CommentRecord[];
+  coachMessages: CoachMessage[];
   idempotencyKeys: Set<string>;
 }
 
@@ -55,6 +56,7 @@ const emptyUser = (): UserState => ({
   syncPreference: null,
   reviews: new Map(),
   comments: [],
+  coachMessages: [],
   idempotencyKeys: new Set(),
 });
 
@@ -315,6 +317,19 @@ export function createMemoryRepository(): Repository {
     listComments(userId: string, day?: string): CommentRecord[] {
       const comments = stateOf(userId).comments;
       return day === undefined ? [...comments] : comments.filter((comment) => comment.day === day);
+    },
+
+    appendCoachMessage(message: CoachMessage): void {
+      const state = stateOf(message.userId);
+      state.coachMessages = [...state.coachMessages, message];
+    },
+
+    listCoachMessages(userId: string, limit?: number): CoachMessage[] {
+      const messages = stateOf(userId).coachMessages;
+      if (limit === undefined) return [...messages];
+      // The most recent N turns, still oldest-first: a transcript reads forward however much of it is loaded.
+      const take = Math.max(0, limit);
+      return messages.slice(Math.max(messages.length - take, 0));
     },
   };
 }

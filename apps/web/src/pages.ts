@@ -21,6 +21,7 @@ import { WIZARD_STEPS } from "@training-planner/domain";
 import type { PainTrend } from "@training-planner/entries";
 import type { SeasonSummary, SeasonWeek } from "@training-planner/season";
 import type { Connection, SyncPreference } from "@training-planner/domain";
+import type { CoachMessage } from "@training-planner/domain";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
 import { addDays, weekStart } from "@training-planner/planner-core";
 import type { Locale } from "@training-planner/i18n";
@@ -541,6 +542,46 @@ export function renderStats(input: StatsPageInput): string {
     : `<ul class="week">${input.comments.map((comment) => `<li class="row"><p class="note"><a href="/day/${escapeHtml(comment.day)}">${escapeHtml(comment.day)}</a> · ${escapeHtml(comment.text)}</p></li>`).join("\n")}</ul>`;
   const body = `${head}${stats}${table}${trend}<section class="card"><h2>${escapeHtml(web["web.stats-comments"])}</h2>${comments}</section>`;
   return layout({ locale: input.locale, title: web["web.stats-title"], body, signedIn: true, active: "/stats" });
+}
+
+export interface CoachPageInput {
+  locale: Locale;
+  messages: readonly CoachMessage[];
+  factsSummary: string;
+  reviewId?: string;
+  error?: string;
+}
+
+/** The conversation: the coach keeps context, but a change is still a review the runner decides (ADR-0011). */
+export function renderCoachPage(input: CoachPageInput): string {
+  const messages = messagesFor(input.locale);
+  const web = messages.web;
+  const head = `<header class="page-head">
+      <p class="eyebrow">${escapeHtml(web["web.nav-coach"])}</p>
+      <h1 class="page-title">${escapeHtml(web["web.coach-title"])}</h1>
+      <p class="page-sub">${escapeHtml(web["web.coach-sub"])}</p>
+    </header>`;
+  const thread = input.messages.length === 0
+    ? `<p class="muted">${escapeHtml(web["web.coach-empty"])}</p>`
+    : `<ul class="week coach-thread">${input.messages
+        .map(
+          (message) => `<li class="row coach-message ${message.role}"><p class="eyebrow">${escapeHtml(
+            message.role === "user" ? web["web.coach-you"] : web["web.coach-coach"],
+          )}</p><p class="note">${escapeHtml(message.text)}</p>${
+            message.reviewId === null ? "" : `<p><a class="chip" href="/review/${escapeHtml(message.reviewId)}">${escapeHtml(web["web.coach-review-opened"])}</a></p>`
+          }</li>`,
+        )
+        .join("\n")}</ul>`;
+  const composer = `<form method="post" action="/coach" class="card stack">
+      <label for="question">${escapeHtml(web["web.coach-placeholder"])}</label>
+      <textarea id="question" name="question" required maxlength="500" rows="3"></textarea>
+      <button type="submit" class="btn btn-primary">${escapeHtml(web["web.coach-send"])}</button>
+    </form>`;
+  const context = `<p class="muted">${escapeHtml(web["web.coach-context"])}: ${escapeHtml(input.factsSummary)}</p>`;
+  const review = input.reviewId === undefined ? "" : `<p><a class="chip done" href="/review/${escapeHtml(input.reviewId)}">${escapeHtml(web["web.coach-review-opened"])}</a></p>`;
+  const error = input.error === undefined ? "" : `<p class="error" role="alert">${escapeHtml(format(web["web.coach-error"], { detail: input.error }))}</p>`;
+  const body = `${head}${error}${review}${context}<section class="card">${thread}</section>${composer}`;
+  return layout({ locale: input.locale, title: web["web.coach-title"], body, signedIn: true, active: "/coach" });
 }
 
 export interface ConnectionsPageInput {

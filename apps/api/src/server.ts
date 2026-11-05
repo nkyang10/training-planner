@@ -16,7 +16,7 @@ import { painReportsOf, painTrendOf, submitEntry } from "@training-planner/entri
 import type { EntryDraft } from "@training-planner/entries";
 import { format, isLocale, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
-import { loadKnowledge } from "@training-planner/knowledge";
+import { canonicalJson, hashOf, loadKnowledge } from "@training-planner/knowledge";
 import type { KnowledgeBundle } from "@training-planner/knowledge";
 import { renderAdjustment, renderComment } from "@training-planner/narrator";
 import { addDays, daysBetween, generatePlan, uuidFrom } from "@training-planner/planner-core";
@@ -24,6 +24,8 @@ import type { Evidence, PlanState } from "@training-planner/planner-core";
 import { ADJUST_COST_KEYS, evaluatePolicy } from "@training-planner/policy";
 import { ADVISOR_REASON_CODES, buildAdvisorRequest, validateProposal } from "@training-planner/advisor";
 import { selectCoachReferences } from "@training-planner/coach";
+import { buildCoachChatRequest, validateCoachReply } from "@training-planner/coach-chat";
+import type { CoachChatRequest } from "@training-planner/coach-chat";
 import type { ModelPort } from "@training-planner/advisor";
 import { diffPlans } from "@training-planner/planner-core";
 import { childPlanVersion } from "@training-planner/replan";
@@ -78,6 +80,8 @@ export interface ApiOptions {
   modelId?: string;
   /** The Garmin Personal API client; tests inject a fake, a deployment uses the real fetch client. */
   garminClient?: GarminClient;
+  /** The conversational coach port (ADR-0011); absent means the coach page explains it is not configured. */
+  coachChatPort?: { complete(request: CoachChatRequest, context: { userId: string }): Promise<unknown> };
 }
 
 interface ApiError {
@@ -440,6 +444,75 @@ export function createApi(options: ApiOptions): RequestListener {
       sendJson(response, 200, { asOfDay: today, signals: output.signals, unavailable: output.unavailable });
       return;
     }
+    // Coach conversation (ADR-0011): context is rebuilt from facts, the reply is grounded and stored, and a change
+    // still has to become a review the runner decides.
+    if (segments[0] === "coach" && segments.length >= 2 && segments[1] === "messages") {
+      if (method === "GET") {
+        sendJson(response, 200, { messages: repository.listCoachMessages(userId, 30) });
+        return;
+      }
+      if (method === "POST") {
+        const body = await readBody(request);
+        if (!isObject(body)) return fail(response, 400, "invalid-body", "expected a JSON object");
+        const question = typeof body["question"] === "string" ? body["question"].trim() : "";
+        if (question.length === 0 || question.length > 500) {
+          return fail(response, 400, "invalid-question", "question must be 1..500 characters");
+        }
+        const port = options.coachChatPort;
+        if (port === undefined) return fail(response, 503, "coach-not-configured", "no model is wired for the coach conversation");
+        const plan = repository.latestPlanVersionFor(userId, today);
+        if (plan === undefined) return fail(response, 404, "no-plan", "no plan version covers this day yet");
+        const entries = repository.listEntries(userId).filter((entry) => entry.day <= today).slice(-7);
+        const pain = entries.some((entry) => (entry.pain ?? []).length > 0);
+        const missed = entries.filter((entry) => entry.outcome === "missed").length;
+        const highRpe = entries.some((entry) => (entry.rpe ?? 0) >= 8);
+        const references = selectCoachReferences({ kind: "comment", pain, missedSessions: missed, highRpe, reviewOptionsCount: 0 });
+        const plannedKm = plan.sessions.reduce((total, session) => total + (session.distanceKm ?? 0), 0);
+        const facts = {
+          today,
+          planSummary: `${plan.sessions.length} sessions, ${Math.round(plannedKm * 10) / 10} km planned`,
+          recentEntries: entries.map((entry) => `${entry.day} ${entry.outcome} ${entry.completedKm ?? 0} km${(entry.pain ?? []).length > 0 ? ", pain reported" : ""}`),
+          comment: repository.listComments(userId, today)[0]?.text ?? null,
+          references: references.map((reference) => ({ id: reference.id, text: reference.text, tier: reference.tier })),
+        };
+        const history = repository.listCoachMessages(userId, 12).map((message) => ({ role: message.role, text: message.text }));
+        const coachRequest = buildCoachChatRequest({ facts, history, question });
+        let output: unknown;
+        try {
+          output = await port.complete(coachRequest, { userId });
+        } catch (error) {
+          return fail(response, 502, "coach-failed", error instanceof Error ? error.message : String(error));
+        }
+        const validated = validateCoachReply(output, facts, question);
+        if (!validated.ok) {
+          return fail(response, 422, "coach-invalid", `${validated.code}: ${validated.detail}`);
+        }
+        const contextHash = hashOf(canonicalJson(facts));
+        const userMessage = {
+          messageId: uuidFrom({ userId, day: today, role: "user", text: question, nonce: String(repository.listCoachMessages(userId, 1).length) }),
+          userId,
+          role: "user" as const,
+          text: question,
+          createdAt: at,
+          contextHash,
+          reviewId: null,
+        };
+        const coachMessage = {
+          messageId: uuidFrom({ userId, day: today, role: "coach", text: validated.reply.reply, nonce: `${history.length}:${question.length}` }),
+          userId,
+          role: "coach" as const,
+          text: validated.reply.reply,
+          createdAt: at,
+          contextHash,
+          reviewId: null,
+        };
+        repository.appendCoachMessage(userMessage);
+        repository.appendCoachMessage(coachMessage);
+        sendJson(response, 201, { reply: validated.reply, messages: repository.listCoachMessages(userId, 30) });
+        return;
+      }
+    }
+
     // POST /reviews/open - the full chain: log -> signals -> triggers -> bounded options -> an open review.
     //
     // It stores the review and the diffs it offered, and it stores no plan version: a proposed version becomes real

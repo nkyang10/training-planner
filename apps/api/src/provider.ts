@@ -162,6 +162,56 @@ export function createHttpModelPort(config: ProviderConfig, options: ProviderOpt
 }
 
 /**
+ * The coach conversation port (ADR-0011): the same deployment config as the advisor, but a chat-shaped request and a
+ * chat-shaped answer. It is a separate port on purpose: the advisor's contract is a proposal, the coach's is language.
+ */
+export function coachChatPortFromEnv(
+  env: Record<string, string | undefined>,
+  options: ProviderOptions = {},
+): { complete(request: unknown, context?: { userId: string }): Promise<unknown> } | undefined {
+  const endpoint = env["TRAINING_PLANNER_MODEL_ENDPOINT"];
+  const baseUrl = env["TRAINING_PLANNER_MODEL_BASE_URL"];
+  const apiKey = env["TRAINING_PLANNER_MODEL_API_KEY"];
+  const model = env["TRAINING_PLANNER_MODEL_NAME"];
+  if ((endpoint === undefined || endpoint.length === 0) && (baseUrl === undefined || baseUrl.length === 0)) return undefined;
+  if (apiKey === undefined || apiKey.length === 0 || model === undefined || model.length === 0) return undefined;
+  const url = endpoint !== undefined && endpoint.length > 0 ? endpoint : chatCompletionsUrl(baseUrl ?? "");
+  const timeoutMs = env["TRAINING_PLANNER_MODEL_TIMEOUT_MS"] === undefined ? 30_000 : Number(env["TRAINING_PLANNER_MODEL_TIMEOUT_MS"]);
+  const fetchImpl = options.fetchImpl ?? fetch;
+  return {
+    async complete(request: unknown): Promise<unknown> {
+      const call = request as {
+        system: { rules: readonly string[]; facts: unknown };
+        history: readonly { role: string; text: string }[];
+        question: string;
+      };
+      const messages = [
+        { role: "system", content: `${call.system.rules.join("\n")}\nFacts: ${JSON.stringify(call.system.facts)}\nAnswer with exactly this JSON object: {"reply": string, "proposeReview": boolean, "reasonCode": string|null}.` },
+        ...call.history.map((turn) => ({ role: turn.role === "user" ? "user" : "assistant", content: turn.text })),
+        { role: "user", content: call.question },
+      ];
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetchImpl(url, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ model, messages, temperature: 0.2, response_format: { type: "json_object" } }),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`coach provider answered ${response.status}`);
+        const body = (await response.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
+        const content = body.choices?.[0]?.message?.content;
+        if (typeof content !== "string") throw new Error("coach provider returned no content");
+        return JSON.parse(content) as unknown;
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  };
+}
+
+/**
  * The deployment's port, from environment variables. Unset variables mean no port: a deployment without a key must
  * not pretend a model exists.
  */

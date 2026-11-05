@@ -166,6 +166,21 @@ rail has no active-item highlight yet; the month grid hides session text under 9
 Honest boundary: the question text is **not** sent to a free-form chat model; it triggers the same bounded review the
 system may open on its own. A conversational coach that answers arbitrary questions would be a new ADR, not a UI patch.
 
+## Coach conversation (2026-11-05 pass)
+
+`/coach` is a real conversation with memory, under ADR-0011:
+
+| Piece | Behaviour |
+|---|---|
+| Thread | `coach_messages` stores role, text, instant and the fact-snapshot hash; the page shows the last 30, the model gets the last 12 turns |
+| Grounding | a reply is accepted only if every number in it appears in the facts or the question; otherwise `422 coach-invalid` and nothing is stored as a coach turn |
+| Context | the facts are rebuilt from the plan and entries on every turn (plan summary, last 7 entries, today's comment, safety-first references) — no vector store |
+| Change | the coach may set `proposeReview`; the page's **Open a review** button proxies `POST /reviews/open`. Only acceptance in the review sheet activates a plan version |
+| Honest | the model never writes a distance; a free-form answer that invents one is rejected, not smoothed over |
+
+Live check: with `TRAINING_PLANNER_MODEL_*` set, the coach answers from the demo runner's facts; if the provider returns a
+number that is not in the facts, the route answers 422 instead of showing it.
+
 ## Honest limits
 
 | Limit | Why |
