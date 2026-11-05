@@ -139,6 +139,7 @@ export type WebTemplate =
   | "web.coach-coach"
   | "web.coach-placeholder"
   | "web.coach-photo"
+  | "web.coach-auto-review"
   | "web.coach-send"
   | "web.coach-review-opened"
   | "web.coach-context"

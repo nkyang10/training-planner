@@ -24,6 +24,8 @@ export interface GarminActivity {
   distance?: number;
   duration?: number;
   startTimeLocal?: string;
+  averageSpeed?: number;
+  averageHR?: number;
 }
 
 export interface GarminClient {
@@ -124,7 +126,23 @@ export function mapGarminActivity(activity: GarminActivity, tzAtEvent: string): 
     sessionTaken: "as-prescribed",
     completedKm: Math.round((metres / 1000) * 10) / 10,
     ...(typeof activity.duration === "number" ? { durationMin: Math.round(activity.duration / 60) } : {}),
+    ...(paceOrHrNote(activity) === null ? {} : { note: paceOrHrNote(activity) as string }),
     source: "import-assistant",
     idempotencyKey: `garmin:${activity.activityId}`,
   };
+}
+
+/** A short factual note from the activity's own averages; no interpretation and no invented number. */
+function paceOrHrNote(activity: GarminActivity): string | null {
+  const parts: string[] = [];
+  if (typeof activity.averageSpeed === "number" && activity.averageSpeed > 0) {
+    const totalSeconds = Math.round(1000 / activity.averageSpeed);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    parts.push(`${minutes}:${String(seconds).padStart(2, "0")} min/km`);
+  }
+  if (typeof activity.averageHR === "number" && activity.averageHR > 0) {
+    parts.push(`avg HR ${Math.round(activity.averageHR)} bpm`);
+  }
+  return parts.length === 0 ? null : `Garmin: ${parts.join(", ")}`;
 }

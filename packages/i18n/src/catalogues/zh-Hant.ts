@@ -155,6 +155,7 @@ export const zhHant: Messages = {
     "web.coach-coach": "教練",
     "web.coach-placeholder": "例如：我膝頭今日好啲，星期五可以加力嗎？",
     "web.coach-photo": "相片（可選）",
+    "web.coach-auto-review": "如果教練覺得要改，自動開一個 review",
     "web.coach-send": "發送",
     "web.coach-review-opened": "教練幫你開咗一個 review。",
     "web.coach-context": "上下文",

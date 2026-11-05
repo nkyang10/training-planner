@@ -154,6 +154,7 @@ export const en: Messages = {
     "web.coach-coach": "Coach",
     "web.coach-placeholder": "e.g. My knee is better today — can we push Friday?",
     "web.coach-photo": "Photo (optional)",
+    "web.coach-auto-review": "Open a review automatically if the coach proposes one",
     "web.coach-send": "Send",
     "web.coach-review-opened": "The coach opened a review for you.",
     "web.coach-context": "Context",

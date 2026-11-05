@@ -30,9 +30,11 @@ import { seasonSummary } from "@training-planner/season";
 import { addDays, eachDay, uuidFrom, weekStart } from "@training-planner/planner-core";
 import { dailyCostOf, evaluatePolicy } from "@training-planner/policy";
 import { decideReview, firstEditableDay } from "@training-planner/review";
+import { selectCoachReferences } from "@training-planner/coach";
 import { exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
+import { stripExif } from "./image";
 import { localClockOf } from "./local-clock";
 import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderCoachPage, renderConnections, renderConsole, renderDay, renderLogin, renderMonth, renderPain, renderReview, renderStats, renderSeason, renderWeek, renderWizard } from "./pages";
 import { STYLES } from "./styles";
@@ -509,6 +511,14 @@ export function createWeb(options: WebOptions): RequestListener {
         const plan = repository.latestPlanVersionFor(userId, today);
         const plannedKm = plan?.sessions.reduce((total, session) => total + (session.distanceKm ?? 0), 0) ?? 0;
         const factsSummary = plan === undefined ? "no plan" : `${plan.sessions.length} sessions, ${Math.round(plannedKm * 10) / 10} km planned`;
+        const recent = repository.listEntries(userId).filter((entry) => entry.day <= today).slice(-14);
+        const coachReferences = selectCoachReferences({
+          kind: "comment",
+          pain: recent.some((entry) => (entry.pain ?? []).length > 0),
+          missedSessions: recent.filter((entry) => entry.outcome === "missed").length,
+          highRpe: recent.some((entry) => (entry.rpe ?? 0) >= 8),
+          reviewOptionsCount: 0,
+        }).map((reference) => ({ id: reference.id, title: reference.title, tier: reference.tier }));
         sendHtml(
           response,
           200,
@@ -516,6 +526,7 @@ export function createWeb(options: WebOptions): RequestListener {
             locale: state.locale,
             messages: repository.listCoachMessages(userId, 30),
             factsSummary,
+            references: coachReferences,
             ...(url.searchParams.get("review") === null ? {} : { reviewId: url.searchParams.get("review") as string }),
             ...(url.searchParams.get("error") === null ? {} : { error: url.searchParams.get("error") as string }),
           }),
@@ -525,8 +536,9 @@ export function createWeb(options: WebOptions): RequestListener {
 
       if (method === "POST" && url.pathname === "/coach") {
         const contentType = request.headers["content-type"] ?? "";
+        let formAutoReview: boolean | undefined;
         let question = "";
-        let attachments: Array<{ attachmentId: string; filename: string; contentType: string; sizeBytes: number; kind: "photo" }> = [];
+        let attachments: Array<{ attachmentId: string; filename: string; contentType: string; sizeBytes: number; kind: "photo"; dataBase64?: string }> = [];
         if (contentType.startsWith("multipart/form-data")) {
           let parsed: Awaited<ReturnType<typeof readMultipart>>;
           try {
@@ -536,6 +548,7 @@ export function createWeb(options: WebOptions): RequestListener {
             return;
           }
           question = (parsed.fields["question"] ?? "").trim();
+          formAutoReview = parsed.fields["autoReview"] === "1";
           const file = parsed.file;
           if (file !== undefined) {
             const extensions: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp" };
@@ -549,21 +562,48 @@ export function createWeb(options: WebOptions): RequestListener {
               return;
             }
             const attachmentId = uuidFrom({ userId, day: state.now.slice(0, 10), kind: "coach-photo", nonce: String(repository.listCoachMessages(userId, 1).length) });
+            const cleaned = stripExif(file.data, file.contentType);
             const directory = join(options.uploadDir ?? "data/uploads", userId);
             mkdirSync(directory, { recursive: true });
-            writeFileSync(join(directory, `${attachmentId}${extension}`), file.data);
-            attachments = [{ attachmentId, filename: file.filename, contentType: file.contentType, sizeBytes: file.data.length, kind: "photo" }];
+            writeFileSync(join(directory, `${attachmentId}${extension}`), cleaned);
+            attachments = [{
+              attachmentId,
+              filename: file.filename,
+              contentType: file.contentType,
+              sizeBytes: cleaned.length,
+              kind: "photo",
+              // Only a small image travels to a vision port; the API caps the base64 length and strips it before storing.
+              ...(cleaned.length <= 1_500_000 ? { dataBase64: Buffer.from(cleaned).toString("base64") } : {}),
+            }];
           }
         } else {
           const form = await readForm(request);
           question = (form.get("question") ?? "").trim();
+          formAutoReview = form.get("autoReview") === "1";
         }
         if (question.length === 0) {
           redirect(response, "/coach?error=" + encodeURIComponent("write a question first"));
           return;
         }
+        const autoReview = (formAutoReview ?? false) === true;
         const result = await proxyJson("/coach/messages", { question, attachments });
-        redirect(response, result.ok ? "/coach?sent=1" : `/coach?error=${encodeURIComponent(result.detail)}`);
+        if (!result.ok) {
+          redirect(response, `/coach?error=${encodeURIComponent(result.detail)}`);
+          return;
+        }
+        const reply = result.payload["reply"];
+        const proposed = typeof reply === "object" && reply !== null && (reply as Record<string, unknown>)["proposeReview"] === true;
+        if (autoReview && proposed) {
+          const opened = await proxyJson("/reviews/open", {});
+          const review = opened.payload["review"];
+          if (opened.ok && typeof review === "object" && review !== null) {
+            redirect(response, `/review/${encodeURIComponent(String((review as Record<string, unknown>)["reviewId"]))}`);
+            return;
+          }
+          redirect(response, `/coach?sent=1&auto=none`);
+          return;
+        }
+        redirect(response, "/coach?sent=1");
         return;
       }
 
@@ -735,13 +775,18 @@ export function createWeb(options: WebOptions): RequestListener {
         const comment = repository.listComments(userId, day)[0];
         if (comment !== undefined && comment.text.length > 0) comments.push({ day, text: comment.text });
       }
-      const trend = (summary?.weeks ?? [])
-        .slice(-8)
-        .map((week) => (week.plannedSessions === 0 ? 0 : Math.round((week.completedSessions / week.plannedSessions) * 100)));
+      const requestedWeeks = Number(url.searchParams.get("weeks") ?? "8") === 12 ? 12 : 8;
+      const recentWeeks = (summary?.weeks ?? []).slice(-requestedWeeks);
+      const trend = recentWeeks.map((week) => (week.plannedSessions === 0 ? 0 : Math.round((week.completedSessions / week.plannedSessions) * 100)));
+      const painByWeek = recentWeeks.map((week) => {
+        const start = week.weekStart;
+        const end = addDays(start, 6);
+        return repository.listEntries(userId).filter((entry) => entry.day >= start && entry.day <= end && (entry.pain ?? []).length > 0).length;
+      });
       sendHtml(
         response,
         200,
-        renderStats({ locale: state.locale, summary, plannedSessions, completedSessions, plannedKm, completedKm, adherencePercent, loggedDays, comments, trend }),
+        renderStats({ locale: state.locale, summary, plannedSessions, completedSessions, plannedKm, completedKm, adherencePercent, loggedDays, comments, trend, weeks: requestedWeeks, painByWeek }),
       );
       return;
     }
