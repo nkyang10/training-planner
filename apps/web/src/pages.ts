@@ -165,7 +165,6 @@ export function renderCalendar(input: CalendarPageInput): string {
   const pageHead = `<header class="page-head">
       <p class="eyebrow">${escapeHtml(web["web.nav-week"])}</p>
       <h1 class="page-title">${escapeHtml(title)}</h1>
-      <p class="page-sub">${escapeHtml(totals)}</p>
     </header>`;
   const hero = `<section class="hero hero-week">
       <span class="hero-art" style="background-image:url('/static/assets/hero-week.png')" aria-hidden="true"></span>
@@ -185,7 +184,6 @@ export function renderCalendar(input: CalendarPageInput): string {
         <a href="/month/${escapeHtml(start.slice(0, 7))}">${escapeHtml(web["web.nav-month"])}</a>
         <a href="/season">${escapeHtml(web["web.nav-season"])}</a>
       </p>
-      <p class="totals">${escapeHtml(totals)}</p>
       ${markers.length === 0 ? "" : `<p class="muted"><span class="chip quiet">${escapeHtml(markers.join(" · "))}</span></p>`}
       <div class="week-grid">${cards}</div>
       ${input.intro === undefined ? "" : `<p class="note">${escapeHtml(input.intro)}</p>`}
