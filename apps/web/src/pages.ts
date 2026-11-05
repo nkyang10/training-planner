@@ -25,6 +25,8 @@ import { format, formatNumber, messagesFor, weekdayName } from "@training-planne
 import { addDays, weekStart } from "@training-planner/planner-core";
 import type { Locale } from "@training-planner/i18n";
 import { escapeHtml, layout } from "./html";
+import { renderCoachPanel } from "./coach-panel";
+import { renderSparkline } from "./sparkline";
 
 export interface CalendarPageInput {
   locale: Locale;
@@ -56,6 +58,9 @@ export interface DayPageInput {
   comment: { text: string; nudge?: string } | undefined;
   /** The next revision's idempotency key: stable for a double submit of the same form, new on a fresh page. */
   idempotencyKey: string;
+  /** The coach answer already localised by the server, when the runner just asked. */
+  coachStatus?: string;
+  coachError?: string;
   error: string | undefined;
   saved: boolean;
   adjustment: { day: string; beforeKm: number; afterKm: number } | undefined;
@@ -438,6 +443,9 @@ export interface WeekPageInput {
   nextWeek: string;
   month: string;
   today?: string;
+  /** A sync result already localised by the server, shown after the redirect back to the week. */
+  synced?: string;
+  syncError?: string;
 }
 
 /** One past or future week, with the same rows as the calendar, so looking back is a first-class action. */
@@ -474,6 +482,14 @@ export function renderWeek(input: WeekPageInput): string {
         <a href="/month/${escapeHtml(input.month)}">${escapeHtml(web["web.nav-month"])}</a>
         <a href="/">${escapeHtml(web["web.nav-week"])}</a>
       </p>
+      <div class="period-nav">
+        <form method="post" action="/week/${escapeHtml(input.weekStart)}/sync" class="inline">
+          <button type="submit" class="btn btn-primary">${escapeHtml(web["web.sync-garmin"])}</button>
+        </form>
+        <a class="btn btn-ghost" href="/day/${escapeHtml(today)}">${escapeHtml(web["web.coach-ask-title"])}</a>
+      </div>
+      ${input.synced === undefined ? "" : `<p class="chip done" role="status">${escapeHtml(format(web["web.sync-done"], { detail: input.synced }))}</p>`}
+      ${input.syncError === undefined ? "" : `<p class="error" role="alert">${escapeHtml(format(web["web.sync-failed"], { detail: input.syncError }))}</p>`}
       <div class="week-grid">${cards}</div>
     </section>`;
   return layout({ locale: input.locale, title, body, active: "/", signedIn: true });
@@ -488,7 +504,8 @@ export interface StatsPageInput {
   completedKm: number;
   adherencePercent: number;
   loggedDays: number;
-  comments: readonly string[];
+  comments: readonly { day: string; text: string }[];
+  trend: readonly number[];
 }
 
 /** Completeness against the plan, plus the coach's comments in one place (2026-11-05). */
@@ -516,10 +533,13 @@ export function renderStats(input: StatsPageInput): string {
     .map((week) => `<tr><td>${escapeHtml(week.weekStart)}</td><td>${escapeHtml(`${formatNumber(week.completedSessions)} / ${formatNumber(week.plannedSessions)}`)}</td><td>${escapeHtml(`${formatNumber(week.completedKm)} / ${formatNumber(week.plannedKm)}`)}</td><td>${escapeHtml(String(week.loggedDays))}</td></tr>`)
     .join("\n");
   const table = `<section class="card"><h2>${escapeHtml(web["web.stats-week"])}</h2><table class="table"><thead><tr><th>${escapeHtml(web["web.stats-week"])}</th><th>${escapeHtml(web["web.stats-done-sessions"])}</th><th>${escapeHtml(web["web.stat-done-km"])}</th><th>${escapeHtml(web["web.stats-logged"])}</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+  const trend = input.trend.length < 2
+    ? ""
+    : `<section class="card"><h2>${escapeHtml(web["web.stats-trend"])}</h2>${renderSparkline({ values: input.trend })}</section>`;
   const comments = input.comments.length === 0
     ? `<p class="muted">${escapeHtml(web["web.stats-no-comments"])}</p>`
-    : `<ul class="week">${input.comments.map((comment) => `<li class="row"><p class="note">${escapeHtml(comment)}</p></li>`).join("\n")}</ul>`;
-  const body = `${head}${stats}${table}<section class="card"><h2>${escapeHtml(web["web.stats-comments"])}</h2>${comments}</section>`;
+    : `<ul class="week">${input.comments.map((comment) => `<li class="row"><p class="note"><a href="/day/${escapeHtml(comment.day)}">${escapeHtml(comment.day)}</a> · ${escapeHtml(comment.text)}</p></li>`).join("\n")}</ul>`;
+  const body = `${head}${stats}${table}${trend}<section class="card"><h2>${escapeHtml(web["web.stats-comments"])}</h2>${comments}</section>`;
   return layout({ locale: input.locale, title: web["web.stats-title"], body, signedIn: true, active: "/stats" });
 }
 
@@ -681,6 +701,12 @@ export function renderDay(input: DayPageInput): string {
   const sessionText = input.session === undefined ? "" : sessionLabel(input.locale, input.session);
   const errorBlock =
     input.error === undefined ? "" : `<p class="error" role="alert">${escapeHtml(format(messages.web["web.error"], { detail: input.error }))}</p>`;
+  const coachPanel = renderCoachPanel({
+    locale: input.locale,
+    day: input.day,
+    ...(input.coachStatus === undefined ? {} : { status: input.coachStatus }),
+    ...(input.coachError === undefined ? {} : { error: input.coachError }),
+  });
 
   const adjustment =
     input.adjustment === undefined
@@ -772,7 +798,8 @@ export function renderDay(input: DayPageInput): string {
       <button type="submit">${escapeHtml(messages.web["web.save"])}</button>
       <p class="note" data-offline-status role="status"></p>
     </form>
-    ${comment}`;
+    ${comment}
+    ${coachPanel}`;
   return layout({ locale: input.locale, title: input.day, body, active: "/", signedIn: true });
 }
 

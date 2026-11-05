@@ -486,6 +486,37 @@ export function createWeb(options: WebOptions): RequestListener {
     }
 
     // One week, past or future: looking back is a first-class action, not a footer link.
+    // One-tap Garmin sync for the week on screen (2026-11-05): the API owns the provider call; the web only asks and
+    // shows the answer, and the runner never leaves the week they were reading.
+    if (method === "POST" && url.pathname.startsWith("/week/") && url.pathname.endsWith("/sync")) {
+      const week = url.pathname.slice("/week/".length, -"/sync".length);
+      if (!ISO_DAY.test(week)) {
+        sendHtml(response, 400, renderLogin(state.locale, "week must be an ISO day"));
+        return;
+      }
+      const apiBase = options.apiBaseUrl ?? "http://127.0.0.1:8082";
+      const doFetch = options.fetchImpl ?? fetch;
+      try {
+        const answer = await doFetch(`${apiBase}/connections/garmin/sync`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${state.token ?? ""}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ from: week, to: addDays(week, 6) }),
+        });
+        const body = (await answer.json()) as Record<string, unknown>;
+        if (!answer.ok) {
+          const error = body["error"];
+          const detail = typeof error === "object" && error !== null && typeof (error as Record<string, unknown>)["detail"] === "string" ? String((error as Record<string, unknown>)["detail"]) : `API answered ${answer.status}`;
+          redirect(response, `/week/${week}?syncError=${encodeURIComponent(detail)}`);
+          return;
+        }
+        const detail = typeof body["detail"] === "string" ? body["detail"] : `${String(body["imported"] ?? 0)} imported, ${String(body["skipped"] ?? 0)} skipped`;
+        redirect(response, `/week/${week}?synced=${encodeURIComponent(detail)}`);
+      } catch (error) {
+        redirect(response, `/week/${week}?syncError=${encodeURIComponent(error instanceof Error ? error.message : String(error))}`);
+      }
+      return;
+    }
+
     if (method === "GET" && url.pathname.startsWith("/week/")) {
       const requested = url.pathname.slice("/week/".length);
       if (!ISO_DAY.test(requested)) {
@@ -509,6 +540,9 @@ export function createWeb(options: WebOptions): RequestListener {
           prevWeek: addDays(week, -7),
           nextWeek: addDays(week, 7),
           month: monthOf(week),
+          today: state.now.slice(0, 10),
+          ...(url.searchParams.get("synced") === null ? {} : { synced: url.searchParams.get("synced") as string }),
+          ...(url.searchParams.get("syncError") === null ? {} : { syncError: url.searchParams.get("syncError") as string }),
         }),
       );
       return;
@@ -526,15 +560,18 @@ export function createWeb(options: WebOptions): RequestListener {
       const completedKm = summary?.weeks.reduce((total, week) => total + week.completedKm, 0) ?? 0;
       const adherencePercent = plannedSessions === 0 ? 0 : Math.round((completedSessions / plannedSessions) * 100);
       const loggedDays = summary?.weeks.reduce((total, week) => total + week.loggedDays, 0) ?? 0;
-      const comments: string[] = [];
+      const comments: Array<{ day: string; text: string }> = [];
       for (const day of eachDay(addDays(today, -27), today)) {
         const comment = repository.listComments(userId, day)[0];
-        if (comment !== undefined && comment.text.length > 0) comments.push(comment.text);
+        if (comment !== undefined && comment.text.length > 0) comments.push({ day, text: comment.text });
       }
+      const trend = (summary?.weeks ?? [])
+        .slice(-8)
+        .map((week) => (week.plannedSessions === 0 ? 0 : Math.round((week.completedSessions / week.plannedSessions) * 100)));
       sendHtml(
         response,
         200,
-        renderStats({ locale: state.locale, summary, plannedSessions, completedSessions, plannedKm, completedKm, adherencePercent, loggedDays, comments }),
+        renderStats({ locale: state.locale, summary, plannedSessions, completedSessions, plannedKm, completedKm, adherencePercent, loggedDays, comments, trend }),
       );
       return;
     }
@@ -840,6 +877,39 @@ export function createWeb(options: WebOptions): RequestListener {
       }
     }
 
+    // Ask the coach (2026-11-05): the question is the runner's; the answer is the deterministic review chain, proxied to
+    // the API. A change can only exist as a review the runner decides, never as a silent edit.
+    if (segments.length === 3 && segments[0] === "day" && ISO_DAY.test(segments[1] ?? "") && segments[2] === "coach" && method === "POST") {
+      const day = segments[1] as string;
+      const form = await readForm(request);
+      const question = (form.get("question") ?? "").trim();
+      if (question.length === 0) {
+        redirect(response, `/day/${day}?coachError=${encodeURIComponent("write a question first")}`);
+        return;
+      }
+      const apiBase = options.apiBaseUrl ?? "http://127.0.0.1:8082";
+      const doFetch = options.fetchImpl ?? fetch;
+      try {
+        const answer = await doFetch(`${apiBase}/reviews/open`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${state.token ?? ""}`, "Content-Type": "application/json" },
+          body: "{}",
+        });
+        const body = (await answer.json()) as Record<string, unknown>;
+        if (answer.status === 201 && typeof body["review"] === "object" && body["review"] !== null) {
+          const review = body["review"] as Record<string, unknown>;
+          redirect(response, `/review/${encodeURIComponent(String(review["reviewId"]))}`);
+          return;
+        }
+        const status = typeof body["status"] === "string" ? body["status"] : "none";
+        const detail = typeof body["detail"] === "string" ? body["detail"] : typeof body["reason"] === "string" ? String(body["reason"]) : "";
+        redirect(response, `/day/${day}?coach=${encodeURIComponent(status)}&coachDetail=${encodeURIComponent(detail)}`);
+      } catch (error) {
+        redirect(response, `/day/${day}?coachError=${encodeURIComponent(error instanceof Error ? error.message : String(error))}`);
+      }
+      return;
+    }
+
     if (segments.length === 2 && segments[0] === "day" && ISO_DAY.test(segments[1] ?? "")) {
       const day = segments[1] as string;
       const plan = repository.latestPlanVersionFor(userId, day);
@@ -864,6 +934,15 @@ export function createWeb(options: WebOptions): RequestListener {
             saved: false,
             adjustment: undefined,
             cost: costOf(state.locale, session, current),
+            ...(url.searchParams.get("coach") === null
+              ? {}
+              : {
+                  coachStatus:
+                    url.searchParams.get("coach") === "suppressed"
+                      ? format(messagesFor(state.locale).web["web.coach-ask-suppressed"], { detail: url.searchParams.get("coachDetail") ?? "" })
+                      : messagesFor(state.locale).web["web.coach-ask-none"],
+                }),
+            ...(url.searchParams.get("coachError") === null ? {} : { coachError: url.searchParams.get("coachError") as string }),
           }),
         );
         return;

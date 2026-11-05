@@ -84,10 +84,12 @@ const planFor = (userId: string): PlanVersion =>
     knowledge,
   }).version;
 
+let fakeApiFetch: typeof fetch | undefined;
+
 beforeAll(async () => {
   repository.savePlanVersion(planFor(USER_A));
   repository.savePlanVersion(planWithPace(USER_C));
-  server = createServer(createWeb({ repository, sessions, knowledge, now: () => NOW, operatorToken: "operator-token" }));
+  server = createServer(createWeb({ repository, sessions, knowledge, now: () => NOW, operatorToken: "operator-token", apiBaseUrl: "http://api.test", fetchImpl: (input, init) => (fakeApiFetch ?? fetch)(input, init) }));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   const port = typeof address === "object" && address !== null ? address.port : 0;
@@ -1003,6 +1005,55 @@ describe("training stats", () => {
   it("marks the active section in the rail", async () => {
     const page = await call("/stats", { cookie: "session=token-a" });
     expect(page.html).toContain('class="side-link active" href="/stats"');
+  });
+});
+
+describe("coach ask and one-tap sync", () => {
+  it("opens the review the coach proposes and sends the runner to it", async () => {
+    fakeApiFetch = async () => new Response(JSON.stringify({ status: "opened", review: { reviewId: "review-1" } }), { status: 201 });
+    const response = await fetch(`${base}/day/2026-11-09/coach`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", cookie: "session=token-a" },
+      body: "question=Can+tomorrow+be+easier%3F",
+      redirect: "manual",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/review/review-1");
+    fakeApiFetch = undefined;
+  });
+
+  it("says nothing needs changing when the coach has no proposal", async () => {
+    fakeApiFetch = async () => new Response(JSON.stringify({ status: "none" }), { status: 200 });
+    const response = await fetch(`${base}/day/2026-11-09/coach`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", cookie: "session=token-a" },
+      body: "question=How+did+I+do%3F",
+      redirect: "manual",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toContain("/day/2026-11-09?coach=none");
+    fakeApiFetch = undefined;
+  });
+
+  it("syncs the week on screen and comes back to it", async () => {
+    fakeApiFetch = async () => new Response(JSON.stringify({ imported: 2, skipped: 0, detail: "2 imported, 0 skipped" }), { status: 200 });
+    const response = await fetch(`${base}/week/2026-11-09/sync`, {
+      method: "POST",
+      headers: { cookie: "session=token-a" },
+      redirect: "manual",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toContain("/week/2026-11-09?synced=");
+    fakeApiFetch = undefined;
+  });
+
+  it("shows the coach panel on a day page and the sparkline on stats", async () => {
+    const day = await call("/day/2026-11-09", { cookie: "session=token-a" });
+    expect(day.html).toContain('class="card coach-panel"');
+    expect(day.html).toContain('action="/day/2026-11-09/coach"');
+    const stats = await call("/stats", { cookie: "session=token-a" });
+    expect(stats.html).toContain("<svg");
+    expect(stats.html).toContain('href="/day/');
   });
 });
 

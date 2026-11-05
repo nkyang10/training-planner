@@ -155,6 +155,17 @@ rail has no active-item highlight yet; the month grid hides session text under 9
 | active nav | the rail and the folded bar mark the current section (`aria-current="page"`); Stats joins Train |
 | page heads | week, pain and review now use the same `page-head` as the rest |
 
+## Ask the coach, one-tap sync, stats trend (2026-11-05 pass)
+
+| Workflow | What now exists |
+|---|---|
+| Before a run | the day page carries an **Ask the coach** panel: the question + a POST to `/day/:day/coach`; the web proxies `POST /reviews/open` on the API, so the answer is the deterministic review chain. A proposal sends the runner to `/review/:id`; "nothing needs changing" comes back to the day page with a plain sentence |
+| After a run | the week page has **Sync Garmin** (`POST /week/:weekStart/sync`) which imports the week through the existing provider route and redirects back to the same week with `synced=` or `syncError=`; the 7-day readiness chip states whether the plan covers today + 6 |
+| Stats | `/stats` adds an **SVG sparkline** of weekly adherence (last 8 weeks, `renderSparkline`) and every coach comment links to its `/day/<day>` |
+
+Honest boundary: the question text is **not** sent to a free-form chat model; it triggers the same bounded review the
+system may open on its own. A conversational coach that answers arbitrary questions would be a new ADR, not a UI patch.
+
 ## Honest limits
 
 | Limit | Why |
