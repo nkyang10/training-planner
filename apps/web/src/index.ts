@@ -18,6 +18,9 @@ const server = startWeb({
   repository: database.repository,
   sessions: createMemorySessions(JSON.parse(tokens) as Record<string, string>),
   port,
+  // The operator token is optional; without it the admin surface is closed rather than open (ADR-0009/0012).
+  ...(process.env["TRAINING_PLANNER_OPERATOR_TOKEN"] === undefined ? {} : { operatorToken: process.env["TRAINING_PLANNER_OPERATOR_TOKEN"] }),
+  ...(process.env["TRAINING_PLANNER_API_URL"] === undefined ? {} : { apiBaseUrl: process.env["TRAINING_PLANNER_API_URL"] }),
 });
 server.on("listening", () => console.log(`web: listening on :${port} (database: ${database.kind})`));
 
