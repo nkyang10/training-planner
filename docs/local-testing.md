@@ -88,6 +88,30 @@ and verified:
 Still not built: a **weekly note** that is its own record (day notes are supported and shown). That needs a storage
 record + contract, which is the next slice; it is not silently implied here.
 
+## Connections: Strava / Garmin (2026-11-05 pass)
+
+The web shell now has a **Connections** tab (`/connections`). It does three things and refuses to pretend about the rest:
+
+| Action | What happens |
+|---|---|
+| Link Garmin | Paste a **Garmin Personal API key** (Garmin Connect → Settings → Personal API Key). The web process proxies the exchange to the API; the connection stores the account name, never the key or token |
+| Choose sync source | Radio group: manual only / Strava / Garmin / both; saved per runner |
+| Sync now (Garmin) | Imports completed runs with distance > 0 in the chosen date range as day entries through the normal entry pipeline; repeated sync is a duplicate, never a second entry |
+| Link Strava | Shows the honest sentence: a registered app (client ID, secret, public callback) is required; `/connections/strava/start` answers `503 strava-not-configured` until then |
+
+Environment for a local Garmin link (the key is a secret; never commit it):
+
+```
+$env:GARMIN_PERSONAL_API_KEY = '<Garmin personal API key>'
+```
+
+The API must be running on :8082 and the web on :8081; the web proxies Garmin actions to `TRAINING_PLANNER_API_URL`
+(default `http://127.0.0.1:8082`). Verified live on 2026-11-05: token exchange, profile display name, activity list,
+and a sync that appended a day entry with idempotency key `garmin:<activityId>`.
+
+Still not built: token storage in a secret manager (the record keeps `credentialRef` only), Strava callback state, and a
+scheduled sync. Those are deployment decisions, not UI gaps.
+
 ## Honest limits
 
 | Limit | Why |
