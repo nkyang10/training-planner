@@ -38,6 +38,19 @@ export function layout(input: LayoutInput): string {
       </form>
     </header>`
     : `<header class="bar"><h1>${escapeHtml(messages.web["web.title"])}</h1></header>`;
+  // Navigation is a first-class part of the shell, not a footer afterthought: on a phone the footer was below the
+  // fold, so the app had no visible way to reach the season, the month or the console.
+  const nav = input.signedIn
+    ? `<nav class="tabs" aria-label="Sections">
+      <a href="/">${escapeHtml(messages.web["web.nav-week"])}</a>
+      <a href="/month">${escapeHtml(messages.web["web.nav-month"])}</a>
+      <a href="/season">${escapeHtml(messages.web["web.nav-season"])}</a>
+      <a href="/console">${escapeHtml(messages.web["web.nav-console"])}</a>
+      <a href="/wizard">${escapeHtml(messages.web["web.nav-wizard"])}</a>
+      <a href="/pain">${escapeHtml(messages.web["web.nav-pain"])}</a>
+      <a href="/export">${escapeHtml(messages.web["web.nav-export"])}</a>
+    </nav>`
+    : "";
   return `<!doctype html>
 <html lang="${htmlLang}">
 <head>
@@ -49,6 +62,7 @@ export function layout(input: LayoutInput): string {
 </head>
 <body>
   ${header}
+  ${nav}
   <main>${input.body}</main>
 </body>
 </html>`;

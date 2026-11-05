@@ -72,6 +72,22 @@ Also verified as real usage: the calendar banner is a link to the review; accept
 "Accepted. The change starts on …", activates the staged plan version (the export then has two plan versions), and the
 banner disappears.
 
+## Mobile navigation, lookback and the shape of the block (2026-11-05 pass)
+
+The first phone-sized pass found the shell had **no navigation**: the only links were in a footer below the fold. Fixed
+and verified:
+
+| Gap | Now |
+|---|---|
+| no navigation on a phone | a `tabs` bar in the shell (Week · Month · Season · Console · Orientation · Pain · Export); on screens ≤ 640 px it is a **fixed bottom bar** with 44 px touch targets and safe-area padding |
+| no lookback | the calendar accepts `?week=YYYY-MM-DD` and has **Previous week / Next week** links; every week has its own page at `/week/:weekStart` with the same rows as the calendar |
+| no monthly view | `/month/:YYYY-MM` lists the weeks that touch the month with planned/done km, sessions and links into each week; previous/next month links |
+| no reference to the shape of the block | the season and month views mark the **peak week** (the week with the most planned kilometres) and the **final surge** (the plan's last planned week); the calendar shows both as one line. These are plan facts, not physiological claims |
+| a note had nowhere to show | the calendar and week views render the runner's own day note (`Note: …`), not only the system comment |
+
+Still not built: a **weekly note** that is its own record (day notes are supported and shown). That needs a storage
+record + contract, which is the next slice; it is not silently implied here.
+
 ## Honest limits
 
 | Limit | Why |

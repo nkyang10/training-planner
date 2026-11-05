@@ -33,7 +33,7 @@ import { exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
 import { localClockOf } from "./local-clock";
-import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderConsole, renderDay, renderLogin, renderPain, renderReview, renderSeason, renderWizard } from "./pages";
+import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderConsole, renderDay, renderLogin, renderMonth, renderPain, renderReview, renderSeason, renderWeek, renderWizard } from "./pages";
 import { STYLES } from "./styles";
 
 export interface WebOptions {
@@ -148,6 +148,32 @@ export function createWeb(options: WebOptions): RequestListener {
     const locale: Locale =
       cookies["locale"] === "zh-Hant" || (cookies["locale"] === undefined && headerLocale.startsWith("zh")) ? "zh-Hant" : "en";
     return { userId: session?.userId ?? null, token, locale, now: now() };
+  };
+
+  // The plan's own shape, named: the week with the most planned kilometres is the peak; the last planned week is the
+  // final surge. These are plan facts, not physiological claims, and the pages say "peak week" rather than "peak".
+  const periodizationOf = (summary: ReturnType<typeof seasonSummary> | undefined): { peakWeek?: string; finalWeek?: string } => {
+    const planned = summary?.weeks.filter((week) => week.plannedKm > 0) ?? [];
+    if (planned.length === 0) return {};
+    const peak = planned.reduce((best, week) => (week.plannedKm > best.plannedKm ? week : best));
+    const last = planned[planned.length - 1];
+    return last === undefined ? {} : { peakWeek: peak.weekStart, finalWeek: last.weekStart };
+  };
+  const monthOf = (day: string): string => day.slice(0, 7);
+  const shiftMonth = (month: string, delta: number): string => {
+    const [year, monthNumber] = month.split("-").map((part) => Number(part));
+    const date = new Date(Date.UTC(year ?? 0, (monthNumber ?? 1) - 1 + delta, 1));
+    return date.toISOString().slice(0, 7);
+  };
+  const weeksOfMonth = (
+    summary: ReturnType<typeof seasonSummary> | undefined,
+    month: string,
+  ): ReturnType<typeof seasonSummary>["weeks"] => {
+    if (summary === undefined) return [];
+    const first = `${month}-01`;
+    const [year, monthNumber] = month.split("-").map((part) => Number(part));
+    const last = new Date(Date.UTC(year ?? 0, monthNumber ?? 1, 0)).toISOString().slice(0, 10);
+    return summary.weeks.filter((week) => week.weekStart <= last && addDays(week.weekStart, 6) >= first);
   };
 
   const currentEntry = (userId: string, day: string): DayEntry | undefined => {
@@ -322,9 +348,14 @@ export function createWeb(options: WebOptions): RequestListener {
 
     if (method === "GET" && url.pathname === "/") {
       const today = state.now.slice(0, 10);
-      const start = weekStart(today);
+      const requestedWeek = url.searchParams.get("week");
+      const shownWeek = requestedWeek !== null && ISO_DAY.test(requestedWeek) ? requestedWeek : weekStart(today);
+      const start = weekStart(shownWeek);
       const days = eachDay(start, addDays(start, 6));
       const plan = repository.latestPlanVersionFor(userId, today);
+      const calendarSummary =
+        plan === undefined ? undefined : seasonSummary({ plan, entries: repository.listEntries(userId), today });
+      const calendarMarkers = periodizationOf(calendarSummary);
       const explanation = plan === undefined ? undefined : renderPlanExplanation(plan, { locale: state.locale });
       const openReview = repository.listReviews(userId).find((review) => review.status === "open");
       // The daily prompt: packages/nudges decides whether one may arrive, and rendering it is the impression, so
@@ -368,6 +399,64 @@ export function createWeb(options: WebOptions): RequestListener {
           intro: explanation?.sentences[0],
           openReview,
           prompt,
+          weekStart: start,
+          isCurrentWeek: start === weekStart(today),
+          ...calendarMarkers,
+        }),
+      );
+      return;
+    }
+
+    // The month view: a runner plans in months; the seven-day week alone hid the shape of the block.
+    if (method === "GET" && (url.pathname === "/month" || url.pathname.startsWith("/month/"))) {
+      const today = state.now.slice(0, 10);
+      const requested = url.pathname === "/month" ? monthOf(today) : url.pathname.slice("/month/".length);
+      if (!/^\d{4}-\d{2}$/.test(requested)) {
+        sendHtml(response, 404, renderLogin(state.locale, "month must be YYYY-MM"));
+        return;
+      }
+      const plan = repository.latestPlanVersionFor(userId, `${requested}-01`);
+      const summary =
+        plan === undefined ? undefined : seasonSummary({ plan, entries: repository.listEntries(userId), today });
+      sendHtml(
+        response,
+        200,
+        renderMonth({
+          locale: state.locale,
+          month: requested,
+          weeks: weeksOfMonth(summary, requested),
+          prevMonth: shiftMonth(requested, -1),
+          nextMonth: shiftMonth(requested, 1),
+          ...periodizationOf(summary),
+        }),
+      );
+      return;
+    }
+
+    // One week, past or future: looking back is a first-class action, not a footer link.
+    if (method === "GET" && url.pathname.startsWith("/week/")) {
+      const requested = url.pathname.slice("/week/".length);
+      if (!ISO_DAY.test(requested)) {
+        sendHtml(response, 404, renderLogin(state.locale, "week must be an ISO day"));
+        return;
+      }
+      const week = weekStart(requested);
+      sendHtml(
+        response,
+        200,
+        renderWeek({
+          locale: state.locale,
+          weekStart: week,
+          days: eachDay(week, addDays(week, 6)),
+          plan: repository.latestPlanVersionFor(userId, week),
+          currentOf: (day) => currentEntry(userId, day),
+          commentOf: (day) => {
+            const comment = repository.listComments(userId, day)[0];
+            return comment === undefined ? undefined : { text: comment.text };
+          },
+          prevWeek: addDays(week, -7),
+          nextWeek: addDays(week, 7),
+          month: monthOf(week),
         }),
       );
       return;
@@ -380,7 +469,7 @@ export function createWeb(options: WebOptions): RequestListener {
         plan === undefined
           ? undefined
           : seasonSummary({ plan, entries: repository.listEntries(userId), today: state.now.slice(0, 10) });
-      sendHtml(response, 200, renderSeason({ locale: state.locale, summary }));
+      sendHtml(response, 200, renderSeason({ locale: state.locale, summary, ...periodizationOf(summary) }));
       return;
     }
 

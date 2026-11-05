@@ -19,7 +19,7 @@ import type {
 } from "@training-planner/domain";
 import { WIZARD_STEPS } from "@training-planner/domain";
 import type { PainTrend } from "@training-planner/entries";
-import type { SeasonSummary } from "@training-planner/season";
+import type { SeasonSummary, SeasonWeek } from "@training-planner/season";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
 import type { Locale } from "@training-planner/i18n";
 import { escapeHtml, layout } from "./html";
@@ -37,6 +37,13 @@ export interface CalendarPageInput {
   openReview: Review | undefined;
   /** The daily prompt's sentence, when packages/nudges said one may arrive. */
   prompt: string | undefined;
+  /** Monday of the week being shown; absent means "the week that contains today". */
+  weekStart?: string;
+  /** Whether the shown week is the current one (the title changes when looking back). */
+  isCurrentWeek?: boolean;
+  /** The week with the most planned kilometres, and the plan's last planned week. */
+  peakWeek?: string;
+  finalWeek?: string;
 }
 
 export interface DayPageInput {
@@ -99,6 +106,15 @@ export function renderCalendar(input: CalendarPageInput): string {
     });
   }
 
+  const firstShown = input.weekStart ?? input.days[0] ?? input.today;
+  const shift = (day: string, days: number): string => {
+    const date = new Date(`${day}T00:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  };
+  const prevWeek = shift(firstShown, -7);
+  const nextWeek = shift(firstShown, 7);
+
   const rows = input.days.map((day) => {
     const session = input.plan?.sessions.find((candidate) => candidate.day === day);
     const current = input.currentOf(day);
@@ -111,6 +127,10 @@ export function renderCalendar(input: CalendarPageInput): string {
     const sessionText = session === undefined ? "" : sessionLabel(input.locale, session);
     const commentText =
       comment === undefined || comment.text.length === 0 ? "" : `<p class="note">${escapeHtml(comment.text)}</p>`;
+    const noteText =
+      current?.note === undefined || current.note === null || current.note.length === 0
+        ? ""
+        : `<p class="note">${escapeHtml(format(messages.web["web.calendar-note"], { note: current.note }))}</p>`;
     return `<li class="row${isToday ? " today" : ""}">
       <a href="/day/${escapeHtml(day)}" class="row-link" aria-label="${escapeHtml(
         format(messages.web["web.day-link"], { weekday: weekdayName(input.locale, day) }),
@@ -120,6 +140,7 @@ export function renderCalendar(input: CalendarPageInput): string {
         ${status}
       </a>
       ${commentText}
+      ${noteText}
     </li>`;
   });
 
@@ -130,12 +151,32 @@ export function renderCalendar(input: CalendarPageInput): string {
     input.openReview === undefined
       ? ""
       : `<a class="card banner" href="/review/${escapeHtml(input.openReview.reviewId)}">${escapeHtml(messages.web["web.review-banner"])}</a>`;
+  const title =
+    input.weekStart !== undefined && input.isCurrentWeek === false
+      ? format(messages.web["web.week-title"], { day: input.weekStart })
+      : messages.web["web.calendar-title"];
+  const weekNav = `
+    <p class="week-nav muted">
+      <a href="/?week=${escapeHtml(prevWeek)}">${escapeHtml(messages.web["web.calendar-prev"])}</a>
+      <a href="/month">${escapeHtml(messages.web["web.nav-month"])}</a>
+      <a href="/?week=${escapeHtml(nextWeek)}">${escapeHtml(messages.web["web.calendar-next"])}</a>
+    </p>`;
+  const peakLine =
+    input.peakWeek === undefined
+      ? ""
+      : `<p class="muted">${escapeHtml(format(messages.web["web.calendar-peak"], { day: input.peakWeek }))}${
+          input.finalWeek === undefined
+            ? ""
+            : ` · ${escapeHtml(format(messages.web["web.calendar-final"], { day: input.finalWeek }))}`
+        }</p>`;
   const body = `
     ${prompt}
     ${banner}
     <section class="card">
-      <h2>${escapeHtml(messages.web["web.calendar-title"])}</h2>
+      <h2>${escapeHtml(title)}</h2>
       ${intro}
+      ${peakLine}
+      ${weekNav}
       <ul class="week">${rows.join("\n")}</ul>
       <p class="muted">
         <a href="/season">${escapeHtml(messages.web["web.season-link"])}</a> ·
@@ -168,6 +209,10 @@ export interface SeasonPageInput {
   locale: Locale;
   /** Undefined when there is no plan: a season with no plan is not an empty season, it is a missing one. */
   summary: SeasonSummary | undefined;
+  /** The week with the most planned kilometres. */
+  peakWeek?: string;
+  /** The plan's last planned week: the final surge before the event, when there is one. */
+  finalWeek?: string;
 }
 
 /**
@@ -201,10 +246,20 @@ export function renderSeason(input: SeasonPageInput): string {
       format(messages.web["web.season-hard"], { count: week.hardDays }),
       format(messages.web["web.season-logged"], { count: week.loggedDays }),
     ];
+    const markers = [
+      week.weekStart === input.peakWeek ? messages.web["web.season-peak"] : "",
+      week.weekStart === input.finalWeek ? messages.web["web.season-final"] : "",
+    ].filter((marker) => marker.length > 0);
+    const markerChips = markers
+      .map((marker) => `<span class="chip quiet">${escapeHtml(marker)}</span>`)
+      .join(" ");
     return `<li class="row${week.status === "current" ? " today" : ""}">
-      <span class="day">${escapeHtml(format(messages.web["web.season-week"], { day: week.weekStart }))}</span>
-      <span class="chip quiet">${escapeHtml(statusLabel(week.status))}</span>
-      <span class="session">${escapeHtml(facts.join(" · "))}</span>
+      <a class="row-link" href="/week/${escapeHtml(week.weekStart)}">
+        <span class="day">${escapeHtml(format(messages.web["web.season-week"], { day: week.weekStart }))}</span>
+        <span class="chip quiet">${escapeHtml(statusLabel(week.status))}</span>
+        <span class="session">${escapeHtml(facts.join(" · "))}</span>
+      </a>
+      ${markerChips}
     </li>`;
   });
 
@@ -240,6 +295,116 @@ export interface PainPageInput {
  * The pain history: the rows row 19 created, on a page. The triage still reads one entry's array (row 35), so this
  * page says what happened rather than what it means - a page that interpreted pain would be a second triage.
  */
+export interface MonthPageInput {
+  locale: Locale;
+  /** `YYYY-MM`. */
+  month: string;
+  weeks: readonly SeasonWeek[];
+  peakWeek?: string;
+  finalWeek?: string;
+  prevMonth: string;
+  nextMonth: string;
+}
+
+/**
+ * The month view: the weeks that touch the month, each with planned/done kilometres, the peak and final-surge markers,
+ * and a link into the week. It exists because a runner plans in months, not only in the seven days in front of them.
+ */
+export function renderMonth(input: MonthPageInput): string {
+  const messages = messagesFor(input.locale);
+  const web = messages.web;
+  const rows =
+    input.weeks.length === 0
+      ? `<p>${escapeHtml(web["web.month-empty"])}</p>`
+      : input.weeks
+          .map((week) => {
+            const facts = [
+              format(web["web.season-planned"], { km: formatNumber(week.plannedKm) }),
+              format(web["web.season-done"], { km: formatNumber(week.completedKm) }),
+              format(web["web.season-sessions"], { done: week.completedSessions, planned: week.plannedSessions }),
+            ];
+            const markers = [
+              week.weekStart === input.peakWeek ? web["web.month-peak"] : "",
+              week.weekStart === input.finalWeek ? web["web.month-final"] : "",
+            ].filter((marker) => marker.length > 0);
+            return `<li class="row"><a class="row-link" href="/week/${escapeHtml(week.weekStart)}">
+        <span class="day">${escapeHtml(format(web["web.month-week"], { day: week.weekStart }))}</span>
+        <span class="session">${escapeHtml(facts.join(" · "))}</span>
+      </a>${
+        markers.length === 0
+          ? ""
+          : ` <span class="chip quiet">${escapeHtml(markers.join(" · "))}</span>`
+      }</li>`;
+          })
+          .join("\n");
+  const body = `<section class="card">
+      <h2>${escapeHtml(format(web["web.month-title"], { month: input.month }))}</h2>
+      <p class="week-nav muted">
+        <a href="/month/${escapeHtml(input.prevMonth)}">${escapeHtml(web["web.calendar-prev"])}</a>
+        <a href="/">${escapeHtml(web["web.nav-week"])}</a>
+        <a href="/month/${escapeHtml(input.nextMonth)}">${escapeHtml(web["web.calendar-next"])}</a>
+      </p>
+      <ul class="week">${rows}</ul>
+      <p class="muted"><a href="/season">${escapeHtml(web["web.season-link"])}</a></p>
+    </section>`;
+  return layout({ locale: input.locale, title: format(web["web.month-title"], { month: input.month }), body, signedIn: true });
+}
+
+export interface WeekPageInput {
+  locale: Locale;
+  weekStart: string;
+  days: readonly string[];
+  plan: PlanVersion | undefined;
+  currentOf: (day: string) => DayEntry | undefined;
+  commentOf: (day: string) => { text: string } | undefined;
+  prevWeek: string;
+  nextWeek: string;
+  month: string;
+}
+
+/** One past or future week, with the same rows as the calendar, so looking back is a first-class action. */
+export function renderWeek(input: WeekPageInput): string {
+  const messages = messagesFor(input.locale);
+  const web = messages.web;
+  const rows = input.days
+    .map((day) => {
+      const session = input.plan?.sessions.find((candidate) => candidate.day === day);
+      const current = input.currentOf(day);
+      const comment = input.commentOf(day);
+      const status =
+        current === undefined
+          ? `<span class="chip quiet">${escapeHtml(web["web.not-logged"])}</span>`
+          : `<span class="chip done">${escapeHtml(web["web.logged"])}</span>`;
+      const sessionText = session === undefined ? "" : sessionLabel(input.locale, session);
+      const commentText =
+        comment === undefined || comment.text.length === 0 ? "" : `<p class="note">${escapeHtml(comment.text)}</p>`;
+      const noteText =
+        current?.note === undefined || current.note === null || current.note.length === 0
+          ? ""
+          : `<p class="note">${escapeHtml(format(web["web.calendar-note"], { note: current.note }))}</p>`;
+      return `<li class="row">
+        <a href="/day/${escapeHtml(day)}" class="row-link">
+          <span class="day">${escapeHtml(weekdayName(input.locale, day))}</span>
+          <span class="session">${escapeHtml(sessionText)}</span>
+          ${status}
+        </a>
+        ${commentText}
+        ${noteText}
+      </li>`;
+    })
+    .join("\n");
+  const body = `<section class="card">
+      <h2>${escapeHtml(format(web["web.week-title"], { day: input.weekStart }))}</h2>
+      <p class="week-nav muted">
+        <a href="/week/${escapeHtml(input.prevWeek)}">${escapeHtml(web["web.week-prev"])}</a>
+        <a href="/month/${escapeHtml(input.month)}">${escapeHtml(web["web.week-back"])}</a>
+        <a href="/week/${escapeHtml(input.nextWeek)}">${escapeHtml(web["web.week-next"])}</a>
+      </p>
+      <ul class="week">${rows}</ul>
+    </section>`;
+  return layout({ locale: input.locale, title: format(web["web.week-title"], { day: input.weekStart }), body, signedIn: true });
+}
+
 export function renderPain(input: PainPageInput): string {
   const messages = messagesFor(input.locale);
   const trendSentence = (trend: PainTrend): string => {

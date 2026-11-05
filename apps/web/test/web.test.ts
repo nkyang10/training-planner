@@ -13,6 +13,7 @@ import type { PlanVersion } from "@training-planner/domain";
 import { generatePlan } from "@training-planner/planner-core";
 import { loadKnowledge } from "@training-planner/knowledge";
 import { openReview } from "@training-planner/review";
+import { renderMonth } from "../src/pages";
 import type { ProposedOption } from "@training-planner/review";
 import type { PlanDiff, Review } from "@training-planner/domain";
 import { createMemoryRepository, createMemorySessions } from "@training-planner/storage";
@@ -782,7 +783,7 @@ describe("the local usage pass fixed these UI/UX gaps", () => {
     repository.saveWizardAnswer(USER_C_ID, { stepId: "availability", answer: { values: ["Mon", "Wed", "Fri"] }, revision: 1, source: "wizard" });
     repository.saveWizardAnswer(USER_C_ID, { stepId: "risk-appetite", answer: { value: "conservative" }, revision: 1, source: "wizard" });
     repository.appendEntryWithEventAndPointer({
-      entry: { day: "2026-11-04", outcome: "missed", revision: 1, tzAtEvent: "Asia/Taipei", sessionTaken: "none", completedKm: 0, idempotencyKey: "ux-missed" },
+      entry: { day: "2026-11-04", outcome: "missed", revision: 1, tzAtEvent: "Asia/Taipei", sessionTaken: "none", completedKm: 0, note: "Knee felt odd", idempotencyKey: "ux-missed" },
       event: {
         eventId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
         userId: USER_C_ID,
@@ -839,5 +840,66 @@ describe("the local usage pass fixed these UI/UX gaps", () => {
     expect(page.status).toBe(200);
     expect(page.html).toContain("night pain");
     expect(page.html).toContain("gait change");
+  });
+});
+
+
+describe("mobile navigation and the month/week lookback", () => {
+  it("puts the sections in the shell, not only in a footer", async () => {
+    const page = await call("/", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('class="tabs"');
+    expect(page.html).toContain('href="/month"');
+    expect(page.html).toContain('href="/season"');
+    expect(page.html).toContain('href="/console"');
+  });
+
+  it("shows a month of weeks, each linking into its own week page", async () => {
+    const page = await call("/month/2026-11", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Month of 2026-11");
+    expect(page.html).toContain('href="/month/2026-10"');
+    expect(page.html).toContain('href="/month/2026-12"');
+  });
+
+  it("renders the peak and final-surge markers from the plan's own weeks", () => {
+    const weeks = [
+      { weekStart: "2026-11-02", status: "current", plannedKm: 10, completedKm: 4, plannedSessions: 3, completedSessions: 1, hardDays: 1, loggedDays: 2, plannedDays: 7 },
+      { weekStart: "2026-11-09", status: "future", plannedKm: 14, completedKm: 0, plannedSessions: 4, completedSessions: 0, hardDays: 2, loggedDays: 0, plannedDays: 7 },
+    ] as unknown as Parameters<typeof renderMonth>[0]["weeks"];
+    const html = renderMonth({
+      locale: "en",
+      month: "2026-11",
+      weeks,
+      peakWeek: "2026-11-09",
+      finalWeek: "2026-11-09",
+      prevMonth: "2026-10",
+      nextMonth: "2026-12",
+    });
+    expect(html).toContain("peak week");
+    expect(html).toContain("final surge");
+    expect(html).toContain('href="/week/2026-11-09"');
+  });
+
+  it("looks back a week from the calendar and forward again", async () => {
+    const page = await call("/?week=2026-10-19", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Week of 2026-10-19");
+    expect(page.html).toContain("Previous week");
+    expect(page.html).toContain("Next week");
+  });
+
+  it("renders one week as its own page with its own navigation", async () => {
+    const page = await call("/week/2026-10-19", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Week of 2026-10-19");
+    expect(page.html).toContain('href="/week/2026-10-12"');
+    expect(page.html).toContain('href="/month/2026-10"');
+  });
+
+  it("shows the runner's own note on the week view", async () => {
+    const page = await call("/week/2026-11-02", { cookie: "session=token-c" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Note: Knee felt odd");
   });
 });
