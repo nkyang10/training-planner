@@ -568,13 +568,19 @@ export function renderCoachPage(input: CoachPageInput): string {
           (message) => `<li class="row coach-message ${message.role}"><p class="eyebrow">${escapeHtml(
             message.role === "user" ? web["web.coach-you"] : web["web.coach-coach"],
           )}</p><p class="note">${escapeHtml(message.text)}</p>${
+            (message.attachments ?? [])
+              .map((attachment) => `<img class="coach-photo" src="/coach/photo/${escapeHtml(attachment.attachmentId)}" alt="${escapeHtml(attachment.filename)}" loading="lazy">`)
+              .join("")
+          }${
             message.reviewId === null ? "" : `<p><a class="chip" href="/review/${escapeHtml(message.reviewId)}">${escapeHtml(web["web.coach-review-opened"])}</a></p>`
           }</li>`,
         )
         .join("\n")}</ul>`;
-  const composer = `<form method="post" action="/coach" class="card stack">
+  const composer = `<form method="post" action="/coach" enctype="multipart/form-data" class="card stack">
       <label for="question">${escapeHtml(web["web.coach-placeholder"])}</label>
       <textarea id="question" name="question" required maxlength="500" rows="3"></textarea>
+      <label for="photo">${escapeHtml(web["web.coach-photo"])}</label>
+      <input id="photo" name="photo" type="file" accept="image/png,image/jpeg,image/webp">
       <button type="submit" class="btn btn-primary">${escapeHtml(web["web.coach-send"])}</button>
     </form>`;
   const context = `<p class="muted">${escapeHtml(web["web.coach-context"])}: ${escapeHtml(input.factsSummary)}</p>`;

@@ -181,6 +181,19 @@ system may open on its own. A conversational coach that answers arbitrary questi
 Live check: with `TRAINING_PLANNER_MODEL_*` set, the coach answers from the demo runner's facts; if the provider returns a
 number that is not in the facts, the route answers 422 instead of showing it.
 
+## Coach context and photos (2026-11-05 pass)
+
+| Piece | Behaviour |
+|---|---|
+| Context | up to **100 turns** and a **100,000-character** budget (history + question); the oldest turns are dropped first, the question always survives |
+| Photos | the composer accepts **one image per turn** (png/jpeg/webp, ≤5 MB); the web stores it under `data/uploads/<userId>/<attachmentId>.<ext>` (git-ignored) and sends only metadata to the API |
+| Serving | `GET /coach/photo/:attachmentId` is session-scoped: the owner gets the image, another runner gets 404 |
+| Model | the fact snapshot carries the attachment **count**, so a text-only port can acknowledge the photo without pretending to see it; a vision port can be added without changing the message contract |
+
+Honest boundary: the current provider (`dgx/general`) is text-only, so the coach is told an image is attached, not shown the
+pixels. Uploads are not EXIF-stripped yet, and the upload directory is local disk (a deployment needs object storage and
+retention rules).
+
 ## Honest limits
 
 | Limit | Why |

@@ -18,7 +18,10 @@ export const COACH_CHAT_RULES: readonly string[] = [
 ];
 
 /** Only the newest turns reach the model; older context is not a licence to invent facts. */
-export const MAX_HISTORY_TURNS = 12;
+export const MAX_HISTORY_TURNS = 100;
+
+/** The character budget for history + question, so a long conversation cannot grow the prompt without bound. */
+export const MAX_CONTEXT_CHARS = 100_000;
 
 /** A question longer than this is truncated rather than rejected, so a paste cannot dominate the prompt. */
 export const MAX_QUESTION_CHARS = 1000;
@@ -41,6 +44,7 @@ function cloneFacts(facts: CoachFactSnapshot): CoachFactSnapshot {
       text: reference.text,
       tier: reference.tier,
     })),
+    ...(facts.attachments === undefined ? {} : { attachments: facts.attachments }),
   };
 }
 
@@ -52,11 +56,19 @@ function normalizeTurn(turn: CoachChatTurn): CoachChatTurn | null {
 }
 
 export function buildCoachChatRequest(input: BuildCoachChatInput): CoachChatRequest {
-  const history = input.history
+  let history = input.history
     .map(normalizeTurn)
     .filter((turn): turn is CoachChatTurn => turn !== null)
     .slice(-MAX_HISTORY_TURNS);
   const question = input.question.trim().slice(0, MAX_QUESTION_CHARS).trim();
+  // The newest turns matter most: drop the oldest until the prompt fits the character budget. The question always
+  // survives; a conversation never silently loses the thing the runner just asked.
+  let chars = history.reduce((total, turn) => total + turn.text.length, 0) + question.length;
+  while (history.length > 0 && chars > MAX_CONTEXT_CHARS) {
+    const removed = history[0];
+    chars -= removed === undefined ? 0 : removed.text.length;
+    history = history.slice(1);
+  }
   return {
     system: { rules: [...COACH_CHAT_RULES], facts: cloneFacts(input.facts) },
     history,

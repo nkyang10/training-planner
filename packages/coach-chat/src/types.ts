@@ -13,6 +13,8 @@ export interface CoachFactSnapshot {
   recentEntries: readonly string[]; // e.g. "2026-11-03 completed 4.2 km, knee pain 3/10"
   comment: string | null;
   references: readonly { id: string; text: string; tier: "safety" | "training" | "tone" }[];
+  /** How many images the runner attached to this turn; the model is told, not shown (text-only port). */
+  attachments?: number;
 }
 
 export interface CoachChatTurn {

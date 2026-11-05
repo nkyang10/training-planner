@@ -458,6 +458,25 @@ export function createApi(options: ApiOptions): RequestListener {
         if (question.length === 0 || question.length > 500) {
           return fail(response, 400, "invalid-question", "question must be 1..500 characters");
         }
+        const rawAttachments = Array.isArray(body["attachments"]) ? body["attachments"] : [];
+        if (rawAttachments.length > 3) return fail(response, 400, "too-many-attachments", "at most 3 images per turn");
+        const allowedTypes = ["image/png", "image/jpeg", "image/webp"] as const;
+        const attachments = rawAttachments.map((candidate) => {
+          if (typeof candidate !== "object" || candidate === null) return null;
+          const item = candidate as Record<string, unknown>;
+          const attachmentId = typeof item["attachmentId"] === "string" ? item["attachmentId"] : "";
+          const filename = typeof item["filename"] === "string" ? item["filename"].slice(0, 120) : "photo";
+          const contentType = typeof item["contentType"] === "string" ? item["contentType"] : "";
+          const sizeBytes = typeof item["sizeBytes"] === "number" ? item["sizeBytes"] : 0;
+          const kind = item["kind"] === "record" ? "record" : "photo";
+          if (attachmentId.length === 0 || sizeBytes <= 0 || sizeBytes > 5_000_000) return null;
+          if (!(allowedTypes as readonly string[]).includes(contentType)) return null;
+          return { attachmentId, filename, contentType: contentType as (typeof allowedTypes)[number], sizeBytes, kind: kind as "photo" | "record" };
+        });
+        if (attachments.some((attachment) => attachment === null)) {
+          return fail(response, 400, "invalid-attachment", "attachments must be png/jpeg/webp up to 5 MB");
+        }
+        const validAttachments = attachments.filter((attachment): attachment is NonNullable<typeof attachment> => attachment !== null);
         const port = options.coachChatPort;
         if (port === undefined) return fail(response, 503, "coach-not-configured", "no model is wired for the coach conversation");
         const plan = repository.latestPlanVersionFor(userId, today);
@@ -474,6 +493,7 @@ export function createApi(options: ApiOptions): RequestListener {
           recentEntries: entries.map((entry) => `${entry.day} ${entry.outcome} ${entry.completedKm ?? 0} km${(entry.pain ?? []).length > 0 ? ", pain reported" : ""}`),
           comment: repository.listComments(userId, today)[0]?.text ?? null,
           references: references.map((reference) => ({ id: reference.id, text: reference.text, tier: reference.tier })),
+          ...(validAttachments.length === 0 ? {} : { attachments: validAttachments.length }),
         };
         const history = repository.listCoachMessages(userId, 12).map((message) => ({ role: message.role, text: message.text }));
         const coachRequest = buildCoachChatRequest({ facts, history, question });
@@ -496,6 +516,7 @@ export function createApi(options: ApiOptions): RequestListener {
           createdAt: at,
           contextHash,
           reviewId: null,
+          ...(validAttachments.length === 0 ? {} : { attachments: validAttachments }),
         };
         const coachMessage = {
           messageId: uuidFrom({ userId, day: today, role: "coach", text: validated.reply.reply, nonce: `${history.length}:${question.length}` }),

@@ -153,6 +153,7 @@ export const en: Messages = {
     "web.coach-you": "You",
     "web.coach-coach": "Coach",
     "web.coach-placeholder": "e.g. My knee is better today — can we push Friday?",
+    "web.coach-photo": "Photo (optional)",
     "web.coach-send": "Send",
     "web.coach-review-opened": "The coach opened a review for you.",
     "web.coach-context": "Context",
