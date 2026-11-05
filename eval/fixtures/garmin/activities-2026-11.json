@@ -1,0 +1,250 @@
+{
+    "note":  "Sanitized capture of the Garmin Personal API activity list on 2026-11-05: owner identity, names and real activity ids removed; structure unchanged.",
+    "capturedAt":  "2026-11-05",
+    "profile":  {
+                    "measurementSystem":  "metric",
+                    "preferredLocale":  "zh_TW"
+                },
+    "activities":  [
+                       {
+                           "activityId":  900001,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  11,
+                                                "typeKey":  "indoor_cardio"
+                                            },
+                           "distance":  0.0,
+                           "duration":  2211.60205078125,
+                           "elapsedDuration":  2211.60205078125,
+                           "startTimeLocal":  "2026-11-04 22:35:52"
+                       },
+                       {
+                           "activityId":  900002,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  2735.090087890625,
+                           "duration":  1163.5260009765625,
+                           "elapsedDuration":  1163.5260009765625,
+                           "startTimeLocal":  "2026-11-03 20:41:29"
+                       },
+                       {
+                           "activityId":  900003,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  5439.27978515625,
+                           "duration":  1747.637939453125,
+                           "elapsedDuration":  1747.637939453125,
+                           "startTimeLocal":  "2026-11-03 20:02:43"
+                       },
+                       {
+                           "activityId":  900004,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  1492.4100341796875,
+                           "duration":  711.593017578125,
+                           "elapsedDuration":  711.593017578125,
+                           "startTimeLocal":  "2026-11-03 19:33:34"
+                       },
+                       {
+                           "activityId":  900005,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  2595.469970703125,
+                           "duration":  1516.031005859375,
+                           "elapsedDuration":  1516.031005859375,
+                           "startTimeLocal":  "2026-11-01 21:00:52"
+                       },
+                       {
+                           "activityId":  900006,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  21216.919921875,
+                           "duration":  7115.9501953125,
+                           "elapsedDuration":  7115.9501953125,
+                           "startTimeLocal":  "2026-11-01 08:00:32"
+                       },
+                       {
+                           "activityId":  900007,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  3342.929931640625,
+                           "duration":  1239.8260498046875,
+                           "elapsedDuration":  1239.8260498046875,
+                           "startTimeLocal":  "2026-10-31 20:14:17"
+                       },
+                       {
+                           "activityId":  900008,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  779.5900268554688,
+                           "duration":  360.5660095214844,
+                           "elapsedDuration":  360.5660095214844,
+                           "startTimeLocal":  "2026-10-30 20:15:53"
+                       },
+                       {
+                           "activityId":  900009,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  7798.39013671875,
+                           "duration":  2550.805908203125,
+                           "elapsedDuration":  2555.174072265625,
+                           "startTimeLocal":  "2026-10-30 19:30:41"
+                       },
+                       {
+                           "activityId":  900010,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  1193.93994140625,
+                           "duration":  596.8200073242188,
+                           "elapsedDuration":  596.8200073242188,
+                           "startTimeLocal":  "2026-10-30 19:14:42"
+                       },
+                       {
+                           "activityId":  900011,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  25,
+                                                "typeKey":  "indoor_cycling"
+                                            },
+                           "distance":  0.0,
+                           "duration":  2701.034912109375,
+                           "elapsedDuration":  2701.034912109375,
+                           "startTimeLocal":  "2026-10-29 22:28:27"
+                       },
+                       {
+                           "activityId":  900012,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  11,
+                                                "typeKey":  "indoor_cardio"
+                                            },
+                           "distance":  0.0,
+                           "duration":  2112.43798828125,
+                           "elapsedDuration":  2115.452880859375,
+                           "startTimeLocal":  "2026-10-28 22:03:05"
+                       },
+                       {
+                           "activityId":  900013,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  1318.56005859375,
+                           "duration":  558.822998046875,
+                           "elapsedDuration":  558.822998046875,
+                           "startTimeLocal":  "2026-10-27 20:51:50"
+                       },
+                       {
+                           "activityId":  900014,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  2104.969970703125,
+                           "duration":  975.7169799804688,
+                           "elapsedDuration":  975.7169799804688,
+                           "startTimeLocal":  "2026-10-27 19:25:31"
+                       },
+                       {
+                           "activityId":  900015,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  2288.889892578125,
+                           "duration":  1371.4990234375,
+                           "elapsedDuration":  1371.4990234375,
+                           "startTimeLocal":  "2026-10-25 11:56:11"
+                       },
+                       {
+                           "activityId":  900016,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  14381.400390625,
+                           "duration":  5396.4541015625,
+                           "elapsedDuration":  5396.4541015625,
+                           "startTimeLocal":  "2026-10-24 16:11:58"
+                       },
+                       {
+                           "activityId":  900017,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  25,
+                                                "typeKey":  "indoor_cycling"
+                                            },
+                           "distance":  0.0,
+                           "duration":  3003.01904296875,
+                           "elapsedDuration":  3003.01904296875,
+                           "startTimeLocal":  "2026-10-23 22:47:19"
+                       },
+                       {
+                           "activityId":  900018,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  11,
+                                                "typeKey":  "indoor_cardio"
+                                            },
+                           "distance":  0.0,
+                           "duration":  1708.9119873046875,
+                           "elapsedDuration":  1708.9119873046875,
+                           "startTimeLocal":  "2026-10-21 23:15:44"
+                       },
+                       {
+                           "activityId":  900019,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  9612.8095703125,
+                           "duration":  3417.416015625,
+                           "elapsedDuration":  3419.549072265625,
+                           "startTimeLocal":  "2026-10-20 20:13:29"
+                       },
+                       {
+                           "activityId":  900020,
+                           "activityName":  null,
+                           "activityType":  {
+                                                "typeId":  1,
+                                                "typeKey":  "running"
+                                            },
+                           "distance":  709.489990234375,
+                           "duration":  307.77899169921875,
+                           "elapsedDuration":  307.77899169921875,
+                           "startTimeLocal":  "2026-10-20 19:50:30"
+                       }
+                   ]
+}

@@ -310,4 +310,24 @@ describe("the model is a port, and its output goes through the same gates", () =
     expect(verdict.fallback).toBe("deterministic-replan");
     expect(verdict.violations.join(" ")).toContain("freeze window");
   });
+
+
+  it("carries the coach's references into the request and hashes them", () => {
+    const references = [
+      {
+        id: "safety-subtract-only",
+        title: "Safety can only subtract",
+        text: "A safety rule may remove or downgrade a session; it may never add load.",
+        tier: "safety" as const,
+        sourcePath: "knowledge/heuristics/safety-hard-stops.yaml",
+        sourceHeading: "subtract_only: true",
+      },
+    ];
+    const call = buildAdvisorRequest(input({ references }));
+    expect(call.request.system.references).toHaveLength(1);
+    expect(call.hashes.referenceHash).toContain("sha256");
+    const empty = buildAdvisorRequest(input());
+    expect(empty.request.system.references).toEqual([]);
+    expect(empty.hashes.referenceHash).not.toBe(call.hashes.referenceHash);
+  });
 });

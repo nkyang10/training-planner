@@ -30,6 +30,7 @@ export default defineConfig({
       { find: "@training-planner/nudges", replacement: here("./packages/nudges/src/index.ts") },
     { find: "@training-planner/season", replacement: here("./packages/season/src/index.ts") },
     { find: "@training-planner/advisor", replacement: here("./packages/advisor/src/index.ts") },
+    { find: "@training-planner/coach", replacement: here("./packages/coach/src/index.ts") },
     ],
   },
   test: {

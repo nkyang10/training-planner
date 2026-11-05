@@ -43,6 +43,8 @@ export interface AdvisorInput {
   allowedCostKeys: readonly string[];
   /** The reason vocabulary the caller allows, so a new reason is a deliberate addition. */
   allowedReasonCodes: readonly string[];
+  /** The coach's selected references; guidance for language, never authority over a number. */
+  references?: readonly ReferencePassage[];
 }
 
 /** A guideline as the model sees it: effective version only, no history. */
@@ -55,8 +57,20 @@ export interface GuidelineDigestRow {
   text: string;
 }
 
+export interface ReferencePassage {
+  id: string;
+  title: string;
+  text: string;
+  tier: "safety" | "training" | "tone";
+  sourcePath: string;
+  sourceHeading: string;
+  reason?: string;
+}
+
 export interface AdvisorRequest {
   system: {
+    /** Curated guidance the model may use for language only; safety passages outrank training ones. */
+    references: ReferencePassage[];
     /** The operator's effective guidelines, ordered by tier then id so the prompt is deterministic. */
     guidelines: GuidelineDigestRow[];
     /** The rules the model cannot break, restated in the request rather than only in the prompt prose. */
@@ -97,6 +111,7 @@ export interface AdvisorHashes {
   guidelineVersionHash: string;
   promptHash: string;
   knowledgeHash: string;
+  referenceHash: string;
 }
 
 export interface AdvisorCall {

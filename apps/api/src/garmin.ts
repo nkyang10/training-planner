@@ -11,6 +11,8 @@
  * - data: GET https://personal.connectapi.garmin.com/userprofile-service/userprofile/settings (Bearer)
  * - activities: GET https://personal.connectapi.garmin.com/activitylist-service/activities/search/activities?start=0&limit=N
  */
+import type { EntryDraft } from "@training-planner/entries";
+
 export interface GarminProfile {
   displayName: string | null;
 }
@@ -101,5 +103,28 @@ export function createGarminClient(options: GarminClientOptions = {}): GarminCli
         return day >= from && day <= to;
       });
     },
+  };
+}
+
+/**
+ * Map one Garmin activity to a day-entry draft, or undefined when the activity cannot be a run entry.
+ *
+ * The mapping is deliberately boring: metres to tenths of a kilometre, seconds to whole minutes, the activity's own
+ * local day, and an idempotency key built from the activity id so a repeated sync is a duplicate, never a second entry.
+ * A zero-distance activity (indoor cardio, strength) is not a run and is not imported.
+ */
+export function mapGarminActivity(activity: GarminActivity, tzAtEvent: string): EntryDraft | undefined {
+  const day = typeof activity.startTimeLocal === "string" ? activity.startTimeLocal.slice(0, 10) : "";
+  const metres = typeof activity.distance === "number" ? activity.distance : 0;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !(metres > 0)) return undefined;
+  return {
+    day,
+    outcome: "completed",
+    tzAtEvent,
+    sessionTaken: "as-prescribed",
+    completedKm: Math.round((metres / 1000) * 10) / 10,
+    ...(typeof activity.duration === "number" ? { durationMin: Math.round(activity.duration / 60) } : {}),
+    source: "import-assistant",
+    idempotencyKey: `garmin:${activity.activityId}`,
   };
 }

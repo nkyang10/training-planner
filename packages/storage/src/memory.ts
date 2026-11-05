@@ -173,7 +173,8 @@ export function createMemoryRepository(): Repository {
     },
 
     listConnections(userId: string): Connection[] {
-      return [...stateOf(userId).connections.values()];
+      // Provider order, matching the SQLite adapter's ORDER BY: the two adapters must not disagree about a list.
+      return [...stateOf(userId).connections.values()].sort((left, right) => (left.provider < right.provider ? -1 : 1));
     },
 
     saveConnection(connection: Connection): void {

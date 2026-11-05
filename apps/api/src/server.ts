@@ -23,6 +23,7 @@ import { addDays, daysBetween, generatePlan, uuidFrom } from "@training-planner/
 import type { Evidence, PlanState } from "@training-planner/planner-core";
 import { ADJUST_COST_KEYS, evaluatePolicy } from "@training-planner/policy";
 import { ADVISOR_REASON_CODES, buildAdvisorRequest, validateProposal } from "@training-planner/advisor";
+import { selectCoachReferences } from "@training-planner/coach";
 import type { ModelPort } from "@training-planner/advisor";
 import { diffPlans } from "@training-planner/planner-core";
 import { childPlanVersion } from "@training-planner/replan";
@@ -39,7 +40,7 @@ import {
 import type { WizardStepId } from "@training-planner/domain";
 import { guidelineSchema } from "@training-planner/domain";
 import { computeSignals } from "@training-planner/signals";
-import { createGarminClient, GarminError } from "./garmin";
+import { createGarminClient, GarminError, mapGarminActivity } from "./garmin";
 import type { GarminClient } from "./garmin";
 import { evaluateTriggers } from "@training-planner/triggers";
 import { decideReview, openReview } from "@training-planner/review";
@@ -558,6 +559,19 @@ export function createApi(options: ApiOptions): RequestListener {
         computedAt: at,
       }).signals;
 
+      // The coach's memory: recent facts select curated passages, safety first. The passages are guidance for language,
+      // never permission to change a number; the validator still owns every gate.
+      const recentEntries = repository
+        .listEntries(userId)
+        .filter((entry) => entry.day <= today)
+        .slice(-14);
+      const references = selectCoachReferences({
+        kind: "review",
+        pain: recentEntries.some((entry) => (entry.pain ?? []).length > 0),
+        missedSessions: recentEntries.filter((entry) => entry.outcome === "missed").length,
+        highRpe: recentEntries.some((entry) => (entry.rpe ?? 0) >= 8),
+        reviewOptionsCount: 0,
+      });
       const call = buildAdvisorRequest({
         plan,
         entries: repository.listEntries(userId),
@@ -575,6 +589,7 @@ export function createApi(options: ApiOptions): RequestListener {
         knowledge,
         allowedCostKeys: [...ADJUST_COST_KEYS],
         allowedReasonCodes: [...ADVISOR_REASON_CODES],
+        references,
       });
 
       let output: unknown;
@@ -834,16 +849,11 @@ export function createApi(options: ApiOptions): RequestListener {
               skipped += 1;
               continue;
             }
-            const draft: EntryDraft = {
-              day,
-              outcome: "completed",
-              tzAtEvent: timezone,
-              sessionTaken: "as-prescribed",
-              completedKm: Math.round((metres / 1000) * 10) / 10,
-              ...(typeof activity.duration === "number" ? { durationMin: Math.round(activity.duration / 60) } : {}),
-              source: "import-assistant",
-              idempotencyKey: `garmin:${activity.activityId}`,
-            };
+            const draft = mapGarminActivity(activity, timezone);
+            if (draft === undefined) {
+              skipped += 1;
+              continue;
+            }
             const result = submitEntry(
               draft,
               { entries: repository.listEntriesForDay(userId, day), events: repository.listEvents(userId) },
