@@ -94,6 +94,12 @@ prose file, a source grade, and a golden test — see
 
 ---
 
+## Local testing stage
+
+The product can be used locally on SQLite with a seeded runner: [docs/local-testing.md](docs/local-testing.md)
+(`npx tsx tools/seed-local.ts`, then the web process on :8081). That page records what the seeded runner has, what to
+look at, and the UI/UX gaps the first real pass found and fixed.
+
 ## Status
 
 | Area | State |

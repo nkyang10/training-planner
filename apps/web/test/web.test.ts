@@ -772,3 +772,72 @@ describe("the review sheet tells a re-plan's honest size (ADR-0010)", () => {
     expect(page.html).toContain('name="optionId" value="replan"');
   });
 });
+
+
+describe("the local usage pass fixed these UI/UX gaps", () => {
+  const USER_C_ID = "c1c1c1c1-c1c1-41c1-81c1-c1c1c1c1c1c1";
+
+  beforeAll(() => {
+    repository.saveWizardAnswer(USER_C_ID, { stepId: "goal", answer: { value: "finish" }, revision: 1, source: "wizard" });
+    repository.saveWizardAnswer(USER_C_ID, { stepId: "availability", answer: { values: ["Mon", "Wed", "Fri"] }, revision: 1, source: "wizard" });
+    repository.saveWizardAnswer(USER_C_ID, { stepId: "risk-appetite", answer: { value: "conservative" }, revision: 1, source: "wizard" });
+    repository.appendEntryWithEventAndPointer({
+      entry: { day: "2026-11-04", outcome: "missed", revision: 1, tzAtEvent: "Asia/Taipei", sessionTaken: "none", completedKm: 0, idempotencyKey: "ux-missed" },
+      event: {
+        eventId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        userId: USER_C_ID,
+        type: "entry.submitted",
+        occurredAt: "2026-11-04T21:30:00.000Z",
+        actor: "runner",
+        payloadVersion: 1,
+        payload: {},
+        trainingDay: "2026-11-04",
+        timezone: "Asia/Taipei",
+        idempotencyKey: "ux-missed",
+      },
+    });
+    repository.savePainReport({
+      userId: USER_C_ID,
+      id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      day: "2026-11-04",
+      site: "knee",
+      side: "right",
+      intensity: 3,
+      duringRun: true,
+      nextMorning: false,
+      trendGaitChange: true,
+      nightPain: true,
+      duration: "few-days",
+      knownInjury: false,
+      note: null,
+    });
+  });
+
+  it("renders availability answers as day names instead of crashing on a day name", async () => {
+    const page = await call("/console", { cookie: "session=token-c", locale: "en" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Monday, Wednesday, Friday");
+  });
+
+  it("a finished wizard lists every answer with a link that changes it", async () => {
+    const page = await call("/wizard", { cookie: "session=token-c", locale: "en" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Which days can you run?");
+    expect(page.html).toContain("/wizard?step=availability");
+    expect(page.html).toContain("Change");
+  });
+
+  it("a day page checks the logged outcome, not always completed", async () => {
+    const page = await call("/day/2026-11-04", { cookie: "session=token-c", locale: "en" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain('value="missed" checked');
+    expect(page.html).not.toContain('value="completed" checked');
+  });
+
+  it("the pain page shows the report's own flags", async () => {
+    const page = await call("/pain", { cookie: "session=token-c", locale: "en" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("night pain");
+    expect(page.html).toContain("gait change");
+  });
+});
