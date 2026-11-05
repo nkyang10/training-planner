@@ -90,8 +90,9 @@ export function buildAdvisorRequest(input: AdvisorInput): AdvisorCall {
   );
   const revisedSteps = [...new Set(answers.filter((answer) => answer.revision > 1).map((answer) => answer.stepId))].sort();
 
+  const references = [...(input.references ?? [])];
   const request: AdvisorRequest = {
-    system: { guidelines, rules: [...REQUEST_RULES] },
+    system: { guidelines, rules: [...REQUEST_RULES], references },
     runner: {
       answers,
       settings: input.settings,
@@ -138,6 +139,7 @@ export function buildAdvisorRequest(input: AdvisorInput): AdvisorCall {
       guidelineVersionHash: hashOf(guidelines.map((guideline) => `${guideline.guidelineId}@${guideline.version}`).join("|")),
       promptHash: hashOf(canonicalJson(request)),
       knowledgeHash: input.knowledge.hash,
+      referenceHash: hashOf(canonicalJson(references)),
     },
   };
 }
