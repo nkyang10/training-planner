@@ -35,7 +35,7 @@ export const COACH_REFERENCES: readonly CoachReference[] = [
     text: "Pain that changes gait, wakes the runner at night, or comes with chest symptoms is a hard stop, not a training problem to program around; the comment ends with a clinician referral.",
     tier: "safety",
     sourcePath: "knowledge/heuristics/safety-hard-stops.yaml",
-    sourceHeading: "no-diet-or-weight-language",
+    sourceHeading: "- id: night-pain-or-bone-tenderness",
   },
   {
     id: "safety-no-diet-language",
