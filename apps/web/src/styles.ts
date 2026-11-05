@@ -109,6 +109,49 @@ button {
 }
 button.quiet { background: transparent; color: var(--muted); font-weight: 400; }
 .inline { margin: 0; }
+.tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 6px 12px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.tabs a {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 10px;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+.tabs a:hover { background: var(--wash, #f2f4f3); }
+.month-week { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.month-week .chip { margin-left: 4px; }
+.week-nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+@media (max-width: 640px) {
+  .tabs {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    border-bottom: 0;
+    border-top: 1px solid var(--line);
+    justify-content: space-between;
+    padding: 4px 6px calc(4px + env(safe-area-inset-bottom, 0px));
+  }
+  .tabs a { padding: 8px 6px; font-size: 12px; flex: 1 1 auto; justify-content: center; }
+  body { padding-bottom: 72px; }
+  .bar h1 { font-size: 18px; }
+}
 @media (max-width: 380px) {
   .row-link { grid-template-columns: 4.5rem 1fr; }
   .row-link .chip { grid-column: 2; justify-self: start; }

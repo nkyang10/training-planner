@@ -100,6 +100,13 @@ The product can be used locally on SQLite with a seeded runner: [docs/local-test
 (`npx tsx tools/seed-local.ts`, then the web process on :8081). That page records what the seeded runner has, what to
 look at, and the UI/UX gaps the first real pass found and fixed.
 
+## Integrations
+
+Garmin and Strava were researched from their official developer pages on 2026-11-05; the documented shapes, the
+deauthorization change (Strava revoke endpoint, 2026-06-01) and what each integration would need are in
+[docs/integrations/garmin-strava.md](docs/integrations/garmin-strava.md). No OAuth credentials exist in this repository,
+so nothing is wired.
+
 ## Status
 
 | Area | State |
