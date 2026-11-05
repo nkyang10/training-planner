@@ -133,8 +133,33 @@ button.quiet { background: transparent; color: var(--muted); font-weight: 400; }
   font-size: 14px;
 }
 .tabs a:hover { background: var(--wash, #f2f4f3); }
+.week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.day-card { display: flex; flex-direction: column; gap: 4px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; text-decoration: none; color: inherit; min-height: 96px; }
+.day-card .date { font-size: 12px; color: var(--muted); }
+.day-card .date b { font-size: 18px; color: var(--ink); }
+.day-card .session { font-weight: 600; font-size: 13px; }
+.day-card.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.day-card.logged { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.month-grid .dow { font-size: 12px; color: var(--muted); text-align: center; }
+.month-day { display: flex; flex-direction: column; gap: 3px; min-height: 64px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; text-decoration: none; color: inherit; font-size: 12px; }
+.month-day .num { font-weight: 700; font-size: 14px; }
+.month-day.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.month-day.pad { opacity: 0.45; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); display: inline-block; }
+.dot.done { background: #2f7d4f; }
+.dot.missed { background: #b24a3a; }
+.dot.rest { background: #9aa4a0; }
+.period-nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 6px 0 10px; }
+.totals { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .month-week { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .month-week .chip { margin-left: 4px; }
+@media (max-width: 640px) {
+  .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .month-day { min-height: 54px; padding: 4px; }
+  .month-day .session { display: none; }
+}
 .week-nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 @media (max-width: 640px) {
   .tabs {

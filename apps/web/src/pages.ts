@@ -22,6 +22,7 @@ import type { PainTrend } from "@training-planner/entries";
 import type { SeasonSummary, SeasonWeek } from "@training-planner/season";
 import type { Connection, SyncPreference } from "@training-planner/domain";
 import { format, formatNumber, messagesFor, weekdayName } from "@training-planner/i18n";
+import { addDays, weekStart } from "@training-planner/planner-core";
 import type { Locale } from "@training-planner/i18n";
 import { escapeHtml, layout } from "./html";
 
@@ -96,96 +97,87 @@ export function renderLogin(locale: Locale, error: string | undefined): string {
   return layout({ locale, title: messages.web["web.login-title"], body, signedIn: false });
 }
 
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+const statusOfDay = (current: DayEntry | undefined, day: string, today: string): "done" | "missed" | "rest" | "none" => {
+  if (current === undefined) return "none";
+  if (current.outcome === "missed" || current.outcome === "skipped") return "missed";
+  if (current.outcome === "rest") return "rest";
+  return day <= today ? "done" : "none";
+};
+
+const noteOf = (current: DayEntry | undefined): string => {
+  if (current?.note === undefined || current.note === null || current.note.length === 0) return "";
+  return current.note.length > 48 ? `${current.note.slice(0, 47)}…` : current.note;
+};
+
+/**
+ * The week as a grid: seven day cards, today ringed, the week's totals above it. A list answers "what is next"; a grid
+ * answers "what does this week look like", which is the question a runner actually asks before a training week.
+ */
 export function renderCalendar(input: CalendarPageInput): string {
   const messages = messagesFor(input.locale);
+  const web = messages.web;
   if (input.plan === undefined) {
     return layout({
       locale: input.locale,
-      title: messages.web["web.title"],
-      body: `<section class="card"><p>${escapeHtml(messages.web["web.no-plan"])}</p></section>`,
+      title: web["web.title"],
+      body: `<section class="card"><p>${escapeHtml(web["web.no-plan"])}</p></section>`,
       signedIn: true,
     });
   }
-
-  const firstShown = input.weekStart ?? input.days[0] ?? input.today;
-  const shift = (day: string, days: number): string => {
-    const date = new Date(`${day}T00:00:00.000Z`);
-    date.setUTCDate(date.getUTCDate() + days);
-    return date.toISOString().slice(0, 10);
-  };
-  const prevWeek = shift(firstShown, -7);
-  const nextWeek = shift(firstShown, 7);
-
-  const rows = input.days.map((day) => {
-    const session = input.plan?.sessions.find((candidate) => candidate.day === day);
-    const current = input.currentOf(day);
-    const comment = input.commentOf(day);
-    const isToday = day === input.today;
-    const status =
-      current === undefined
-        ? `<span class="chip quiet">${escapeHtml(messages.web["web.not-logged"])}</span>`
-        : `<span class="chip done">${escapeHtml(messages.web["web.logged"])}</span>`;
-    const sessionText = session === undefined ? "" : sessionLabel(input.locale, session);
-    const commentText =
-      comment === undefined || comment.text.length === 0 ? "" : `<p class="note">${escapeHtml(comment.text)}</p>`;
-    const noteText =
-      current?.note === undefined || current.note === null || current.note.length === 0
-        ? ""
-        : `<p class="note">${escapeHtml(format(messages.web["web.calendar-note"], { note: current.note }))}</p>`;
-    return `<li class="row${isToday ? " today" : ""}">
-      <a href="/day/${escapeHtml(day)}" class="row-link" aria-label="${escapeHtml(
-        format(messages.web["web.day-link"], { weekday: weekdayName(input.locale, day) }),
-      )}">
-        <span class="day">${escapeHtml(weekdayName(input.locale, day))}</span>
+  const start = input.weekStart ?? input.days[0] ?? input.today;
+  const sessions = input.days.map((day) => input.plan?.sessions.find((candidate) => candidate.day === day));
+  const plannedKm = sessions.reduce((total, session) => total + (session?.distanceKm ?? 0), 0);
+  const plannedSessions = sessions.filter((session) => session !== undefined).length;
+  const entries = input.days.map((day) => input.currentOf(day));
+  const doneKm = entries.reduce((total, entry) => total + (entry?.completedKm ?? 0), 0);
+  const doneSessions = entries.filter((entry) => entry !== undefined && entry.outcome === "completed").length;
+  const cards = input.days
+    .map((day, index) => {
+      const session = sessions[index];
+      const current = entries[index];
+      const comment = input.commentOf(day);
+      const status = statusOfDay(current, day, input.today);
+      const sessionText = session === undefined ? web["web.rest-day"] : sessionLabel(input.locale, session);
+      const note = noteOf(current);
+      const commentText = comment === undefined || comment.text.length === 0 ? "" : comment.text;
+      return `<a class="day-card${day === input.today ? " today" : ""}${status === "done" ? " logged" : ""}" href="/day/${escapeHtml(day)}">
+        <span class="date"><b>${escapeHtml(day.slice(8, 10))}</b> ${escapeHtml(weekdayName(input.locale, day))}</span>
         <span class="session">${escapeHtml(sessionText)}</span>
-        ${status}
-      </a>
-      ${commentText}
-      ${noteText}
-    </li>`;
-  });
-
-  const intro = input.intro === undefined ? "" : `<p class="muted">${escapeHtml(input.intro)}</p>`;
-  const prompt =
-    input.prompt === undefined ? "" : `<p class="chip prompt" role="status">${escapeHtml(input.prompt)}</p>`;
-  const banner =
-    input.openReview === undefined
-      ? ""
-      : `<a class="card banner" href="/review/${escapeHtml(input.openReview.reviewId)}">${escapeHtml(messages.web["web.review-banner"])}</a>`;
-  const title =
-    input.weekStart !== undefined && input.isCurrentWeek === false
-      ? format(messages.web["web.week-title"], { day: input.weekStart })
-      : messages.web["web.calendar-title"];
-  const weekNav = `
-    <p class="week-nav muted">
-      <a href="/?week=${escapeHtml(prevWeek)}">${escapeHtml(messages.web["web.calendar-prev"])}</a>
-      <a href="/month">${escapeHtml(messages.web["web.nav-month"])}</a>
-      <a href="/?week=${escapeHtml(nextWeek)}">${escapeHtml(messages.web["web.calendar-next"])}</a>
-    </p>`;
-  const peakLine =
-    input.peakWeek === undefined
-      ? ""
-      : `<p class="muted">${escapeHtml(format(messages.web["web.calendar-peak"], { day: input.peakWeek }))}${
-          input.finalWeek === undefined
-            ? ""
-            : ` · ${escapeHtml(format(messages.web["web.calendar-final"], { day: input.finalWeek }))}`
-        }</p>`;
-  const body = `
-    ${prompt}
-    ${banner}
-    <section class="card">
+        <span class="chip ${status === "done" ? "done" : "quiet"}">${escapeHtml(status === "done" ? web["web.logged"] : web["web.not-logged"])}</span>
+        ${note.length === 0 ? "" : `<span class="note">${escapeHtml(format(web["web.calendar-note"], { note }))}</span>`}
+        ${commentText.length === 0 ? "" : `<span class="note">${escapeHtml(commentText)}</span>`}
+      </a>`;
+    })
+    .join("\n");
+  const title = input.isCurrentWeek === true ? web["web.calendar-title"] : format(web["web.week-title"], { day: start });
+  const markers = [
+    start === input.peakWeek ? web["web.calendar-peak"] : "",
+    start === input.finalWeek ? web["web.calendar-final"] : "",
+  ].filter((marker) => marker.length > 0);
+  const body = `<section class="card">
       <h2>${escapeHtml(title)}</h2>
-      ${intro}
-      ${peakLine}
-      ${weekNav}
-      <ul class="week">${rows.join("\n")}</ul>
-      <p class="muted">
-        <a href="/season">${escapeHtml(messages.web["web.season-link"])}</a> ·
-        <a href="/console">${escapeHtml(messages.web["web.console-link"])}</a> ·
-        <a href="/pain">${escapeHtml(messages.web["web.pain-link"])}</a>
+      <p class="period-nav">
+        <a href="/?week=${escapeHtml(addDays(start, -7))}">${escapeHtml(web["web.calendar-prev"])}</a>
+        <a class="chip ${input.isCurrentWeek === true ? "done" : "quiet"}" href="/?week=${escapeHtml(weekStart(input.today))}">${escapeHtml(web["web.grid-today"])}</a>
+        <a href="/?week=${escapeHtml(addDays(start, 7))}">${escapeHtml(web["web.calendar-next"])}</a>
+        <a href="/month/${escapeHtml(start.slice(0, 7))}">${escapeHtml(web["web.nav-month"])}</a>
+        <a href="/season">${escapeHtml(web["web.nav-season"])}</a>
       </p>
+      <p class="totals">${escapeHtml(format(web["web.grid-totals"], { planned: formatNumber(plannedKm), done: formatNumber(doneKm), doneSessions, plannedSessions }))}</p>
+      ${markers.length === 0 ? "" : `<p class="muted"><span class="chip quiet">${escapeHtml(markers.join(" · "))}</span></p>`}
+      <div class="week-grid">${cards}</div>
+      ${input.intro === undefined ? "" : `<p class="note">${escapeHtml(input.intro)}</p>`}
+      ${input.prompt === undefined ? "" : `<p class="muted">${escapeHtml(input.prompt)}</p>`}
+      ${input.openReview === undefined ? "" : `<p><a class="chip" href="/review/${escapeHtml(input.openReview.reviewId)}">${escapeHtml(web["web.review-banner"])}</a></p>`}
+      <form class="period-nav" method="get" action="/jump">
+        <label for="jump">${escapeHtml(web["web.grid-jump"])}</label>
+        <input id="jump" name="date" type="date" value="${escapeHtml(input.today)}">
+        <button type="submit">${escapeHtml(web["web.grid-go"])}</button>
+      </form>
     </section>`;
-  return layout({ locale: input.locale, title: messages.web["web.calendar-title"], body, signedIn: true });
+  return layout({ locale: input.locale, title, body, signedIn: true });
 }
 
 const OUTCOMES = ["completed", "partial", "skipped", "rest", "missed"] as const;
@@ -305,6 +297,11 @@ export interface MonthPageInput {
   finalWeek?: string;
   prevMonth: string;
   nextMonth: string;
+  /** The padded month grid (Monday first); absent keeps the week-list fallback for direct callers. */
+  days?: readonly string[];
+  today?: string;
+  sessionOf?: (day: string) => string;
+  statusOf?: (day: string) => "done" | "missed" | "rest" | "none";
 }
 
 /**
@@ -314,41 +311,61 @@ export interface MonthPageInput {
 export function renderMonth(input: MonthPageInput): string {
   const messages = messagesFor(input.locale);
   const web = messages.web;
-  const rows =
-    input.weeks.length === 0
-      ? `<p>${escapeHtml(web["web.month-empty"])}</p>`
-      : input.weeks
-          .map((week) => {
-            const facts = [
-              format(web["web.season-planned"], { km: formatNumber(week.plannedKm) }),
-              format(web["web.season-done"], { km: formatNumber(week.completedKm) }),
-              format(web["web.season-sessions"], { done: week.completedSessions, planned: week.plannedSessions }),
-            ];
-            const markers = [
-              week.weekStart === input.peakWeek ? web["web.month-peak"] : "",
-              week.weekStart === input.finalWeek ? web["web.month-final"] : "",
-            ].filter((marker) => marker.length > 0);
-            return `<li class="row"><a class="row-link" href="/week/${escapeHtml(week.weekStart)}">
+  const title = format(web["web.month-title"], { month: input.month });
+  const header = `<h2>${escapeHtml(title)}</h2>
+      <p class="period-nav">
+        <a href="/month/${escapeHtml(input.prevMonth)}">${escapeHtml(web["web.month-prev"])}</a>
+        <a class="chip quiet" href="/month/${escapeHtml((input.today ?? `${input.month}-01`).slice(0, 7))}">${escapeHtml(web["web.month-this"])}</a>
+        <a href="/month/${escapeHtml(input.nextMonth)}">${escapeHtml(web["web.month-next"])}</a>
+        <a href="/">${escapeHtml(web["web.nav-week"])}</a>
+        <a href="/season">${escapeHtml(web["web.nav-season"])}</a>
+      </p>`;
+  if (input.days === undefined) {
+    const rows =
+      input.weeks.length === 0
+        ? `<p>${escapeHtml(web["web.month-empty"])}</p>`
+        : input.weeks
+            .map((week) => {
+              const facts = [
+                format(web["web.season-planned"], { km: formatNumber(week.plannedKm) }),
+                format(web["web.season-done"], { km: formatNumber(week.completedKm) }),
+                format(web["web.season-sessions"], { done: week.completedSessions, planned: week.plannedSessions }),
+              ];
+              const markers = [
+                week.weekStart === input.peakWeek ? web["web.month-peak"] : "",
+                week.weekStart === input.finalWeek ? web["web.month-final"] : "",
+              ].filter((marker) => marker.length > 0);
+              return `<li class="row"><a class="row-link" href="/week/${escapeHtml(week.weekStart)}">
         <span class="day">${escapeHtml(format(web["web.month-week"], { day: week.weekStart }))}</span>
         <span class="session">${escapeHtml(facts.join(" · "))}</span>
-      </a>${
-        markers.length === 0
-          ? ""
-          : ` <span class="chip quiet">${escapeHtml(markers.join(" · "))}</span>`
-      }</li>`;
-          })
-          .join("\n");
+      </a>${markers.length === 0 ? "" : ` <span class="chip quiet">${escapeHtml(markers.join(" · "))}</span>`}</li>`;
+            })
+            .join("\n");
+    return layout({ locale: input.locale, title, body: `<section class="card">${header}<ul class="week">${rows}</ul></section>`, signedIn: true });
+  }
+  const head = WEEKDAYS.map((day) => `<span class="dow">${escapeHtml(messages.weekday[day])}</span>`).join("");
+  const cells = input.days
+    .map((day) => {
+      const inMonth = day.slice(0, 7) === input.month;
+      const status = input.statusOf?.(day) ?? "none";
+      const session = input.sessionOf?.(day) ?? "";
+      return `<a class="month-day${day === input.today ? " today" : ""}${inMonth ? "" : " pad"}" href="/day/${escapeHtml(day)}">
+        <span class="num">${escapeHtml(day.slice(8, 10))}</span>
+        <span class="session">${escapeHtml(session)}</span>
+        <span class="dot ${status}" aria-hidden="true"></span>
+      </a>`;
+    })
+    .join("\n");
+  const markers = [
+    input.peakWeek === undefined ? "" : web["web.month-peak"],
+    input.finalWeek === undefined ? "" : web["web.month-final"],
+  ].filter((marker) => marker.length > 0);
   const body = `<section class="card">
-      <h2>${escapeHtml(format(web["web.month-title"], { month: input.month }))}</h2>
-      <p class="week-nav muted">
-        <a href="/month/${escapeHtml(input.prevMonth)}">${escapeHtml(web["web.calendar-prev"])}</a>
-        <a href="/">${escapeHtml(web["web.nav-week"])}</a>
-        <a href="/month/${escapeHtml(input.nextMonth)}">${escapeHtml(web["web.calendar-next"])}</a>
-      </p>
-      <ul class="week">${rows}</ul>
-      <p class="muted"><a href="/season">${escapeHtml(web["web.season-link"])}</a></p>
+      ${header}
+      ${markers.length === 0 ? "" : `<p class="muted"><span class="chip quiet">${escapeHtml(markers.join(" · "))}</span></p>`}
+      <div class="month-grid">${head}${cells}</div>
     </section>`;
-  return layout({ locale: input.locale, title: format(web["web.month-title"], { month: input.month }), body, signedIn: true });
+  return layout({ locale: input.locale, title, body, signedIn: true });
 }
 
 export interface WeekPageInput {
@@ -361,49 +378,43 @@ export interface WeekPageInput {
   prevWeek: string;
   nextWeek: string;
   month: string;
+  today?: string;
 }
 
 /** One past or future week, with the same rows as the calendar, so looking back is a first-class action. */
 export function renderWeek(input: WeekPageInput): string {
   const messages = messagesFor(input.locale);
   const web = messages.web;
-  const rows = input.days
+  const today = input.today ?? input.days[0] ?? input.weekStart;
+  const title = format(web["web.week-title"], { day: input.weekStart });
+  const cards = input.days
     .map((day) => {
       const session = input.plan?.sessions.find((candidate) => candidate.day === day);
       const current = input.currentOf(day);
       const comment = input.commentOf(day);
-      const status =
-        current === undefined
-          ? `<span class="chip quiet">${escapeHtml(web["web.not-logged"])}</span>`
-          : `<span class="chip done">${escapeHtml(web["web.logged"])}</span>`;
-      const sessionText = session === undefined ? "" : sessionLabel(input.locale, session);
-      const commentText =
-        comment === undefined || comment.text.length === 0 ? "" : `<p class="note">${escapeHtml(comment.text)}</p>`;
-      const noteText =
-        current?.note === undefined || current.note === null || current.note.length === 0
-          ? ""
-          : `<p class="note">${escapeHtml(format(web["web.calendar-note"], { note: current.note }))}</p>`;
-      return `<li class="row">
-        <a href="/day/${escapeHtml(day)}" class="row-link">
-          <span class="day">${escapeHtml(weekdayName(input.locale, day))}</span>
-          <span class="session">${escapeHtml(sessionText)}</span>
-          ${status}
-        </a>
-        ${commentText}
-        ${noteText}
-      </li>`;
+      const status = statusOfDay(current, day, today);
+      const sessionText = session === undefined ? web["web.rest-day"] : sessionLabel(input.locale, session);
+      return `<a class="day-card${day === today ? " today" : ""}${status === "done" ? " logged" : ""}" href="/day/${escapeHtml(day)}">
+        <span class="date"><b>${escapeHtml(day.slice(8, 10))}</b> ${escapeHtml(weekdayName(input.locale, day))}</span>
+        <span class="session">${escapeHtml(sessionText)}</span>
+        <span class="chip ${status === "done" ? "done" : "quiet"}">${escapeHtml(status === "done" ? web["web.logged"] : web["web.not-logged"])}</span>
+        ${current?.note === undefined || current.note === null || current.note.length === 0 ? "" : `<span class="note">${escapeHtml(format(web["web.calendar-note"], { note: current.note }))}</span>`}
+        ${comment === undefined || comment.text.length === 0 ? "" : `<span class="note">${escapeHtml(comment.text)}</span>`}
+      </a>`;
     })
     .join("\n");
   const body = `<section class="card">
-      <h2>${escapeHtml(format(web["web.week-title"], { day: input.weekStart }))}</h2>
-      <p class="week-nav muted">
+      <h2>${escapeHtml(title)}</h2>
+      <p class="period-nav">
         <a href="/week/${escapeHtml(input.prevWeek)}">${escapeHtml(web["web.week-prev"])}</a>
-        <a href="/month/${escapeHtml(input.month)}">${escapeHtml(web["web.week-back"])}</a>
+        <a class="chip quiet" href="/week/${escapeHtml(weekStart(today))}">${escapeHtml(web["web.grid-today"])}</a>
         <a href="/week/${escapeHtml(input.nextWeek)}">${escapeHtml(web["web.week-next"])}</a>
+        <a href="/month/${escapeHtml(input.month)}">${escapeHtml(web["web.nav-month"])}</a>
+        <a href="/">${escapeHtml(web["web.nav-week"])}</a>
       </p>
-      <ul class="week">${rows}</ul>
+      <div class="week-grid">${cards}</div>
     </section>`;
-  return layout({ locale: input.locale, title: format(web["web.week-title"], { day: input.weekStart }), body, signedIn: true });
+  return layout({ locale: input.locale, title, body, signedIn: true });
 }
 
 export interface ConnectionsPageInput {
