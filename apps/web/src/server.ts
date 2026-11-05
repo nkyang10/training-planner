@@ -33,7 +33,7 @@ import { exportDocument } from "@training-planner/storage";
 import type { CommentRecord, Repository, Sessions } from "@training-planner/storage";
 import { escapeHtml } from "./html";
 import { localClockOf } from "./local-clock";
-import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderConnections, renderConsole, renderDay, renderLogin, renderMonth, renderPain, renderReview, renderStats, renderSeason, renderWeek, renderWizard } from "./pages";
+import { renderAdminGuidelines, renderAdminLogin, renderCalendar, renderCoachPage, renderConnections, renderConsole, renderDay, renderLogin, renderMonth, renderPain, renderReview, renderStats, renderSeason, renderWeek, renderWizard } from "./pages";
 import { STYLES } from "./styles";
 
 export interface WebOptions {
@@ -437,6 +437,74 @@ export function createWeb(options: WebOptions): RequestListener {
         return;
       }
       redirect(response, `/?week=${weekStart(requested)}`);
+      return;
+    }
+
+    // The coach conversation (ADR-0011): the page reads the stored thread; a turn is proxied to the API, which owns the
+    // model, the grounding check and the store. A change still has to become a review the runner decides.
+    if (url.pathname === "/coach" || url.pathname === "/coach/review") {
+      const apiBase = options.apiBaseUrl ?? "http://127.0.0.1:8082";
+      const doFetch = options.fetchImpl ?? fetch;
+      const proxyJson = async (route: string, body: unknown): Promise<{ ok: boolean; status: number; detail: string; payload: Record<string, unknown> }> => {
+        try {
+          const response = await doFetch(`${apiBase}${route}`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${state.token ?? ""}`, "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const payload = (await response.json()) as Record<string, unknown>;
+          if (response.ok) return { ok: true, status: response.status, detail: "", payload };
+          const error = payload["error"];
+          const detail = typeof error === "object" && error !== null && typeof (error as Record<string, unknown>)["detail"] === "string" ? String((error as Record<string, unknown>)["detail"]) : `API answered ${response.status}`;
+          return { ok: false, status: response.status, detail, payload };
+        } catch (error) {
+          return { ok: false, status: 0, detail: error instanceof Error ? error.message : String(error), payload: {} };
+        }
+      };
+
+      if (method === "GET" && url.pathname === "/coach") {
+        const today = state.now.slice(0, 10);
+        const plan = repository.latestPlanVersionFor(userId, today);
+        const plannedKm = plan?.sessions.reduce((total, session) => total + (session.distanceKm ?? 0), 0) ?? 0;
+        const factsSummary = plan === undefined ? "no plan" : `${plan.sessions.length} sessions, ${Math.round(plannedKm * 10) / 10} km planned`;
+        sendHtml(
+          response,
+          200,
+          renderCoachPage({
+            locale: state.locale,
+            messages: repository.listCoachMessages(userId, 30),
+            factsSummary,
+            ...(url.searchParams.get("review") === null ? {} : { reviewId: url.searchParams.get("review") as string }),
+            ...(url.searchParams.get("error") === null ? {} : { error: url.searchParams.get("error") as string }),
+          }),
+        );
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/coach") {
+        const form = await readForm(request);
+        const question = (form.get("question") ?? "").trim();
+        if (question.length === 0) {
+          redirect(response, "/coach?error=" + encodeURIComponent("write a question first"));
+          return;
+        }
+        const result = await proxyJson("/coach/messages", { question });
+        redirect(response, result.ok ? "/coach?sent=1" : `/coach?error=${encodeURIComponent(result.detail)}`);
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/coach/review") {
+        const result = await proxyJson("/reviews/open", {});
+        const review = result.payload["review"];
+        if (result.ok && typeof review === "object" && review !== null) {
+          redirect(response, `/review/${encodeURIComponent(String((review as Record<string, unknown>)["reviewId"]))}`);
+          return;
+        }
+        redirect(response, `/coach?error=${encodeURIComponent(result.detail.length === 0 ? "no review was opened" : result.detail)}`);
+        return;
+      }
+
+      sendHtml(response, 404, renderLogin(state.locale, "no such coach route"));
       return;
     }
 

@@ -12,7 +12,7 @@
  * - **idempotency is a uniqueness rule**: `appendEntryWithEventAndPointer` refuses a second row for an
  *   idempotency key that already exists. A middleware cannot give that guarantee; a unique index can.
  */
-import type { AiReviewProposal, AthleteProfile, Connection, ConnectionProvider, DayEntry, GuidelineContract, LlmConsent, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, SyncPreference, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
+import type { AiReviewProposal, AthleteProfile, CoachMessage, Connection, ConnectionProvider, DayEntry, GuidelineContract, LlmConsent, PainReport, PlanDiff, PlanVersion, ProfileRevision, PromptDelivery, Review, SyncPreference, TrainingEvent, WizardAnswerRecord } from "@training-planner/domain";
 import type { Locale } from "@training-planner/i18n";
 
 export interface SupersededPointer {
@@ -93,6 +93,13 @@ export interface Repository {
 
   saveComment(comment: CommentRecord): void;
   listComments(userId: string, day?: string): CommentRecord[];
+  /**
+   * The coach conversation for one user, oldest first. `limit` keeps the most recent N turns but returns them
+   * still oldest-first, so a transcript reads forward however much of it is loaded.
+   */
+  listCoachMessages(userId: string, limit?: number): CoachMessage[];
+  /** Append one coach turn. The conversation is append-only: a message is a row, never an edit. */
+  appendCoachMessage(message: CoachMessage): void;
   /** Append one AI-review audit row: the model's output, the gates' verdict, and the hashes (ADR-0009). */
   saveAiReviewProposal(record: AiReviewProposal): void;
   /** Every AI-review audit row for this user, oldest first. */

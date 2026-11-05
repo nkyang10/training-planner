@@ -45,6 +45,7 @@ import type { DatabaseSync as DatabaseSyncType } from "node:sqlite";
 import type {
   AiReviewProposal,
   AthleteProfile,
+  CoachMessage,
   Connection,
   DayEntry,
   GuidelineContract,
@@ -62,6 +63,20 @@ import type {
 import { promptDeliverySchema } from "@training-planner/domain";
 import { DuplicateIdempotencyError, type AppendEntryInput, type CommentRecord, type Repository } from "./types";
 import { SQLITE_SCHEMA } from "./sqlite-schema";
+
+/**
+ * The coach conversation's table. It is created here, next to the adapter that reads it, because the schema file
+ * describes the pre-existing tables and this change is scoped to the coach-message feature.
+ */
+const COACH_MESSAGES_SCHEMA = `
+CREATE TABLE IF NOT EXISTS coach_messages (
+  message_id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  payload TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS coach_messages_user_created ON coach_messages (user_id, created_at);
+`;
 
 export interface SqliteRepositoryOptions {
   filename: string;
@@ -148,6 +163,7 @@ export function createSqliteRepository(options: SqliteRepositoryOptions): Sqlite
   // is the kind of difference that only shows up in production.
   database.exec("PRAGMA foreign_keys = ON");
   database.exec(SQLITE_SCHEMA);
+  database.exec(COACH_MESSAGES_SCHEMA);
 
   const insertPlanVersion = (version: PlanVersion): void => {
     // Plan versions are immutable history. A second save of the same version id keeps the first row rather
@@ -474,6 +490,33 @@ export function createSqliteRepository(options: SqliteRepositoryOptions): Sqlite
               .prepare("SELECT payload FROM system_comments WHERE user_id = ? AND day = ? ORDER BY seq ASC")
               .all(userId, day);
       return rows.map((row) => decode<CommentRecord>(text(row, "payload")));
+    },
+
+    appendCoachMessage(message: CoachMessage): void {
+      database
+        .prepare("INSERT INTO coach_messages (message_id, user_id, created_at, payload) VALUES (?, ?, ?, ?)")
+        .run(message.messageId, message.userId, message.createdAt, encode(message));
+    },
+
+    listCoachMessages(userId: string, limit?: number): CoachMessage[] {
+      const rows =
+        limit === undefined
+          ? database
+              .prepare("SELECT payload FROM coach_messages WHERE user_id = ? ORDER BY created_at ASC, rowid ASC")
+              .all(userId)
+          : database
+              .prepare(
+                `SELECT payload FROM (
+                   SELECT payload, created_at, rowid
+                     FROM coach_messages
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC, rowid DESC
+                    LIMIT ?
+                 )
+                 ORDER BY created_at ASC, rowid ASC`,
+              )
+              .all(userId, Math.max(0, limit));
+      return rows.map((row) => decode<CoachMessage>(text(row, "payload")));
     },
 
     saveAiReviewProposal(record: AiReviewProposal): void {

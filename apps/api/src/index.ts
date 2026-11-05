@@ -5,7 +5,7 @@
  * so the process wrapper is the only untested-by-vitest part of the app - and it is four lines of wiring.
  */
 import { createMemorySessions, createRepositoryFromSpec } from "@training-planner/storage";
-import { modelPortFromEnv } from "./provider";
+import { coachChatPortFromEnv, modelPortFromEnv } from "./provider";
 import { startApi } from "./server";
 
 const port = Number(process.env["PORT"] ?? "8080");
@@ -19,12 +19,14 @@ if (tokens === undefined || tokens.length === 0) {
 const sessions = createMemorySessions(JSON.parse(tokens) as Record<string, string>);
 const database = createRepositoryFromSpec(process.env["TRAINING_PLANNER_DB"]);
 const modelPort = modelPortFromEnv(process.env);
+const coachChatPort = coachChatPortFromEnv(process.env);
 const modelId = process.env["TRAINING_PLANNER_MODEL_NAME"];
 const server = startApi({
   repository: database.repository,
   sessions,
   port,
   ...(modelPort === undefined ? {} : { modelPort, ...(modelId === undefined ? {} : { modelId }) }),
+  ...(coachChatPort === undefined ? {} : { coachChatPort }),
 });
 server.on("listening", () =>
   console.log(`api: listening on :${port} (database: ${database.kind}${modelPort === undefined ? ", no model port" : `, model: ${modelId ?? "configured"}`})`),

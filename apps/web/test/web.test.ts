@@ -1057,3 +1057,39 @@ describe("coach ask and one-tap sync", () => {
   });
 });
 
+describe("coach conversation", () => {
+  it("renders the thread page with the composer and the rail link", async () => {
+    const page = await call("/coach", { cookie: "session=token-a" });
+    expect(page.status).toBe(200);
+    expect(page.html).toContain("Coach conversation");
+    expect(page.html).toContain('action="/coach"');
+    expect(page.html).toContain('name="question"');
+    expect(page.html).toContain('href="/coach"');
+  });
+
+  it("sends a turn through the API proxy and comes back to the thread", async () => {
+    fakeApiFetch = async () => new Response(JSON.stringify({ reply: { reply: "Keep it easy." }, messages: [] }), { status: 201 });
+    const response = await fetch(`${base}/coach`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", cookie: "session=token-a" },
+      body: "question=How+did+I+do%3F",
+      redirect: "manual",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/coach?sent=1");
+    fakeApiFetch = undefined;
+  });
+
+  it("opens a review from the thread when the coach proposes one", async () => {
+    fakeApiFetch = async () => new Response(JSON.stringify({ status: "opened", review: { reviewId: "coach-review" } }), { status: 201 });
+    const response = await fetch(`${base}/coach/review`, {
+      method: "POST",
+      headers: { cookie: "session=token-a" },
+      redirect: "manual",
+    });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/review/coach-review");
+    fakeApiFetch = undefined;
+  });
+});
+
