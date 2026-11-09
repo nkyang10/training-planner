@@ -16,8 +16,8 @@ importers:
         version: 3.25.76
     devDependencies:
       '@types/node':
-        specifier: ^22.10.2
-        version: 22.20.5
+        specifier: ^26.6.6
+        version: 26.6.6
       fast-check:
         specifier: ^3.23.2
         version: 3.23.2
@@ -29,15 +29,47 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^2.1.8
-        version: 2.1.9(@types/node@22.20.5)
+        version: 2.1.9(@types/node@26.6.6)
+
+  packages/advisor: {}
 
   packages/cli: {}
 
+  packages/coach: {}
+
+  packages/coach-chat: {}
+
   packages/domain: {}
+
+  packages/entries: {}
+
+  packages/i18n: {}
 
   packages/knowledge: {}
 
+  packages/narrator: {}
+
+  packages/nudges: {}
+
+  packages/offline: {}
+
   packages/planner-core: {}
+
+  packages/policy: {}
+
+  packages/replan: {}
+
+  packages/review: {}
+
+  packages/season: {}
+
+  packages/signals: {}
+
+  packages/storage: {}
+
+  packages/triggers: {}
+
+  packages/worker: {}
 
 packages:
 
@@ -491,8 +523,8 @@ packages:
   '@types/estree@1.0.10':
     resolution: {integrity: sha512-lTyOMnOcmRBzdCv6/4zUZCrEhV0xrqQiUZBZtVcbmLHBXKLnN8q89v/wKRF/Q0HbwVsqbIG3o5HDoFl9sduM+g==}
 
-  '@types/node@22.20.5':
-    resolution: {integrity: sha512-U2+DNr+wSjpsTS/wZGYHq7GcwfuSmKiKvoPvK22zwTlRhU91yOniN4qRR5KhIjvif7ysw/dz/hKmfDH0Ris4aA==}
+  '@types/node@26.6.6':
+    resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
 
   '@vitest/expect@2.1.9':
     resolution: {integrity: sha512-UJCIkTBenHeKT1TTlKMJWy1laZewsRIzYighyYiJKZreqtdxSos/S1t+ktRMQWu2CKqaarrkeszJx1cgC5tGZw==}
@@ -658,8 +690,8 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  undici-types@6.21.0:
-    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
+  undici-types@8.9.0:
+    resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
   vite-node@2.1.9:
     resolution: {integrity: sha512-AM9aQ/IPrW/6ENLQg3AGY4K1N2TGZdR5e4gu/MmmR2xR3Ll1+dib+nook92g4TV3PXVyeyxdWwtaCAiUL0hMxA==}
@@ -969,9 +1001,9 @@ snapshots:
 
   '@types/estree@1.0.10': {}
 
-  '@types/node@22.20.5':
+  '@types/node@26.6.6':
     dependencies:
-      undici-types: 6.21.0
+      undici-types: 8.9.0
 
   '@vitest/expect@2.1.9':
     dependencies:
@@ -980,13 +1012,13 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 1.2.0
 
-  '@vitest/mocker@2.1.9(vite@5.4.21(@types/node@22.20.5))':
+  '@vitest/mocker@2.1.9(vite@5.4.21(@types/node@26.6.6))':
     dependencies:
       '@vitest/spy': 2.1.9
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 5.4.21(@types/node@22.20.5)
+      vite: 5.4.21(@types/node@26.6.6)
 
   '@vitest/pretty-format@2.1.9':
     dependencies:
@@ -1186,15 +1218,15 @@ snapshots:
 
   typescript@5.9.3: {}
 
-  undici-types@6.21.0: {}
+  undici-types@8.9.0: {}
 
-  vite-node@2.1.9(@types/node@22.20.5):
+  vite-node@2.1.9(@types/node@26.6.6):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3
       es-module-lexer: 1.7.0
       pathe: 1.1.2
-      vite: 5.4.21(@types/node@22.20.5)
+      vite: 5.4.21(@types/node@26.6.6)
     transitivePeerDependencies:
       - '@types/node'
       - less
@@ -1206,19 +1238,19 @@ snapshots:
       - supports-color
       - terser
 
-  vite@5.4.21(@types/node@22.20.5):
+  vite@5.4.21(@types/node@26.6.6):
     dependencies:
       esbuild: 0.21.5
       postcss: 8.5.32
       rollup: 4.67.4
     optionalDependencies:
-      '@types/node': 22.20.5
+      '@types/node': 26.6.6
       fsevents: 2.3.3
 
-  vitest@2.1.9(@types/node@22.20.5):
+  vitest@2.1.9(@types/node@26.6.6):
     dependencies:
       '@vitest/expect': 2.1.9
-      '@vitest/mocker': 2.1.9(vite@5.4.21(@types/node@22.20.5))
+      '@vitest/mocker': 2.1.9(vite@5.4.21(@types/node@26.6.6))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.9
       '@vitest/snapshot': 2.1.9
@@ -1234,11 +1266,11 @@ snapshots:
       tinyexec: 0.3.2
       tinypool: 1.1.1
       tinyrainbow: 1.2.0
-      vite: 5.4.21(@types/node@22.20.5)
-      vite-node: 2.1.9(@types/node@22.20.5)
+      vite: 5.4.21(@types/node@26.6.6)
+      vite-node: 2.1.9(@types/node@26.6.6)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@types/node': 22.20.5
+      '@types/node': 26.6.6
     transitivePeerDependencies:
       - less
       - lightningcss
