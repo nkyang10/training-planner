@@ -116,7 +116,7 @@ jobs:
           }
           'Vocabulary gate clean.'
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: '3.12' }
 
       - name: Contract instances (valid must validate, invalid must not)
@@ -289,7 +289,7 @@ jobs:
       # The phase gate runs the gates a phase claims. In the knowledge job it can check the corpus gates;
       # here, where node_modules exists, it can also run the test suite and the golden suite that M1's
       # criteria claim. A claim verified nowhere is a sentence, and a claim verified in two jobs is a claim.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: '3.12' }
       - name: Phase control (graph, states and done claims)
         shell: pwsh
